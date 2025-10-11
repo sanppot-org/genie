@@ -305,7 +305,7 @@ class TestUpbitAPIBuyMarketOrder:
             api = UpbitAPI(mock_config)
 
             with pytest.raises(UpbitAPIError) as exc_info:
-                api.buy_market_order()
+                api.buy_market_order(ticker='KRW-BTC', price=50000.0)
 
             assert exc_info.value.message == 'Insufficient funds.'
             assert exc_info.value.name == 'insufficient_funds'
@@ -340,7 +340,7 @@ class TestUpbitAPIBuyMarketOrder:
 
             api = UpbitAPI(mock_config)
 
-            result = api.buy_market_order()
+            result = api.buy_market_order(ticker='KRW-BTC', price=50000.0)
 
             assert isinstance(result, OrderResult)
             assert result.uuid == 'test-uuid-123'
@@ -371,7 +371,7 @@ class TestUpbitAPISellMarketOrder:
             api = UpbitAPI(mock_config)
 
             with pytest.raises(UpbitAPIError) as exc_info:
-                api.sell_market_order()
+                api.sell_market_order(ticker='KRW-BTC', volume=0.001)
 
             assert exc_info.value.message == 'Insufficient volume.'
             assert exc_info.value.name == 'insufficient_volume'
@@ -406,9 +406,85 @@ class TestUpbitAPISellMarketOrder:
 
             api = UpbitAPI(mock_config)
 
-            result = api.sell_market_order()
+            result = api.sell_market_order(ticker='KRW-BTC', volume=0.001)
 
             assert isinstance(result, OrderResult)
             assert result.uuid == 'test-uuid-456'
             assert result.side == OrderSide.ASK
             assert result.ord_type == OrderType.MARKET
+
+
+class TestUpbitAPISellMarketOrderByPrice:
+    """UpbitAPI.sell_market_order_by_price 메서드 테스트"""
+
+    @patch('src.upbit.upbit_api.pyupbit.Upbit')
+    @patch('src.upbit.upbit_api.get_current_price')
+    def test_sell_market_order_by_price_정상_반환(self, mock_get_current_price, mock_upbit_class):
+        """현재가로 수량 계산 후 매도 주문을 정상적으로 수행한다"""
+        # Mock 설정
+        mock_get_current_price.return_value = 100000000.0  # 1억원
+        
+        mock_upbit_instance = MagicMock()
+        mock_upbit_instance.sell_market_order.return_value = {
+            'uuid': 'test-uuid-789',
+            'side': 'ask',
+            'ord_type': 'market',
+            'price': '0',
+            'state': 'wait',
+            'market': 'KRW-BTC',
+            'created_at': '2024-01-01T00:00:00+09:00',
+            'volume': '0.0005',
+            'remaining_volume': '0.0005',
+            'reserved_fee': '0',
+            'remaining_fee': '0',
+            'paid_fee': '0',
+            'locked': '0.0005',
+            'executed_volume': '0',
+            'trades_count': 0
+        }
+        mock_upbit_class.return_value = mock_upbit_instance
+
+        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+            mock_config = MagicMock()
+            mock_config.upbit_access_key = "test_access"
+            mock_config.upbit_secret_key = "test_secret"
+
+            api = UpbitAPI(mock_config)
+            result = api.sell_market_order_by_price(ticker='KRW-BTC', price=50000.0)
+
+            # 검증
+            assert isinstance(result, OrderResult)
+            assert result.uuid == 'test-uuid-789'
+            assert result.side == OrderSide.ASK
+            
+            # get_current_price가 올바르게 호출되었는지 확인
+            mock_get_current_price.assert_called_once_with('KRW-BTC')
+            
+            # 계산된 volume으로 sell_market_order가 호출되었는지 확인
+            # volume = 50000.0 / 100000000.0 = 0.0005
+            mock_upbit_instance.sell_market_order.assert_called_once_with('KRW-BTC', 0.0005)
+
+    @patch('src.upbit.upbit_api.pyupbit.Upbit')
+    @patch('src.upbit.upbit_api.get_current_price')
+    def test_sell_market_order_by_price_현재가_0일때_예외_발생(self, mock_get_current_price, mock_upbit_class):
+        """현재가가 0일 때 ValueError 예외를 발생시킨다"""
+        # Mock 설정
+        mock_get_current_price.return_value = 0.0
+        
+        mock_upbit_instance = MagicMock()
+        mock_upbit_class.return_value = mock_upbit_instance
+
+        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+            mock_config = MagicMock()
+            mock_config.upbit_access_key = "test_access"
+            mock_config.upbit_secret_key = "test_secret"
+
+            api = UpbitAPI(mock_config)
+
+            with pytest.raises(ValueError) as exc_info:
+                api.sell_market_order_by_price(ticker='KRW-BTC', price=50000.0)
+
+            assert '현재가를 조회할 수 없습니다' in str(exc_info.value)
+            
+            # sell_market_order는 호출되지 않아야 함
+            mock_upbit_instance.sell_market_order.assert_not_called()

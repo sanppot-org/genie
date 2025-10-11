@@ -145,6 +145,29 @@ class UpbitAPI:
         self._check_api_error(result)
         return OrderResult.from_dict(result)
 
+    def sell_market_order_by_price(self, ticker: str, price: float) -> OrderResult:
+        """
+        KRW 금액 기반 시장가 매도 주문
+
+        Args:
+            ticker: 마켓 ID (예: 'KRW-BTC')
+            price: 매도할 금액 (KRW)
+
+        Returns:
+            주문 결과
+
+        Raises:
+            ValueError: 현재가가 0이거나 조회 실패 시
+            UpbitAPIError: API 호출 중 에러가 발생한 경우
+        """
+        current_price = get_current_price(ticker)
+        
+        if current_price == 0.0:
+            raise ValueError(f"현재가를 조회할 수 없습니다: {ticker}")
+        
+        volume = price / current_price
+        return self.sell_market_order(ticker, volume)
+
     @staticmethod
     def _check_api_error(result: dict | list | None):
         """
