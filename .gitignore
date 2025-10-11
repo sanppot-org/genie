@@ -1,2 +1,6 @@
 .idea
 genie.egg-info
+__pycache__
+.serena
+.DS_Store
+.pytest_cache
