@@ -78,8 +78,6 @@ def get_candles(
 
 class UpbitAPI:
     def __init__(self, config: Config):
-        if not config.upbit_access_key or not config.upbit_secret_key:
-            raise ValueError("업비트 API 키가 설정되지 않았습니다")
         self.upbit = pyupbit.Upbit(config.upbit_access_key, config.upbit_secret_key)
 
     def get_balance(self, currency: str = const.CURRENCY_KRW) -> float:
