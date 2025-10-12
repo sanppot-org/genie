@@ -35,7 +35,7 @@ class TestSellMarketOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.sell_market_order(ticker="005930", quantity="10")
+        result = api.sell_market_order(ticker="005930", quantity=10)
 
         # Then
         assert result.rt_cd == "0"
@@ -83,7 +83,7 @@ class TestSellMarketOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.sell_market_order(ticker="005930", quantity="10")
+        result = api.sell_market_order(ticker="005930", quantity=10)
 
         # Then
         assert result.rt_cd == "0"
@@ -109,7 +109,7 @@ class TestSellMarketOrder:
 
         # When & Then
         with pytest.raises(Exception) as exc_info:
-            api.sell_market_order(ticker="005930", quantity="10")
+            api.sell_market_order(ticker="005930", quantity=10)
 
         assert "주식 주문 실패" in str(exc_info.value)
 
@@ -139,7 +139,7 @@ class TestSellMarketOrder:
 
         # When & Then
         with pytest.raises(Exception) as exc_info:
-            api.sell_market_order(ticker="005930", quantity="10")
+            api.sell_market_order(ticker="005930", quantity=10)
 
         assert "주문 실패" in str(exc_info.value)
 
@@ -171,7 +171,7 @@ class TestSellLimitOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.sell_limit_order(ticker="005930", quantity="10", price="70000")
+        result = api.sell_limit_order(ticker="005930", quantity=10, price=70000)
 
         # Then
         assert result.rt_cd == "0"
@@ -213,7 +213,7 @@ class TestSellLimitOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.sell_limit_order(ticker="005930", quantity="10", price="70000")
+        result = api.sell_limit_order(ticker="005930", quantity=10, price=70000)
 
         # Then
         assert result.rt_cd == "0"
@@ -250,7 +250,7 @@ class TestBuyMarketOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.buy_market_order(ticker="005930", price="100000")
+        result = api.buy_market_order(ticker="005930", price=100000)
 
         # Then
         assert result.rt_cd == "0"
@@ -292,7 +292,7 @@ class TestBuyMarketOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.buy_market_order(ticker="005930", price="100000")
+        result = api.buy_market_order(ticker="005930", price=100000)
 
         # Then
         assert result.rt_cd == "0"
@@ -334,7 +334,7 @@ class TestBuyLimitOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.buy_limit_order(ticker="005930", quantity="10", price="70000")
+        result = api.buy_limit_order(ticker="005930", quantity=10, price=70000)
 
         # Then
         assert result.rt_cd == "0"
@@ -376,7 +376,7 @@ class TestBuyLimitOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.buy_limit_order(ticker="005930", quantity="10", price="70000")
+        result = api.buy_limit_order(ticker="005930", quantity=10, price=70000)
 
         # Then
         assert result.rt_cd == "0"

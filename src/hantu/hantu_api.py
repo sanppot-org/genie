@@ -87,7 +87,7 @@ class HantuAPI:
             logger.error(f"Error Code : {res.status_code} | {res.text}")
             raise Exception(f"주식 시세 조회 실패: {res.text}")
 
-    def sell_market_order(self, ticker: str, quantity: str) -> order.ResponseBody:
+    def sell_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
         """시장가 매도 주문
 
         Args:
@@ -102,10 +102,10 @@ class HantuAPI:
             ord_dvsn=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
-            price="0"  # 시장가는 0
+            price=0
         )
 
-    def sell_limit_order(self, ticker: str, quantity: str, price: str) -> order.ResponseBody:
+    def sell_limit_order(self, ticker: str, quantity: int, price: int) -> order.ResponseBody:
         """지정가 매도 주문
 
         Args:
@@ -124,7 +124,7 @@ class HantuAPI:
             price=price
         )
 
-    def buy_market_order(self, ticker: str, price: str) -> order.ResponseBody:
+    def buy_market_order(self, ticker: str, price: int) -> order.ResponseBody:
         """시장가 매수 주문
 
         Args:
@@ -139,10 +139,10 @@ class HantuAPI:
             ord_dvsn=OrderDivision.MARKET,
             ticker=ticker,
             quantity=price,  # 시장가 매수는 매수 금액을 수량 필드에 전달
-            price="0"  # 시장가는 0
+            price=0
         )
 
-    def buy_limit_order(self, ticker: str, quantity: str, price: str) -> order.ResponseBody:
+    def buy_limit_order(self, ticker: str, quantity: int, price: int) -> order.ResponseBody:
         """지정가 매수 주문
 
         Args:
@@ -166,8 +166,8 @@ class HantuAPI:
             ord_dv: OrderDirection,
             ord_dvsn: OrderDivision,
             ticker: str,
-            quantity: str,
-            price: str
+            quantity: int,
+            price: int
     ) -> order.ResponseBody:
         """주식 주문 (내부 메서드)
 
@@ -176,7 +176,7 @@ class HantuAPI:
             ord_dvsn: 주문 구분 (OrderDivision.LIMIT 또는 OrderDivision.MARKET)
             ticker: 종목코드 (예: 005930)
             quantity: 주문 수량
-            price: 주문 단가 (시장가일 경우 "0")
+            price: 주문 단가 (시장가일 경우 0)
 
         Returns:
             order.ResponseBody: 주문 응답
@@ -184,7 +184,7 @@ class HantuAPI:
         URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
 
         # TR_ID 설정 (계좌 타입과 매수/매도 구분에 따라 다름)
-        tr_id = self.ORDER_TR_ID_MAP[self.account_type, ord_dv] # type: ignore[index]
+        tr_id = self.ORDER_TR_ID_MAP[self.account_type, ord_dv]  # type: ignore[index]
 
         header = order.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -198,8 +198,8 @@ class HantuAPI:
             ACNT_PRDT_CD=self.acnt_prdt_cd,
             PDNO=ticker,
             ORD_DVSN=ord_dvsn.value,
-            ORD_QTY=quantity,
-            ORD_UNPR=price,
+            ORD_QTY=str(quantity),
+            ORD_UNPR=str(price),
         )
 
         # 호출
