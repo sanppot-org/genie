@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from src.config import Config
+from src.config import UpbitConfig
 
 
 class TestConfig:
@@ -18,7 +18,7 @@ class TestConfig:
             'UPBIT_ACCESS_KEY': 'test_access_key',
             'UPBIT_SECRET_KEY': 'test_secret_key',
         }):
-            config = Config(_env_file='nonexistent.env')
+            config = UpbitConfig(_env_file='nonexistent.env')
 
             assert config.upbit_access_key == 'test_access_key'
             assert config.upbit_secret_key == 'test_secret_key'
@@ -27,7 +27,7 @@ class TestConfig:
         """필수 필드가 누락되면 ValidationError가 발생한다"""
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(ValidationError) as exc_info:
-                Config(_env_file='nonexistent.env')
+                UpbitConfig(_env_file='nonexistent.env')
 
             errors = exc_info.value.errors()
             error_fields = {error['loc'][0] for error in errors}
@@ -41,7 +41,7 @@ class TestConfig:
             'UPBIT_SECRET_KEY': 'test_secret_key',
         }, clear=True):
             with pytest.raises(ValidationError) as exc_info:
-                Config(_env_file='nonexistent.env')
+                UpbitConfig(_env_file='nonexistent.env')
 
             errors = exc_info.value.errors()
             error_fields = {error['loc'][0] for error in errors}
@@ -55,7 +55,7 @@ class TestConfig:
             'UPBIT_ACCESS_KEY': 'test_access_key',
         }, clear=True):
             with pytest.raises(ValidationError) as exc_info:
-                Config(_env_file='nonexistent.env')
+                UpbitConfig(_env_file='nonexistent.env')
 
             errors = exc_info.value.errors()
             error_fields = {error['loc'][0] for error in errors}
@@ -70,7 +70,7 @@ class TestConfig:
             'UPBIT_SECRET_KEY': 'test_secret_key',
         }, clear=True):
             with pytest.raises(ValidationError) as exc_info:
-                Config(_env_file='nonexistent.env')
+                UpbitConfig(_env_file='nonexistent.env')
 
             errors = exc_info.value.errors()
             error_fields = {error['loc'][0] for error in errors}
@@ -83,7 +83,7 @@ class TestConfig:
             'UPBIT_ACCESS_KEY': 'env_access_key',
             'UPBIT_SECRET_KEY': 'env_secret_key',
         }):
-            config = Config()
+            config = UpbitConfig()
 
             assert config.upbit_access_key == 'env_access_key'
             assert config.upbit_secret_key == 'env_secret_key'
@@ -91,7 +91,7 @@ class TestConfig:
     def test_Config_호출시_기본_env_파일_로드(self):
         """Config()만 호출하면 기본 .env 파일(config/genie/.env)을 읽는다"""
         with patch.dict(os.environ, {}, clear=True):
-            config = Config()
+            config = UpbitConfig()
 
             # config/genie/.env 파일의 값을 읽어야 함 (값 존재 여부만 확인)
             assert config.upbit_access_key is not None

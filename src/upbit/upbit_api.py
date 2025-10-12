@@ -11,7 +11,7 @@ import pyupbit
 from pandas import DataFrame
 
 from src import constants as const
-from src.config import Config
+from src.config import UpbitConfig
 from src.upbit.model.balance import BalanceInfo
 from src.upbit.model.candle import CandleData
 from src.upbit.model.error import UpbitAPIError
@@ -77,7 +77,7 @@ def get_candles(
 
 
 class UpbitAPI:
-    def __init__(self, config: Config):
+    def __init__(self, config: UpbitConfig):
         self.upbit = pyupbit.Upbit(config.upbit_access_key, config.upbit_secret_key)
 
     def get_balance(self, currency: str = const.CURRENCY_KRW) -> float:
@@ -159,10 +159,10 @@ class UpbitAPI:
             UpbitAPIError: API 호출 중 에러가 발생한 경우
         """
         current_price = get_current_price(ticker)
-        
+
         if current_price == 0.0:
             raise ValueError(f"현재가를 조회할 수 없습니다: {ticker}")
-        
+
         volume = price / current_price
         return self.sell_market_order(ticker, volume)
 

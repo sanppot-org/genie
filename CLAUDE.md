@@ -99,7 +99,7 @@ git submodule update --remote
 ### API 사용 예제
 
 ```python
-from src.config import Config
+from src.config import UpbitConfig
 from src.upbit.upbit_api import UpbitAPI, get_current_price, get_candles
 
 # 공개 API (인증 불필요)
@@ -107,7 +107,7 @@ current_price = get_current_price()
 candles = get_candles()
 
 # 인증이 필요한 API
-config = Config()  # .env에서 API 키 로드
+config = UpbitConfig()  # .env에서 API 키 로드
 api = UpbitAPI(config)
 
 # 잔고 조회
@@ -136,6 +136,7 @@ sell_order = api.sell_market_order(ticker='KRW-ETH', volume=0.001)
 ### 환경 변수
 
 `.env` 파일 예시:
+
 ```bash
 UPBIT_ACCESS_KEY=your_access_key_here
 UPBIT_SECRET_KEY=your_secret_key_here

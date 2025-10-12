@@ -102,7 +102,7 @@ class TestUpbitAPIGetBalance:
         mock_upbit_class.return_value = mock_upbit_instance
 
         # Config mock
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -123,7 +123,7 @@ class TestUpbitAPIGetBalance:
         mock_upbit_class.return_value = mock_upbit_instance
 
         # Config mock
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -140,7 +140,7 @@ class TestUpbitAPIGetBalance:
         mock_upbit_instance = MagicMock()
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -164,7 +164,7 @@ class TestUpbitAPIGetBalance:
         mock_upbit_instance.get_balance.return_value = 1.5
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -204,7 +204,7 @@ class TestUpbitAPIGetBalances:
         ]
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -231,7 +231,7 @@ class TestUpbitAPIGetBalances:
         }
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -251,7 +251,7 @@ class TestUpbitAPIGetBalances:
         mock_upbit_instance.get_balances.return_value = None
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -271,7 +271,7 @@ class TestUpbitAPIGetBalances:
         mock_upbit_instance.get_balances.return_value = []
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -297,7 +297,7 @@ class TestUpbitAPIBuyMarketOrder:
         }
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -333,7 +333,7 @@ class TestUpbitAPIBuyMarketOrder:
         }
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -363,7 +363,7 @@ class TestUpbitAPISellMarketOrder:
         }
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -399,7 +399,7 @@ class TestUpbitAPISellMarketOrder:
         }
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -423,7 +423,7 @@ class TestUpbitAPISellMarketOrderByPrice:
         """현재가로 수량 계산 후 매도 주문을 정상적으로 수행한다"""
         # Mock 설정
         mock_get_current_price.return_value = 100000000.0  # 1억원
-        
+
         mock_upbit_instance = MagicMock()
         mock_upbit_instance.sell_market_order.return_value = {
             'uuid': 'test-uuid-789',
@@ -444,7 +444,7 @@ class TestUpbitAPISellMarketOrderByPrice:
         }
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -456,10 +456,10 @@ class TestUpbitAPISellMarketOrderByPrice:
             assert isinstance(result, OrderResult)
             assert result.uuid == 'test-uuid-789'
             assert result.side == OrderSide.ASK
-            
+
             # get_current_price가 올바르게 호출되었는지 확인
             mock_get_current_price.assert_called_once_with('KRW-BTC')
-            
+
             # 계산된 volume으로 sell_market_order가 호출되었는지 확인
             # volume = 50000.0 / 100000000.0 = 0.0005
             mock_upbit_instance.sell_market_order.assert_called_once_with('KRW-BTC', 0.0005)
@@ -470,11 +470,11 @@ class TestUpbitAPISellMarketOrderByPrice:
         """현재가가 0일 때 ValueError 예외를 발생시킨다"""
         # Mock 설정
         mock_get_current_price.return_value = 0.0
-        
+
         mock_upbit_instance = MagicMock()
         mock_upbit_class.return_value = mock_upbit_instance
 
-        with patch('src.upbit.upbit_api.Config') as mock_config_class:
+        with patch('src.upbit.upbit_api.UpbitConfig') as mock_config_class:
             mock_config = MagicMock()
             mock_config.upbit_access_key = "test_access"
             mock_config.upbit_secret_key = "test_secret"
@@ -485,6 +485,6 @@ class TestUpbitAPISellMarketOrderByPrice:
                 api.sell_market_order_by_price(ticker='KRW-BTC', price=50000.0)
 
             assert '현재가를 조회할 수 없습니다' in str(exc_info.value)
-            
+
             # sell_market_order는 호출되지 않아야 함
             mock_upbit_instance.sell_market_order.assert_not_called()
