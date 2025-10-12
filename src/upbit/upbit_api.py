@@ -7,7 +7,7 @@
 import logging
 from enum import Enum
 
-import pyupbit
+import pyupbit  # type: ignore
 from pandas import DataFrame
 
 from src import constants as const

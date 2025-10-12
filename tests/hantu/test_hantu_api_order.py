@@ -3,7 +3,7 @@
 import pytest
 
 from src.config import HantuConfig
-from src.hantu.hantu_api import HantuAPI
+from src.hantu.domestic_api import HantuDomesticAPI
 from src.hantu.model import AccountType
 
 
@@ -14,7 +14,7 @@ class TestSellMarketOrder:
         """가상 계좌로 시장가 매도 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -62,7 +62,7 @@ class TestSellMarketOrder:
         """실제 계좌로 시장가 매도 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.REAL)
+        api = HantuDomesticAPI(config, AccountType.REAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -96,7 +96,7 @@ class TestSellMarketOrder:
         """시장가 매도 주문 실패"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -117,7 +117,7 @@ class TestSellMarketOrder:
         """응답 코드가 실패인 경우"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -151,7 +151,7 @@ class TestSellLimitOrder:
         """가상 계좌로 지정가 매도 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -193,7 +193,7 @@ class TestSellLimitOrder:
         """실제 계좌로 지정가 매도 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.REAL)
+        api = HantuDomesticAPI(config, AccountType.REAL)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -230,7 +230,7 @@ class TestBuyMarketOrder:
         """가상 계좌로 시장가 매수 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -272,7 +272,7 @@ class TestBuyMarketOrder:
         """실제 계좌로 시장가 매수 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.REAL)
+        api = HantuDomesticAPI(config, AccountType.REAL)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -314,7 +314,7 @@ class TestBuyLimitOrder:
         """가상 계좌로 지정가 매수 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -356,7 +356,7 @@ class TestBuyLimitOrder:
         """실제 계좌로 지정가 매수 주문"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.REAL)
+        api = HantuDomesticAPI(config, AccountType.REAL)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 

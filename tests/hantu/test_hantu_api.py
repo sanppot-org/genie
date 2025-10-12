@@ -1,12 +1,12 @@
-"""한국투자증권 API 테스트"""
+"""한국투자증권 국내 주식 API 테스트"""
 
 from src.config import HantuConfig
-from src.hantu.hantu_api import HantuAPI
+from src.hantu.domestic_api import HantuDomesticAPI
 from src.hantu.model import AccountType
 
 
-class TestHantuAPIInit:
-    """HantuAPI 초기화 테스트"""
+class TestHantuDomesticAPIInit:
+    """HantuDomesticAPI 초기화 테스트"""
 
     def test_init_with_real_account(self):
         """실제 계좌로 초기화 시 실제 계좌 설정 사용"""
@@ -14,7 +14,7 @@ class TestHantuAPIInit:
         config = HantuConfig()
 
         # When
-        api = HantuAPI(config, AccountType.REAL)
+        api = HantuDomesticAPI(config, AccountType.REAL)
 
         # Then
         assert api.account_type == AccountType.REAL
@@ -31,7 +31,7 @@ class TestHantuAPIInit:
         config = HantuConfig()
 
         # When
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # Then
         assert api.account_type == AccountType.VIRTUAL
@@ -48,8 +48,8 @@ class TestHantuAPIInit:
         config = HantuConfig()
 
         # When
-        real_api = HantuAPI(config, AccountType.REAL)
-        virtual_api = HantuAPI(config, AccountType.VIRTUAL)
+        real_api = HantuDomesticAPI(config, AccountType.REAL)
+        virtual_api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # Then
         assert real_api.app_key != virtual_api.app_key
@@ -65,7 +65,7 @@ class TestGetBalance:
         """단일 페이지 응답 (연속 조회 불필요)"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -159,7 +159,7 @@ class TestGetBalance:
         """다중 페이지 응답 (연속 조회 필요)"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -305,7 +305,7 @@ class TestGetBalance:
         """API 에러 응답"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')

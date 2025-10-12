@@ -4,7 +4,7 @@
 import pytest
 
 from src.config import HantuConfig
-from src.hantu.hantu_api import HantuAPI
+from src.hantu.domestic_api import HantuDomesticAPI
 from src.hantu.model import AccountType, MarketCode
 
 
@@ -15,7 +15,7 @@ class TestGetStockPrice:
         """정상적인 시세 조회 - 삼성전자"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -64,7 +64,7 @@ class TestGetStockPrice:
         """시장 코드 지정하여 조회"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -108,7 +108,7 @@ class TestGetStockPrice:
         """코스닥 종목 조회 - 카카오"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -151,7 +151,7 @@ class TestGetStockPrice:
         """응답 구조 검증"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -198,7 +198,7 @@ class TestGetStockPrice:
         """API 에러 응답"""
         # Given
         config = HantuConfig()
-        api = HantuAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
