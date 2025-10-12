@@ -6,7 +6,8 @@ from typing import List, Tuple
 import requests
 
 from src.config import HantuConfig
-from src.hantu.model import AccountType, MarketCode, access_token, balance, stock_price
+from src.hantu.model import AccountType, MarketCode, access_token, balance, order, stock_price
+from src.hantu.model.order import OrderDirection, OrderDivision
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,138 @@ class HantuAPI:
             logger.error(f"Error Code : {res.status_code} | {res.text}")
             raise Exception(f"주식 시세 조회 실패: {res.text}")
 
+    def sell_market_order(self, ticker: str, quantity: str) -> order.ResponseBody:
+        """시장가 매도 주문
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            quantity: 주문 수량
+
+        Returns:
+            order.ResponseBody: 주문 응답
+        """
+        return self._order(
+            ord_dv=OrderDirection.SELL,
+            ord_dvsn=OrderDivision.MARKET,
+            ticker=ticker,
+            quantity=quantity,
+            price="0"  # 시장가는 0
+        )
+
+    def sell_limit_order(self, ticker: str, quantity: str, price: str) -> order.ResponseBody:
+        """지정가 매도 주문
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            quantity: 주문 수량
+            price: 주문 단가
+
+        Returns:
+            order.ResponseBody: 주문 응답
+        """
+        return self._order(
+            ord_dv=OrderDirection.SELL,
+            ord_dvsn=OrderDivision.LIMIT,
+            ticker=ticker,
+            quantity=quantity,
+            price=price
+        )
+
+    def buy_market_order(self, ticker: str, price: str) -> order.ResponseBody:
+        """시장가 매수 주문
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            price: 매수 금액 (원)
+
+        Returns:
+            order.ResponseBody: 주문 응답
+        """
+        return self._order(
+            ord_dv=OrderDirection.BUY,
+            ord_dvsn=OrderDivision.MARKET,
+            ticker=ticker,
+            quantity=price,  # 시장가 매수는 매수 금액을 수량 필드에 전달
+            price="0"  # 시장가는 0
+        )
+
+    def buy_limit_order(self, ticker: str, quantity: str, price: str) -> order.ResponseBody:
+        """지정가 매수 주문
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            quantity: 주문 수량
+            price: 주문 단가
+
+        Returns:
+            order.ResponseBody: 주문 응답
+        """
+        return self._order(
+            ord_dv=OrderDirection.BUY,
+            ord_dvsn=OrderDivision.LIMIT,
+            ticker=ticker,
+            quantity=quantity,
+            price=price
+        )
+
+    def _order(
+            self,
+            ord_dv: OrderDirection,
+            ord_dvsn: OrderDivision,
+            ticker: str,
+            quantity: str,
+            price: str
+    ) -> order.ResponseBody:
+        """주식 주문 (내부 메서드)
+
+        Args:
+            ord_dv: 매수/매도 구분 (OrderDirection.BUY 또는 OrderDirection.SELL)
+            ord_dvsn: 주문 구분 (OrderDivision.LIMIT 또는 OrderDivision.MARKET)
+            ticker: 종목코드 (예: 005930)
+            quantity: 주문 수량
+            price: 주문 단가 (시장가일 경우 "0")
+
+        Returns:
+            order.ResponseBody: 주문 응답
+        """
+        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
+
+        # TR_ID 설정 (계좌 타입과 매수/매도 구분에 따라 다름)
+        tr_id = self.ORDER_TR_ID_MAP[self.account_type, ord_dv] # type: ignore[index]
+
+        header = order.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+            tr_id=tr_id,
+        )
+
+        body = order.RequestBody(
+            CANO=self.cano,
+            ACNT_PRDT_CD=self.acnt_prdt_cd,
+            PDNO=ticker,
+            ORD_DVSN=ord_dvsn.value,
+            ORD_QTY=quantity,
+            ORD_UNPR=price,
+        )
+
+        # 호출
+        res = requests.post(
+            URL,
+            headers=header.model_dump(by_alias=True),
+            data=body.model_dump_json()
+        )
+
+        if res.status_code == 200:
+            response_body = order.ResponseBody.model_validate(res.json())
+            if response_body.rt_cd != "0":
+                logger.error(f"주문 실패: {response_body.msg1}")
+                raise Exception(f"주문 실패: {response_body.msg1}")
+            return response_body
+        else:
+            logger.error(f"Error Code : {res.status_code} | {res.text}")
+            raise Exception(f"주식 주문 실패: {res.text}")
+
     def _get_balance_recursive(
             self,
             ctx_area_fk100: str = "",
@@ -107,7 +240,7 @@ class HantuAPI:
         if accumulated_output1 is None:
             accumulated_output1 = []
 
-        URL = f"{self.config.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
+        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
 
         header = balance.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -200,3 +333,11 @@ class HantuAPI:
             return self._make_token()
 
         return data.access_token
+
+    # TR_ID 매핑 (계좌 타입, 주문 방향) -> TR_ID
+    ORDER_TR_ID_MAP = {
+        (AccountType.REAL, OrderDirection.SELL): "TTTC0011U",  # 실전 매도
+        (AccountType.REAL, OrderDirection.BUY): "TTTC0012U",  # 실전 매수
+        (AccountType.VIRTUAL, OrderDirection.SELL): "VTTC0011U",  # 모의 매도
+        (AccountType.VIRTUAL, OrderDirection.BUY): "VTTC0012U",  # 모의 매수
+    }
