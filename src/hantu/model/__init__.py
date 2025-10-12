@@ -2,5 +2,6 @@
 
 from src.hantu.model import stock_price
 from src.hantu.model.account_type import AccountType
+from src.hantu.model.market_code import MarketCode
 
-__all__ = ["AccountType", "stock_price"]
+__all__ = ["AccountType", "stock_price", "MarketCode"]

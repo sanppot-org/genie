@@ -6,7 +6,7 @@ from typing import List, Tuple
 import requests
 
 from src.config import HantuConfig
-from src.hantu.model import AccountType, access_token, balance, stock_price
+from src.hantu.model import AccountType, MarketCode, access_token, balance, stock_price
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +50,12 @@ class HantuAPI:
         output1, output2 = self._get_balance_recursive()
         return balance.BalanceResponse(output1=output1, output2=output2)
 
-    def get_stock_price(self, ticker: str, market_code: str = "J") -> stock_price.ResponseBody:
+    def get_stock_price(self, ticker: str, market_code: MarketCode = MarketCode.KRX) -> stock_price.ResponseBody:
         """주식 현재가 시세 조회
 
         Args:
             ticker: 종목코드 (예: 005930)
-            market_code: 시장 분류 코드 (J:KRX, NX:NXT, UN:통합) 기본값은 J
+            market_code: 시장 분류 코드 (기본값: MarketCode.KRX)
 
         Returns:
             stock_price.ResponseBody: 주식 현재가 시세 정보
