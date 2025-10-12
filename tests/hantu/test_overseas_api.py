@@ -3,7 +3,9 @@
 import pytest
 
 from src.config import HantuConfig
-from src.hantu.model import AccountType, OverseasExchangeCode, TradingCurrencyCode
+from src.hantu.model.domestic.account_type import AccountType
+from src.hantu.model.domestic.trading_currency_code import TradingCurrencyCode
+from src.hantu.model.overseas.exchange_code import OverseasExchangeCode
 from src.hantu.overseas_api import HantuOverseasAPI
 
 

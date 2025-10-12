@@ -4,7 +4,8 @@ from pathlib import Path
 import requests
 
 from src.config import HantuConfig
-from src.hantu.model import AccountType, access_token
+from src.hantu.model import access_token
+from src.hantu.model.domestic.account_type import AccountType
 
 logger = logging.getLogger(__name__)
 

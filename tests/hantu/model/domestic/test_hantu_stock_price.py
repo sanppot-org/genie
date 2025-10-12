@@ -1,7 +1,7 @@
 """주식 현재가 시세 모델 테스트"""
 
-from src.hantu.model import stock_price
-from src.hantu.model.market_code import MarketCode
+from src.hantu.model.domestic import stock_price
+from src.hantu.model.domestic.market_code import MarketCode
 
 
 class TestRequestQueryParam:

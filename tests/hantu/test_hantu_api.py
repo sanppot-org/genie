@@ -2,7 +2,7 @@
 
 from src.config import HantuConfig
 from src.hantu.domestic_api import HantuDomesticAPI
-from src.hantu.model import AccountType
+from src.hantu.model.domestic.account_type import AccountType
 
 
 class TestHantuDomesticAPIInit:

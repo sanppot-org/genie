@@ -1,6 +1,6 @@
 """주문 모델 테스트"""
 
-from src.hantu.model.order import RequestHeader, RequestBody, OrderOutput, ResponseBody
+from src.hantu.model.domestic.order import RequestHeader, RequestBody, OrderOutput, ResponseBody
 
 
 class TestRequestHeader:

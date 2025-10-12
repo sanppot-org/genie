@@ -5,8 +5,10 @@ from typing import List, Tuple
 import requests
 
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model import AccountType, MarketCode, balance, order, stock_price
-from src.hantu.model.order import OrderDirection, OrderDivision
+from src.hantu.model.domestic import balance, order, stock_price
+from src.hantu.model.domestic.account_type import AccountType
+from src.hantu.model.domestic.market_code import MarketCode
+from src.hantu.model.domestic.order import OrderDirection, OrderDivision
 
 logger = logging.getLogger(__name__)
 

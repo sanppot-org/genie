@@ -5,7 +5,17 @@ from typing import List, Tuple
 import requests
 
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model import AccountType, OverseasExchangeCode, TradingCurrencyCode, overseas_balance
+from src.hantu.model.domestic.account_type import AccountType
+from src.hantu.model.domestic.trading_currency_code import TradingCurrencyCode
+from src.hantu.model.overseas import balance as overseas_balance
+from src.hantu.model.overseas.asset_type import OverseasAssetType
+from src.hantu.model.overseas.candle_period import OverseasCandlePeriod
+from src.hantu.model.overseas.exchange_code import OverseasExchangeCode
+from src.hantu.model.overseas.market_code import OverseasMarketCode
+from src.hantu.model.overseas.price import (
+    OverseasCurrentPriceResponse,
+    OverseasDailyCandleResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,3 +133,101 @@ class HantuOverseasAPI(HantuBaseAPI):
         else:
             logger.error(f"Error Code : {res.status_code} | {res.text}")
             raise Exception(f"해외 주식 잔고 조회 실패: {res.text}")
+
+    def get_current_price(
+            self, excd: OverseasMarketCode = OverseasMarketCode.NYS, symb: str = ""
+    ) -> OverseasCurrentPriceResponse:
+        """해외 주식 현재체결가 조회
+
+        Args:
+            excd: 거래소코드 (OverseasMarketCode enum, 기본값: NYS)
+            symb: 종목코드 (예: AAPL, TSLA 등)
+
+        Returns:
+            OverseasCurrentPriceResponse: 현재체결가 정보
+
+        Raises:
+            ValueError: 필수 파라미터가 누락된 경우
+            Exception: API 호출 실패 시
+        """
+        if not symb:
+            raise ValueError("종목코드(symb)는 필수입니다")
+
+        URL = f"{self.url_base}/uapi/overseas-price/v1/quotations/price"
+        headers = {
+            "authorization": f"Bearer {self._get_token()}",
+            "appkey": self.app_key,
+            "appsecret": self.app_secret,
+            "tr_id": "HHDFS00000300",
+        }
+
+        params = {
+            "AUTH": "",
+            "EXCD": excd.value,
+            "SYMB": symb,
+        }
+
+        res = requests.get(URL, headers=headers, params=params)
+
+        if res.status_code == 200 and res.json()["rt_cd"] == "0":
+            return OverseasCurrentPriceResponse.model_validate(res.json())
+        else:
+            logger.error(f"Error Code : {res.status_code} | {res.text}")
+            raise Exception(f"해외 주식 현재가 조회 실패: {res.text}")
+
+    def get_daily_candles(
+            self,
+            symb: str,
+            start_date: str,
+            end_date: str,
+            excd: OverseasAssetType = OverseasAssetType.INDEX,
+            period: OverseasCandlePeriod = OverseasCandlePeriod.DAILY,
+    ) -> OverseasDailyCandleResponse:
+        """해외 주식 일/주/월/년 캔들 데이터 조회
+
+        Args:
+            symb: 종목코드
+            start_date: 시작일자 (YYYYMMDD)
+            end_date: 종료일자 (YYYYMMDD)
+            excd: 자산 유형 코드 (OverseasAssetType enum)
+            period: 기간구분 (OverseasCandlePeriod enum, 기본값: DAILY)
+
+        Returns:
+            OverseasDailyCandleResponse: 캔들 데이터 목록
+
+        Raises:
+            ValueError: 필수 파라미터가 누락된 경우
+            Exception: API 호출 실패 시
+        """
+        if not symb:
+            raise ValueError("종목코드(symb)는 필수입니다")
+        if not start_date:
+            raise ValueError("시작일자(start_date)는 필수입니다")
+        if not end_date:
+            raise ValueError("종료일자(end_date)는 필수입니다")
+
+        URL = f"{self.url_base}/uapi/overseas-price/v1/quotations/inquire-daily-chartprice"
+        tr_id = "FHKST03030100"
+
+        headers = {
+            "authorization": f"Bearer {self._get_token()}",
+            "appkey": self.app_key,
+            "appsecret": self.app_secret,
+            "tr_id": tr_id,
+        }
+
+        params = {
+            "FID_COND_MRKT_DIV_CODE": excd.value,
+            "FID_INPUT_ISCD": symb,
+            "FID_INPUT_DATE_1": start_date,
+            "FID_INPUT_DATE_2": end_date,
+            "FID_PERIOD_DIV_CODE": period.value,
+        }
+
+        res = requests.get(URL, headers=headers, params=params)
+
+        if res.status_code == 200 and res.json()["rt_cd"] == "0":
+            return OverseasDailyCandleResponse.model_validate(res.json())
+        else:
+            logger.error(f"Error Code : {res.status_code} | {res.text}")
+            raise Exception(f"해외 주식 캔들 데이터 조회 실패: {res.text}")

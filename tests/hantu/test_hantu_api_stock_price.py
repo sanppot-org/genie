@@ -5,7 +5,8 @@ import pytest
 
 from src.config import HantuConfig
 from src.hantu.domestic_api import HantuDomesticAPI
-from src.hantu.model import AccountType, MarketCode
+from src.hantu.model.domestic.account_type import AccountType
+from src.hantu.model.domestic.market_code import MarketCode
 
 
 class TestGetStockPrice:

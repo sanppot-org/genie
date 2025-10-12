@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from src.hantu.model.market_code import MarketCode
+from src.hantu.model.domestic.market_code import MarketCode
 
 
 class RequestHeader(BaseModel):
