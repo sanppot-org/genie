@@ -6,7 +6,7 @@ from typing import List, Tuple
 import requests
 
 from src.config import HantuConfig
-from src.hantu.model import AccountType, access_token, balance
+from src.hantu.model import AccountType, access_token, balance, stock_price
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +41,50 @@ class HantuAPI:
 
     def get_balance(self) -> balance.BalanceResponse:
         """주식 잔고 조회
-        
+
         연속 조회를 통해 모든 보유 종목과 계좌 전체 정보를 반환합니다.
-        
+
         Returns:
             balance.BalanceResponse: output1(개별 종목 보유 정보), output2(계좌 전체 정보)
         """
         output1, output2 = self._get_balance_recursive()
         return balance.BalanceResponse(output1=output1, output2=output2)
+
+    def get_stock_price(self, ticker: str, market_code: str = "J") -> stock_price.ResponseBody:
+        """주식 현재가 시세 조회
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            market_code: 시장 분류 코드 (J:KRX, NX:NXT, UN:통합) 기본값은 J
+
+        Returns:
+            stock_price.ResponseBody: 주식 현재가 시세 정보
+        """
+        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-price"
+
+        header = stock_price.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = stock_price.RequestQueryParam(
+            FID_COND_MRKT_DIV_CODE=market_code,
+            FID_INPUT_ISCD=ticker,
+        )
+
+        # 호출
+        res = requests.get(
+            URL,
+            headers=header.model_dump(by_alias=True),
+            params=param.model_dump()
+        )
+
+        if res.status_code == 200 and res.json()["rt_cd"] == "0":
+            return stock_price.ResponseBody.model_validate(res.json())
+        else:
+            logger.error(f"Error Code : {res.status_code} | {res.text}")
+            raise Exception(f"주식 시세 조회 실패: {res.text}")
 
     def _get_balance_recursive(
             self,
