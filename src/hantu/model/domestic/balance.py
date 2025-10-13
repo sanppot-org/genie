@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Optional, List
 
 from pydantic import BaseModel, Field
@@ -67,6 +68,48 @@ class ResponseBodyoutput1(BaseModel):
     grta_rt_name: str  # 보증금율명
     sbst_pric: str  # 대용가격
     stck_loan_unpr: str  # 주식대출단가
+
+    def to_simple(self) -> 'StockBalance':
+        """핵심 필드만 추출하여 StockBalance로 변환"""
+        return StockBalance(
+            stock_code=self.pdno,
+            stock_name=self.prdt_name,
+            holding_quantity=int(self.hldg_qty),
+            orderable_quantity=int(self.ord_psbl_qty),
+            purchase_avg_price=Decimal(self.pchs_avg_pric),
+            purchase_amount=Decimal(self.pchs_amt),
+            current_price=Decimal(self.prpr),
+            evaluation_amount=Decimal(self.evlu_amt),
+            profit_loss_amount=Decimal(self.evlu_pfls_amt),
+            profit_loss_rate=Decimal(self.evlu_pfls_rt),
+        )
+
+
+class StockBalance(BaseModel):
+    """주식 보유 잔고 (핵심 정보)
+
+    ResponseBodyoutput1의 27개 필드 중
+    실무에서 가장 많이 사용되는 10개 필드만 추출
+    """
+    # 종목 정보
+    stock_code: str  # 종목코드 (예: "005930")
+    stock_name: str  # 종목명 (예: "삼성전자")
+
+    # 보유 수량
+    holding_quantity: int  # 보유수량
+    orderable_quantity: int  # 주문가능수량
+
+    # 매입 정보
+    purchase_avg_price: Decimal  # 매입평균가격
+    purchase_amount: Decimal  # 매입금액
+
+    # 현재 시세
+    current_price: Decimal  # 현재가
+
+    # 평가 정보
+    evaluation_amount: Decimal  # 평가금액
+    profit_loss_amount: Decimal  # 평가손익금액
+    profit_loss_rate: Decimal  # 평가손익율 (%)
 
 
 class ResponseBodyoutput2(BaseModel):

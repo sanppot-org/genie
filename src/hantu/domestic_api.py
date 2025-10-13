@@ -5,7 +5,7 @@ from typing import List, Tuple
 import requests
 
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model.domestic import balance, order, stock_price
+from src.hantu.model.domestic import balance, order, psbl_order, stock_price
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.market_code import MarketCode
 from src.hantu.model.domestic.order import OrderDirection, OrderDivision
@@ -33,6 +33,61 @@ class HantuDomesticAPI(HantuBaseAPI):
         """
         output1, output2 = self._get_balance_recursive()
         return balance.BalanceResponse(output1=output1, output2=output2)
+
+    def get_psbl_order(
+            self,
+            ticker: str,
+            price: str,
+            ord_dvsn: OrderDivision = OrderDivision.MARKET,
+            cma_evlu_amt_icld_yn: str = "N",
+            ovrs_icld_yn: str = "N"
+    ) -> psbl_order.ResponseBody:
+        """매수가능 조회
+
+        특정 종목의 매수 가능 금액과 수량을 조회합니다.
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            price: 주문단가 (1주당 가격)
+            ord_dvsn: 주문구분 (기본값: MARKET - 시장가)
+            cma_evlu_amt_icld_yn: CMA평가금액포함여부 (기본값: N)
+            ovrs_icld_yn: 해외포함여부 (기본값: N)
+
+        Returns:
+            psbl_order.ResponseBody: 매수가능 조회 결과
+        """
+        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-psbl-order"
+
+        # TR_ID 설정 (계좌 타입에 따라 다름)
+        tr_id = "TTTC8908R" if self.account_type == AccountType.REAL else "VTTC8908R"
+
+        header = psbl_order.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+            tr_id=tr_id,
+        )
+
+        param = psbl_order.RequestQueryParam(
+            CANO=self.cano,
+            ACNT_PRDT_CD=self.acnt_prdt_cd,
+            PDNO=ticker,
+            ORD_UNPR=price,
+            ORD_DVSN=ord_dvsn.value,
+            CMA_EVLU_AMT_ICLD_YN=cma_evlu_amt_icld_yn,
+            OVRS_ICLD_YN=ovrs_icld_yn,
+        )
+
+        # 호출
+        res = requests.get(
+            URL,
+            headers=header.model_dump(by_alias=True),
+            params=param.model_dump()
+        )
+
+        self._validate_response(res)
+
+        return psbl_order.ResponseBody.model_validate(res.json())
 
     def get_stock_price(self, ticker: str, market_code: MarketCode = MarketCode.KRX) -> stock_price.ResponseBody:
         """주식 현재가 시세 조회

@@ -250,7 +250,7 @@ class TestBuyMarketOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.buy_market_order(ticker="005930", price=100000)
+        result = api.buy_market_order(ticker="005930", quantity=10)
 
         # Then
         assert result.rt_cd == "0"
@@ -265,7 +265,7 @@ class TestBuyMarketOrder:
         body = json.loads(mock_post.call_args[1]['data'])
         assert body['PDNO'] == "005930"
         assert body['ORD_DVSN'] == "01"  # 시장가
-        assert body['ORD_QTY'] == "100000"  # 시장가 매수는 매수 금액
+        assert body['ORD_QTY'] == "10"  # 10주
         assert body['ORD_UNPR'] == "0"  # 시장가는 0
 
     def test_buy_market_order_real_account(self, mocker):
@@ -292,7 +292,7 @@ class TestBuyMarketOrder:
         mock_post = mocker.patch('requests.post', return_value=mock_response)
 
         # When
-        result = api.buy_market_order(ticker="005930", price=100000)
+        result = api.buy_market_order(ticker="005930", quantity=10)
 
         # Then
         assert result.rt_cd == "0"
@@ -304,7 +304,7 @@ class TestBuyMarketOrder:
         # 바디 검증
         import json
         body = json.loads(mock_post.call_args[1]['data'])
-        assert body['ORD_QTY'] == "100000"  # 시장가 매수는 매수 금액
+        assert body['ORD_QTY'] == "10"  # 10주
 
 
 class TestBuyLimitOrder:
