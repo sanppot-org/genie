@@ -1,12 +1,14 @@
 import logging
 import time
+from datetime import date, time as time_obj
 from typing import List, Tuple
 
 import requests
 
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model.domestic import balance, order, psbl_order, stock_price
+from src.hantu.model.domestic import balance, chart, order, psbl_order, stock_price
 from src.hantu.model.domestic.account_type import AccountType
+from src.hantu.model.domestic.chart import ChartInterval, PriceType
 from src.hantu.model.domestic.market_code import MarketCode
 from src.hantu.model.domestic.order import OrderDirection, OrderDivision
 
@@ -319,6 +321,102 @@ class HantuDomesticAPI(HantuBaseAPI):
         else:
             # 모든 페이지 수집 완료
             return accumulated_output1, accumulated_output2
+
+    def get_daily_chart(
+            self,
+            ticker: str,
+            start_date: date,
+            end_date: date,
+            interval: ChartInterval = ChartInterval.DAY,
+            price_type: PriceType = PriceType.ADJUSTED,
+            market_code: MarketCode = MarketCode.KRX
+    ) -> chart.DailyChartResponseBody:
+        """일/주/월/년봉 차트 조회
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            start_date: 조회 시작일자 (date 객체)
+            end_date: 조회 종료일자 (date 객체, 최대 100개)
+            interval: 차트 주기 (기본값: DAY - 일봉)
+            price_type: 가격 타입 (기본값: ADJUSTED - 수정주가)
+            market_code: 시장 분류 코드 (기본값: KRX)
+
+        Returns:
+            chart.DailyChartResponseBody: 일/주/월/년봉 차트 데이터
+        """
+        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
+
+        header = chart.DailyChartRequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = chart.DailyChartRequestQueryParam(
+            FID_COND_MRKT_DIV_CODE=market_code,
+            FID_INPUT_ISCD=ticker,
+            FID_INPUT_DATE_1=start_date.strftime("%Y%m%d"),
+            FID_INPUT_DATE_2=end_date.strftime("%Y%m%d"),
+            FID_PERIOD_DIV_CODE=interval,
+            FID_ORG_ADJ_PRC=price_type,
+        )
+
+        # 호출
+        res = requests.get(
+            URL,
+            headers=header.model_dump(by_alias=True),
+            params=param.model_dump()
+        )
+
+        self._validate_response(res)
+
+        return chart.DailyChartResponseBody.model_validate(res.json())
+
+    def get_minute_chart(
+            self,
+            ticker: str,
+            target_date: date,
+            target_time: time_obj,
+            market_code: MarketCode = MarketCode.KRX
+    ) -> chart.MinuteChartResponseBody:
+        """분봉 차트 조회
+
+        - 한 번 호출에 최대 120건
+
+        Args:
+            ticker: 종목코드 (예: 005930)
+            target_date: 조회 일자 (date 객체)
+            target_time: 조회 시간 (time 객체)
+            market_code: 시장 분류 코드 (기본값: KRX)
+
+        Returns:
+            chart.MinuteChartResponseBody: 분봉 차트 데이터
+        """
+        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice"
+
+        header = chart.MinuteChartRequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = chart.MinuteChartRequestQueryParam(
+            FID_COND_MRKT_DIV_CODE=market_code,
+            FID_INPUT_ISCD=ticker,
+            FID_INPUT_HOUR_1=target_time.strftime("%H%M%S"),
+            FID_INPUT_DATE_1=target_date.strftime("%Y%m%d"),
+        )
+
+        # 호출
+        res = requests.get(
+            URL,
+            headers=header.model_dump(by_alias=True),
+            params=param.model_dump()
+        )
+
+        self._validate_response(res)
+
+        return chart.MinuteChartResponseBody.model_validate(res.json())
 
     # TR_ID 매핑 (계좌 타입, 주문 방향) -> TR_ID
     ORDER_TR_ID_MAP = {

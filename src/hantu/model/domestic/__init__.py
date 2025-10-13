@@ -9,6 +9,7 @@ __all__ = [
     "MarketCode",
     "TradingCurrencyCode",
     "balance",
+    "chart",
     "order",
     "stock_price",
 ]

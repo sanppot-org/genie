@@ -111,7 +111,7 @@ class TestSellMarketOrder:
         with pytest.raises(Exception) as exc_info:
             api.sell_market_order(ticker="005930", quantity=10)
 
-        assert "주식 주문 실패" in str(exc_info.value)
+        assert "Error: Bad Request" == str(exc_info.value)
 
     def test_sell_market_order_with_error_response_code(self, mocker):
         """응답 코드가 실패인 경우"""
@@ -124,6 +124,7 @@ class TestSellMarketOrder:
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
+        mock_response.text = "주문가능수량을 초과하였습니다."
         mock_response.json.return_value = {
             "rt_cd": "1",
             "msg_cd": "EGW00123",
@@ -141,7 +142,7 @@ class TestSellMarketOrder:
         with pytest.raises(Exception) as exc_info:
             api.sell_market_order(ticker="005930", quantity=10)
 
-        assert "주문 실패" in str(exc_info.value)
+        assert "Error: 주문가능수량을 초과하였습니다." == str(exc_info.value)
 
 
 class TestSellLimitOrder:

@@ -216,5 +216,5 @@ class TestGetStockPrice:
         mocker.patch('requests.get', return_value=mock_response)
 
         # When & Then
-        with pytest.raises(Exception, match="주식 시세 조회 실패"):
+        with pytest.raises(Exception, match="Error: Bad Request"):
             api.get_stock_price("000000")

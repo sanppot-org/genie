@@ -256,5 +256,5 @@ class TestGetBalance:
         mocker.patch('requests.get', return_value=mock_response)
 
         # When & Then
-        with pytest.raises(Exception, match="해외 주식 잔고 조회 실패"):
+        with pytest.raises(Exception, match="Error: Bad Request"):
             api.get_balance(ovrs_excg_cd=OverseasExchangeCode.NASD, tr_crcy_cd=TradingCurrencyCode.USD)
