@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import requests
+from requests import Response
 
 from src.config import HantuConfig
 from src.hantu.model import access_token
@@ -79,3 +80,9 @@ class HantuBaseAPI:
             return self._make_token()
 
         return data.access_token
+
+    @staticmethod
+    def _validate_response(res: Response):
+        if not res or res.status_code != 200 or res.json()["rt_cd"] != "0":
+            logger.error(f"Error Code : {res.status_code} | {res.text}")
+            raise Exception(f"Error: {res.text}")

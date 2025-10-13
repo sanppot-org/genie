@@ -64,11 +64,9 @@ class HantuDomesticAPI(HantuBaseAPI):
             params=param.model_dump()
         )
 
-        if res.status_code == 200 and res.json()["rt_cd"] == "0":
-            return stock_price.ResponseBody.model_validate(res.json())
-        else:
-            logger.error(f"Error Code : {res.status_code} | {res.text}")
-            raise Exception(f"주식 시세 조회 실패: {res.text}")
+        self._validate_response(res)
+
+        return stock_price.ResponseBody.model_validate(res.json())
 
     def sell_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
         """시장가 매도 주문
@@ -107,12 +105,12 @@ class HantuDomesticAPI(HantuBaseAPI):
             price=price
         )
 
-    def buy_market_order(self, ticker: str, price: int) -> order.ResponseBody:
+    def buy_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
         """시장가 매수 주문
 
         Args:
             ticker: 종목코드 (예: 005930)
-            price: 매수 금액 (원)
+            quantity: 매수 수량 (주)
 
         Returns:
             order.ResponseBody: 주문 응답
@@ -121,7 +119,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             ord_dv=OrderDirection.BUY,
             ord_dvsn=OrderDivision.MARKET,
             ticker=ticker,
-            quantity=price,  # 시장가 매수는 매수 금액을 수량 필드에 전달
+            quantity=quantity,
             price=0
         )
 
@@ -192,15 +190,9 @@ class HantuDomesticAPI(HantuBaseAPI):
             data=body.model_dump_json()
         )
 
-        if res.status_code == 200:
-            response_body = order.ResponseBody.model_validate(res.json())
-            if response_body.rt_cd != "0":
-                logger.error(f"주문 실패: {response_body.msg1}")
-                raise Exception(f"주문 실패: {response_body.msg1}")
-            return response_body
-        else:
-            logger.error(f"Error Code : {res.status_code} | {res.text}")
-            raise Exception(f"주식 주문 실패: {res.text}")
+        self._validate_response(res)
+
+        return order.ResponseBody.model_validate(res.json())
 
     def _get_balance_recursive(
             self,
@@ -247,33 +239,31 @@ class HantuDomesticAPI(HantuBaseAPI):
             params=param.model_dump()
         )
 
-        if res.status_code == 200 and res.json()["rt_cd"] == "0":
-            response_body = balance.ResponseBody.model_validate(res.json())
+        self._validate_response(res)
 
-            # 현재 페이지 데이터 누적
-            accumulated_output1.extend(response_body.output1)
-            # output2는 마지막 페이지의 값을 사용 (계좌 전체 정보)
-            accumulated_output2 = response_body.output2
+        response_body = balance.ResponseBody.model_validate(res.json())
 
-            # 연속 조회 필요 여부 확인
-            response_tr_cont = res.headers.get('tr_cont', '')
+        # 현재 페이지 데이터 누적
+        accumulated_output1.extend(response_body.output1)
+        # output2는 마지막 페이지의 값을 사용 (계좌 전체 정보)
+        accumulated_output2 = response_body.output2
 
-            if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
-                # API 호출 간격 (과부하 방지)
-                time.sleep(0.1)
-                # 재귀 호출로 다음 페이지 가져오기
-                return self._get_balance_recursive(
-                    ctx_area_fk100=response_body.ctx_area_fk100,
-                    ctx_area_nk100=response_body.ctx_area_nk100,
-                    tr_cont="N",
-                    accumulated_output1=accumulated_output1,
-                )
-            else:
-                # 모든 페이지 수집 완료
-                return accumulated_output1, accumulated_output2
+        # 연속 조회 필요 여부 확인
+        response_tr_cont = res.headers.get('tr_cont', '')
+
+        if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
+            # API 호출 간격 (과부하 방지)
+            time.sleep(0.1)
+            # 재귀 호출로 다음 페이지 가져오기
+            return self._get_balance_recursive(
+                ctx_area_fk100=response_body.ctx_area_fk100,
+                ctx_area_nk100=response_body.ctx_area_nk100,
+                tr_cont="N",
+                accumulated_output1=accumulated_output1,
+            )
         else:
-            logger.error(f"Error Code : {res.status_code} | {res.text}")
-            raise Exception()
+            # 모든 페이지 수집 완료
+            return accumulated_output1, accumulated_output2
 
     # TR_ID 매핑 (계좌 타입, 주문 방향) -> TR_ID
     ORDER_TR_ID_MAP = {

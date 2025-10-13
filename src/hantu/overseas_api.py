@@ -106,33 +106,31 @@ class HantuOverseasAPI(HantuBaseAPI):
             params=param.model_dump()
         )
 
-        if res.status_code == 200 and res.json()["rt_cd"] == "0":
-            response_body = overseas_balance.ResponseBody.model_validate(res.json())
+        self._validate_response(res)
 
-            # 현재 페이지 데이터 누적
-            accumulated_output1.extend(response_body.output1)
-            # output2는 마지막 페이지의 값을 사용 (계좌 전체 정보)
-            # 연속 조회 필요 여부 확인
-            response_tr_cont = res.headers.get('tr_cont', '')
+        response_body = overseas_balance.ResponseBody.model_validate(res.json())
 
-            if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
-                # API 호출 간격 (과부하 방지)
-                time.sleep(0.1)
-                # 재귀 호출로 다음 페이지 가져오기
-                return self._get_balance_recursive(
-                    ovrs_excg_cd=ovrs_excg_cd,
-                    tr_crcy_cd=tr_crcy_cd,
-                    ctx_area_fk200=response_body.ctx_area_fk200,
-                    ctx_area_nk200=response_body.ctx_area_nk200,
-                    tr_cont="N",
-                    accumulated_output1=accumulated_output1,
-                )
-            else:
-                # 모든 페이지 수집 완료
-                return accumulated_output1, response_body.output2
+        # 현재 페이지 데이터 누적
+        accumulated_output1.extend(response_body.output1)
+        # output2는 마지막 페이지의 값을 사용 (계좌 전체 정보)
+        # 연속 조회 필요 여부 확인
+        response_tr_cont = res.headers.get('tr_cont', '')
+
+        if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
+            # API 호출 간격 (과부하 방지)
+            time.sleep(0.1)
+            # 재귀 호출로 다음 페이지 가져오기
+            return self._get_balance_recursive(
+                ovrs_excg_cd=ovrs_excg_cd,
+                tr_crcy_cd=tr_crcy_cd,
+                ctx_area_fk200=response_body.ctx_area_fk200,
+                ctx_area_nk200=response_body.ctx_area_nk200,
+                tr_cont="N",
+                accumulated_output1=accumulated_output1,
+            )
         else:
-            logger.error(f"Error Code : {res.status_code} | {res.text}")
-            raise Exception(f"해외 주식 잔고 조회 실패: {res.text}")
+            # 모든 페이지 수집 완료
+            return accumulated_output1, response_body.output2
 
     def get_current_price(
             self, excd: OverseasMarketCode = OverseasMarketCode.NYS, symb: str = ""
@@ -169,11 +167,9 @@ class HantuOverseasAPI(HantuBaseAPI):
 
         res = requests.get(URL, headers=headers, params=params)
 
-        if res.status_code == 200 and res.json()["rt_cd"] == "0":
-            return OverseasCurrentPriceResponse.model_validate(res.json())
-        else:
-            logger.error(f"Error Code : {res.status_code} | {res.text}")
-            raise Exception(f"해외 주식 현재가 조회 실패: {res.text}")
+        self._validate_response(res)
+
+        return OverseasCurrentPriceResponse.model_validate(res.json())
 
     def get_daily_candles(
             self,
@@ -226,8 +222,6 @@ class HantuOverseasAPI(HantuBaseAPI):
 
         res = requests.get(URL, headers=headers, params=params)
 
-        if res.status_code == 200 and res.json()["rt_cd"] == "0":
-            return OverseasDailyCandleResponse.model_validate(res.json())
-        else:
-            logger.error(f"Error Code : {res.status_code} | {res.text}")
-            raise Exception(f"해외 주식 캔들 데이터 조회 실패: {res.text}")
+        self._validate_response(res)
+
+        return OverseasDailyCandleResponse.model_validate(res.json())
