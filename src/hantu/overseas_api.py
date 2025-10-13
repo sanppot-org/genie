@@ -6,8 +6,10 @@ import requests
 
 from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic.account_type import AccountType
+from src.hantu.model.domestic.order import OrderDirection
 from src.hantu.model.domestic.trading_currency_code import TradingCurrencyCode
 from src.hantu.model.overseas import balance as overseas_balance
+from src.hantu.model.overseas import order as overseas_order
 from src.hantu.model.overseas.asset_type import OverseasAssetType
 from src.hantu.model.overseas.candle_period import OverseasCandlePeriod
 from src.hantu.model.overseas.exchange_code import OverseasExchangeCode
@@ -225,3 +227,237 @@ class HantuOverseasAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return OverseasDailyCandleResponse.model_validate(res.json())
+
+    def buy_market_order(
+            self,
+            ticker: str,
+            quantity: int,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD
+    ) -> overseas_order.ResponseBody:
+        """시장가 매수 주문
+
+        주의: 미국 시장은 시장가 매수를 지원하지 않으므로 지정가로 주문합니다.
+        현재가를 조회하여 해당 가격으로 지정가 주문을 실행합니다.
+
+        Args:
+            ticker: 종목코드 (예: AAPL, TSLA)
+            quantity: 주문 수량
+            exchange_code: 거래소 코드 (기본값: NASD)
+
+        Returns:
+            overseas_order.ResponseBody: 주문 응답
+        """
+        # 현재가 조회
+        price_info = self.get_current_price(
+            excd=OverseasMarketCode(exchange_code.value),
+            symb=ticker
+        )
+        current_price = price_info.output.last
+
+        return self._order(
+            ord_dv=OrderDirection.BUY,
+            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price=current_price
+        )
+
+    def buy_limit_order(
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD
+    ) -> overseas_order.ResponseBody:
+        """지정가 매수 주문
+
+        Args:
+            ticker: 종목코드 (예: AAPL, TSLA)
+            quantity: 주문 수량
+            price: 주문 단가
+            exchange_code: 거래소 코드 (기본값: NASD)
+
+        Returns:
+            overseas_order.ResponseBody: 주문 응답
+        """
+        return self._order(
+            ord_dv=OrderDirection.BUY,
+            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price=price
+        )
+
+    def sell_market_order(
+            self,
+            ticker: str,
+            quantity: int,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD
+    ) -> overseas_order.ResponseBody:
+        """시장가 매도 주문
+
+        주의: 미국 시장은 시장가 매도를 지원하지 않으므로 지정가로 주문합니다.
+        현재가를 조회하여 해당 가격으로 지정가 주문을 실행합니다.
+
+        Args:
+            ticker: 종목코드 (예: AAPL, TSLA)
+            quantity: 주문 수량
+            exchange_code: 거래소 코드 (기본값: NASD)
+
+        Returns:
+            overseas_order.ResponseBody: 주문 응답
+        """
+        # 현재가 조회
+        price_info = self.get_current_price(
+            excd=OverseasMarketCode(exchange_code.value),
+            symb=ticker
+        )
+        current_price = price_info.output.last
+
+        return self._order(
+            ord_dv=OrderDirection.SELL,
+            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price=current_price
+        )
+
+    def sell_limit_order(
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD
+    ) -> overseas_order.ResponseBody:
+        """지정가 매도 주문
+
+        Args:
+            ticker: 종목코드 (예: AAPL, TSLA)
+            quantity: 주문 수량
+            price: 주문 단가
+            exchange_code: 거래소 코드 (기본값: NASD)
+
+        Returns:
+            overseas_order.ResponseBody: 주문 응답
+        """
+        return self._order(
+            ord_dv=OrderDirection.SELL,
+            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price=price
+        )
+
+    def _order(
+            self,
+            ord_dv: OrderDirection,
+            ord_dvsn: overseas_order.OverseasOrderDivision,
+            exchange_code: OverseasExchangeCode,
+            ticker: str,
+            quantity: int,
+            price: str
+    ) -> overseas_order.ResponseBody:
+        """해외주식 주문 (내부 메서드)
+
+        Args:
+            ord_dv: 매수/매도 구분 (OrderDirection.BUY 또는 OrderDirection.SELL)
+            ord_dvsn: 주문 구분 (OverseasOrderDivision)
+            exchange_code: 거래소 코드
+            ticker: 종목코드 (예: AAPL, TSLA)
+            quantity: 주문 수량
+            price: 주문 단가 (시장가일 경우 0)
+
+        Returns:
+            overseas_order.ResponseBody: 주문 응답
+        """
+        URL = f"{self.url_base}/uapi/overseas-stock/v1/trading/order"
+
+        # TR_ID 설정 (계좌 타입, 거래소, 매수/매도 구분에 따라 다름)
+        tr_id = self.ORDER_TR_ID_MAP[self.account_type, exchange_code, ord_dv]
+
+        header = overseas_order.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+            tr_id=tr_id,
+        )
+
+        # SLL_TYPE 설정 (매도: "00", 매수: "")
+        sll_type = "00" if ord_dv == OrderDirection.SELL else ""
+
+        body = overseas_order.RequestBody(
+            CANO=self.cano,
+            ACNT_PRDT_CD=self.acnt_prdt_cd,
+            OVRS_EXCG_CD=exchange_code.value,
+            PDNO=ticker,
+            ORD_QTY=str(quantity),
+            OVRS_ORD_UNPR=str(price),
+            SLL_TYPE=sll_type,
+            ORD_DVSN=ord_dvsn.value,
+        )
+
+        # 호출
+        res = requests.post(
+            URL,
+            headers=header.model_dump(by_alias=True),
+            data=body.model_dump_json()
+        )
+
+        self._validate_response(res)
+
+        return overseas_order.ResponseBody.model_validate(res.json())
+
+    # TR_ID 매핑 (계좌 타입, 거래소, 주문 방향) -> TR_ID
+    ORDER_TR_ID_MAP = {
+        # 미국 (NASD, NYSE, AMEX)
+        (AccountType.REAL, OverseasExchangeCode.NASD, OrderDirection.BUY): "TTTT1002U",
+        (AccountType.REAL, OverseasExchangeCode.NASD, OrderDirection.SELL): "TTTT1006U",
+        (AccountType.REAL, OverseasExchangeCode.NYSE, OrderDirection.BUY): "TTTT1002U",
+        (AccountType.REAL, OverseasExchangeCode.NYSE, OrderDirection.SELL): "TTTT1006U",
+        (AccountType.REAL, OverseasExchangeCode.AMEX, OrderDirection.BUY): "TTTT1002U",
+        (AccountType.REAL, OverseasExchangeCode.AMEX, OrderDirection.SELL): "TTTT1006U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.NASD, OrderDirection.BUY): "VTTT1002U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.NASD, OrderDirection.SELL): "VTTT1006U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.NYSE, OrderDirection.BUY): "VTTT1002U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.NYSE, OrderDirection.SELL): "VTTT1006U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.AMEX, OrderDirection.BUY): "VTTT1002U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.AMEX, OrderDirection.SELL): "VTTT1006U",
+
+        # 홍콩
+        (AccountType.REAL, OverseasExchangeCode.SEHK, OrderDirection.BUY): "TTTS1002U",
+        (AccountType.REAL, OverseasExchangeCode.SEHK, OrderDirection.SELL): "TTTS1001U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.SEHK, OrderDirection.BUY): "VTTS1002U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.SEHK, OrderDirection.SELL): "VTTS1001U",
+
+        # 중국 상해
+        (AccountType.REAL, OverseasExchangeCode.SHAA, OrderDirection.BUY): "TTTS0202U",
+        (AccountType.REAL, OverseasExchangeCode.SHAA, OrderDirection.SELL): "TTTS1005U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.SHAA, OrderDirection.BUY): "VTTS0202U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.SHAA, OrderDirection.SELL): "VTTS1005U",
+
+        # 중국 심천
+        (AccountType.REAL, OverseasExchangeCode.SZAA, OrderDirection.BUY): "TTTS0305U",
+        (AccountType.REAL, OverseasExchangeCode.SZAA, OrderDirection.SELL): "TTTS0304U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.SZAA, OrderDirection.BUY): "VTTS0305U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.SZAA, OrderDirection.SELL): "VTTS0304U",
+
+        # 일본
+        (AccountType.REAL, OverseasExchangeCode.TKSE, OrderDirection.BUY): "TTTS0308U",
+        (AccountType.REAL, OverseasExchangeCode.TKSE, OrderDirection.SELL): "TTTS0307U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.TKSE, OrderDirection.BUY): "VTTS0308U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.TKSE, OrderDirection.SELL): "VTTS0307U",
+
+        # 베트남 (하노이, 호치민)
+        (AccountType.REAL, OverseasExchangeCode.HASE, OrderDirection.BUY): "TTTS0311U",
+        (AccountType.REAL, OverseasExchangeCode.HASE, OrderDirection.SELL): "TTTS0310U",
+        (AccountType.REAL, OverseasExchangeCode.VNSE, OrderDirection.BUY): "TTTS0311U",
+        (AccountType.REAL, OverseasExchangeCode.VNSE, OrderDirection.SELL): "TTTS0310U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.HASE, OrderDirection.BUY): "VTTS0311U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.HASE, OrderDirection.SELL): "VTTS0310U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.VNSE, OrderDirection.BUY): "VTTS0311U",
+        (AccountType.VIRTUAL, OverseasExchangeCode.VNSE, OrderDirection.SELL): "VTTS0310U",
+    }

@@ -9,11 +9,13 @@ class OverseasCurrentPriceData(BaseModel):
     """해외주식 현재체결가 데이터"""
 
     rsym: str = Field(..., description="실시간조회종목코드")
-    symb: str = Field(..., description="종목코드")
+    zdiv: str = Field(..., description="소수점자리수")
+    base: str = Field(..., description="전일종가")
+    pvol: str = Field(..., description="전일거래량")
     last: str = Field(..., description="현재가")
-    sign: str = Field(..., description="전일대비부호")
-    change: str = Field(..., description="전일대비")
-    diff: str = Field(..., description="등락률")
+    sign: str = Field(..., description="대비기호")
+    diff: str = Field(..., description="대비")
+    rate: str = Field(..., description="등락율")
     tvol: str = Field(..., description="거래량")
     tamt: str = Field(..., description="거래대금")
     ordy: str = Field(..., description="매수가능여부")

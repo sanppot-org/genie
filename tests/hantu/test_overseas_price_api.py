@@ -33,11 +33,13 @@ class TestGetCurrentPrice:
             "msg1": "성공",
             "output": {
                 "rsym": "NASD.AAPL",
-                "symb": "AAPL",
+                "zdiv": "2",
+                "base": "147.75",
+                "pvol": "48000000",
                 "last": "150.25",
                 "sign": "1",
-                "change": "2.50",
-                "diff": "1.69",
+                "diff": "2.50",
+                "rate": "1.69",
                 "tvol": "50000000",
                 "tamt": "7512500000",
                 "ordy": "Y",
@@ -53,8 +55,9 @@ class TestGetCurrentPrice:
             result = api.get_current_price(excd=OverseasMarketCode.NAS, symb="AAPL")
 
             assert isinstance(result, OverseasCurrentPriceResponse)
-            assert result.output.symb == "AAPL"
+            assert result.output.rsym == "NASD.AAPL"
             assert result.output.last == "150.25"
+            assert result.output.diff == "2.50"
 
     def test_get_current_price_with_invalid_params_raises_error(self, api):
         """잘못된 파라미터로 호출 시 에러 발생 테스트"""
