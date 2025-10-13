@@ -2,6 +2,7 @@ import logging
 
 from src.config import UpbitConfig, HantuConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
+from src.hantu.model.domestic import AccountType
 
 # 로깅 설정
 logging.basicConfig(
