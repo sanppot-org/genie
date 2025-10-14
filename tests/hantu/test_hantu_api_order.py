@@ -10,11 +10,15 @@ from src.hantu.model.domestic.account_type import AccountType
 class TestSellMarketOrder:
     """시장가 매도 주문 테스트"""
 
-    def test_sell_market_order_virtual_account(self, mocker):
-        """가상 계좌로 시장가 매도 주문"""
+    @pytest.mark.parametrize("account_type,expected_tr_id", [
+        (AccountType.VIRTUAL, "VTTC0011U"),
+        (AccountType.REAL, "TTTC0011U"),
+    ])
+    def test_sell_market_order(self, mocker, account_type, expected_tr_id):
+        """시장가 매도 주문 - 실제/가상 계좌"""
         # Given
         config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, account_type)
 
         # _get_token mock
         mocker.patch.object(api, '_get_token', return_value='mock_token')
@@ -48,7 +52,7 @@ class TestSellMarketOrder:
 
         # 헤더 검증
         headers = call_kwargs['headers']
-        assert headers['tr_id'] == "VTTC0011U"  # 가상 계좌 매도
+        assert headers['tr_id'] == expected_tr_id
 
         # 바디 검증
         import json
@@ -57,40 +61,6 @@ class TestSellMarketOrder:
         assert body['ORD_DVSN'] == "01"  # 시장가
         assert body['ORD_QTY'] == "10"
         assert body['ORD_UNPR'] == "0"  # 시장가는 0
-
-    def test_sell_market_order_real_account(self, mocker):
-        """실제 계좌로 시장가 매도 주문"""
-        # Given
-        config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.REAL)
-
-        # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
-
-        mock_response = mocker.Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "rt_cd": "0",
-            "msg_cd": "MCA00000",
-            "msg1": "정상처리 되었습니다.",
-            "output": {
-                "KRX_FWDG_ORD_ORGNO": "91252",
-                "ODNO": "0000117057",
-                "ORD_TMD": "121052"
-            }
-        }
-
-        mock_post = mocker.patch('requests.post', return_value=mock_response)
-
-        # When
-        result = api.sell_market_order(ticker="005930", quantity=10)
-
-        # Then
-        assert result.rt_cd == "0"
-
-        # 헤더 검증 - 실제 계좌는 TTTC0011U
-        headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "TTTC0011U"
 
     def test_sell_market_order_error(self, mocker):
         """시장가 매도 주문 실패"""
@@ -148,11 +118,15 @@ class TestSellMarketOrder:
 class TestSellLimitOrder:
     """지정가 매도 주문 테스트"""
 
-    def test_sell_limit_order_virtual_account(self, mocker):
-        """가상 계좌로 지정가 매도 주문"""
+    @pytest.mark.parametrize("account_type,expected_tr_id", [
+        (AccountType.VIRTUAL, "VTTC0011U"),
+        (AccountType.REAL, "TTTC0011U"),
+    ])
+    def test_sell_limit_order(self, mocker, account_type, expected_tr_id):
+        """지정가 매도 주문 - 실제/가상 계좌"""
         # Given
         config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, account_type)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -180,7 +154,7 @@ class TestSellLimitOrder:
 
         # 헤더 검증
         headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "VTTC0011U"
+        assert headers['tr_id'] == expected_tr_id
 
         # 바디 검증
         import json
@@ -190,48 +164,19 @@ class TestSellLimitOrder:
         assert body['ORD_QTY'] == "10"
         assert body['ORD_UNPR'] == "70000"
 
-    def test_sell_limit_order_real_account(self, mocker):
-        """실제 계좌로 지정가 매도 주문"""
-        # Given
-        config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.REAL)
-
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
-
-        mock_response = mocker.Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "rt_cd": "0",
-            "msg_cd": "MCA00000",
-            "msg1": "정상처리 되었습니다.",
-            "output": {
-                "KRX_FWDG_ORD_ORGNO": "91252",
-                "ODNO": "0000117058",
-                "ORD_TMD": "121053"
-            }
-        }
-
-        mock_post = mocker.patch('requests.post', return_value=mock_response)
-
-        # When
-        result = api.sell_limit_order(ticker="005930", quantity=10, price=70000)
-
-        # Then
-        assert result.rt_cd == "0"
-
-        # 실제 계좌는 TTTC0011U
-        headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "TTTC0011U"
-
 
 class TestBuyMarketOrder:
     """시장가 매수 주문 테스트"""
 
-    def test_buy_market_order_virtual_account(self, mocker):
-        """가상 계좌로 시장가 매수 주문"""
+    @pytest.mark.parametrize("account_type,expected_tr_id", [
+        (AccountType.VIRTUAL, "VTTC0012U"),
+        (AccountType.REAL, "TTTC0012U"),
+    ])
+    def test_buy_market_order(self, mocker, account_type, expected_tr_id):
+        """시장가 매수 주문 - 실제/가상 계좌"""
         # Given
         config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, account_type)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -259,7 +204,7 @@ class TestBuyMarketOrder:
 
         # 헤더 검증
         headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "VTTC0012U"  # 가상 계좌 매수
+        assert headers['tr_id'] == expected_tr_id
 
         # 바디 검증
         import json
@@ -269,53 +214,19 @@ class TestBuyMarketOrder:
         assert body['ORD_QTY'] == "10"  # 10주
         assert body['ORD_UNPR'] == "0"  # 시장가는 0
 
-    def test_buy_market_order_real_account(self, mocker):
-        """실제 계좌로 시장가 매수 주문"""
-        # Given
-        config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.REAL)
-
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
-
-        mock_response = mocker.Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "rt_cd": "0",
-            "msg_cd": "MCA00000",
-            "msg1": "정상처리 되었습니다.",
-            "output": {
-                "KRX_FWDG_ORD_ORGNO": "91252",
-                "ODNO": "0000117059",
-                "ORD_TMD": "121054"
-            }
-        }
-
-        mock_post = mocker.patch('requests.post', return_value=mock_response)
-
-        # When
-        result = api.buy_market_order(ticker="005930", quantity=10)
-
-        # Then
-        assert result.rt_cd == "0"
-
-        # 실제 계좌는 TTTC0012U
-        headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "TTTC0012U"
-
-        # 바디 검증
-        import json
-        body = json.loads(mock_post.call_args[1]['data'])
-        assert body['ORD_QTY'] == "10"  # 10주
-
 
 class TestBuyLimitOrder:
     """지정가 매수 주문 테스트"""
 
-    def test_buy_limit_order_virtual_account(self, mocker):
-        """가상 계좌로 지정가 매수 주문"""
+    @pytest.mark.parametrize("account_type,expected_tr_id", [
+        (AccountType.VIRTUAL, "VTTC0012U"),
+        (AccountType.REAL, "TTTC0012U"),
+    ])
+    def test_buy_limit_order(self, mocker, account_type, expected_tr_id):
+        """지정가 매수 주문 - 실제/가상 계좌"""
         # Given
         config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.VIRTUAL)
+        api = HantuDomesticAPI(config, account_type)
 
         mocker.patch.object(api, '_get_token', return_value='mock_token')
 
@@ -343,7 +254,7 @@ class TestBuyLimitOrder:
 
         # 헤더 검증
         headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "VTTC0012U"
+        assert headers['tr_id'] == expected_tr_id
 
         # 바디 검증
         import json
@@ -352,36 +263,3 @@ class TestBuyLimitOrder:
         assert body['ORD_DVSN'] == "00"  # 지정가
         assert body['ORD_QTY'] == "10"
         assert body['ORD_UNPR'] == "70000"
-
-    def test_buy_limit_order_real_account(self, mocker):
-        """실제 계좌로 지정가 매수 주문"""
-        # Given
-        config = HantuConfig()
-        api = HantuDomesticAPI(config, AccountType.REAL)
-
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
-
-        mock_response = mocker.Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "rt_cd": "0",
-            "msg_cd": "MCA00000",
-            "msg1": "정상처리 되었습니다.",
-            "output": {
-                "KRX_FWDG_ORD_ORGNO": "91252",
-                "ODNO": "0000117060",
-                "ORD_TMD": "121055"
-            }
-        }
-
-        mock_post = mocker.patch('requests.post', return_value=mock_response)
-
-        # When
-        result = api.buy_limit_order(ticker="005930", quantity=10, price=70000)
-
-        # Then
-        assert result.rt_cd == "0"
-
-        # 실제 계좌는 TTTC0012U
-        headers = mock_post.call_args[1]['headers']
-        assert headers['tr_id'] == "TTTC0012U"

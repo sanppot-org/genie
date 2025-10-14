@@ -4,12 +4,14 @@ from src.hantu.model.overseas.asset_type import OverseasAssetType
 from src.hantu.model.overseas.candle_period import OverseasCandlePeriod
 from src.hantu.model.overseas.exchange_code import OverseasExchangeCode
 from src.hantu.model.overseas.market_code import OverseasMarketCode
+from src.hantu.model.overseas.minute_interval import OverseasMinuteInterval
 
 __all__ = [
     "OverseasAssetType",
     "OverseasCandlePeriod",
     "OverseasExchangeCode",
     "OverseasMarketCode",
+    "OverseasMinuteInterval",
     "balance",
     "price",
 ]

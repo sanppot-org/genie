@@ -14,9 +14,11 @@ from src.hantu.model.overseas.asset_type import OverseasAssetType
 from src.hantu.model.overseas.candle_period import OverseasCandlePeriod
 from src.hantu.model.overseas.exchange_code import OverseasExchangeCode
 from src.hantu.model.overseas.market_code import OverseasMarketCode
+from src.hantu.model.overseas.minute_interval import OverseasMinuteInterval
 from src.hantu.model.overseas.price import (
     OverseasCurrentPriceResponse,
     OverseasDailyCandleResponse,
+    OverseasMinuteCandleResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -227,6 +229,142 @@ class HantuOverseasAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return OverseasDailyCandleResponse.model_validate(res.json())
+
+    def get_minute_candles(
+            self,
+            symb: str,
+            excd: OverseasMarketCode = OverseasMarketCode.NAS,
+            nmin: OverseasMinuteInterval = OverseasMinuteInterval.MIN_1,
+            include_previous: bool = False,
+            limit: int = 120,
+    ) -> OverseasMinuteCandleResponse:
+        """해외 주식 분봉 데이터 조회
+
+        연속 조회를 통해 모든 분봉 데이터를 반환합니다.
+
+        Args:
+            symb: 종목코드 (예: TSLA, AAPL)
+            excd: 거래소코드 (기본값: NAS, OverseasMarketCode 사용)
+            nmin: 분 간격 (기본값: MIN_1, OverseasMinuteInterval 사용)
+            include_previous: 전일 포함 여부 (기본값: False)
+            limit: 요청 개수 (최대 120, 기본값: 120)
+
+        Returns:
+            OverseasMinuteCandleResponse: 분봉 데이터 목록
+
+        Raises:
+            ValueError: 필수 파라미터가 누락된 경우
+            Exception: API 호출 실패 시
+        """
+        if not symb:
+            raise ValueError("종목코드(symb)는 필수입니다")
+        if limit > 120:
+            raise ValueError("요청 개수(limit)는 최대 120입니다")
+
+        result = self._get_minute_candles_recursive(
+            symb=symb,
+            excd=excd,
+            nmin=nmin,
+            include_previous=include_previous,
+            limit=limit,
+        )
+        return result
+
+    def _get_minute_candles_recursive(
+            self,
+            symb: str,
+            excd: OverseasMarketCode,
+            nmin: OverseasMinuteInterval,
+            include_previous: bool,
+            limit: int,
+            next_key: str = "",
+            key_buff: str = "",
+            tr_cont: str = "",
+            accumulated_output2=None,
+            output1_metadata=None,
+    ) -> OverseasMinuteCandleResponse:
+        """해외 주식 분봉 조회 (연속 조회 지원) - 내부 메서드
+
+        Args:
+            symb: 종목코드
+            excd: 거래소코드 (OverseasMarketCode enum)
+            nmin: 분 간격 (OverseasMinuteInterval enum)
+            include_previous: 전일 포함 여부
+            limit: 요청 개수 (int, 최대 120)
+            next_key: 다음 조회 키
+            key_buff: 키 버퍼
+            tr_cont: 연속 거래 여부
+            accumulated_output2: 누적된 output2 (분봉 데이터)
+            output1_metadata: output1 메타데이터
+
+        Returns:
+            OverseasMinuteCandleResponse: 분봉 응답 객체
+        """
+        if accumulated_output2 is None:
+            accumulated_output2 = []
+
+        URL = f"{self.url_base}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
+        tr_id = "HHDFS76950200"
+
+        headers = {
+            "authorization": f"Bearer {self._get_token()}",
+            "appkey": self.app_key,
+            "appsecret": self.app_secret,
+            "tr_id": tr_id,
+            "tr_cont": tr_cont if tr_cont else "",
+        }
+
+        params = {
+            "AUTH": "",
+            "EXCD": excd.value,
+            "SYMB": symb,
+            "NMIN": nmin.value,
+            "PINC": "1" if include_previous else "0",
+            "NEXT": next_key,
+            "NREC": str(limit),
+            "FILL": "",
+            "KEYB": key_buff,
+        }
+
+        res = requests.get(URL, headers=headers, params=params)
+
+        self._validate_response(res)
+
+        response_body = res.json()
+
+        # 첫 번째 호출에서만 output1 메타데이터 저장
+        if output1_metadata is None and "output1" in response_body:
+            output1_metadata = response_body["output1"]
+
+        # 현재 페이지의 분봉 데이터 누적
+        if "output2" in response_body and response_body["output2"]:
+            accumulated_output2.extend(response_body["output2"])
+
+        # 연속 조회 필요 여부 확인
+        response_tr_cont = res.headers.get('tr_cont', '')
+
+        if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
+            # API 호출 간격 (과부하 방지)
+            time.sleep(0.1)
+            # 재귀 호출로 다음 페이지 가져오기
+            return self._get_minute_candles_recursive(
+                symb=symb,
+                excd=excd,
+                nmin=nmin,
+                include_previous=include_previous,
+                limit=limit,
+                next_key="1",
+                key_buff=key_buff,
+                tr_cont="N",
+                accumulated_output2=accumulated_output2,
+                output1_metadata=output1_metadata,
+            )
+        else:
+            # 모든 페이지 수집 완료
+            return OverseasMinuteCandleResponse(
+                output1=output1_metadata,
+                output2=accumulated_output2
+            )
 
     def buy_market_order(
             self,
