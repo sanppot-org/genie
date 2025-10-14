@@ -52,7 +52,7 @@ class TestGetCurrentPrice:
             mock_get.return_value.status_code = 200
             mock_get.return_value.json.return_value = mock_response
 
-            result = api.get_current_price(excd=OverseasMarketCode.NAS, symb="AAPL")
+            result = api.get_current_price(exchange_code=OverseasMarketCode.NAS, symbol="AAPL")
 
             assert isinstance(result, OverseasCurrentPriceResponse)
             assert result.output.rsym == "NASD.AAPL"
@@ -62,7 +62,7 @@ class TestGetCurrentPrice:
     def test_get_current_price_with_invalid_params_raises_error(self, api):
         """잘못된 파라미터로 호출 시 에러 발생 테스트"""
         with pytest.raises(ValueError):
-            api.get_current_price(symb="")
+            api.get_current_price(symbol="")
 
 
 class TestGetDailyCandles:
@@ -106,7 +106,7 @@ class TestGetDailyCandles:
             mock_get.return_value.headers = {"tr_cont": ""}
 
             result = api.get_daily_candles(
-                excd=OverseasAssetType.INDEX, symb="AAPL", start_date="20240101", end_date="20240131"
+                asset_type=OverseasAssetType.INDEX, symbol="AAPL", start_date="20240101", end_date="20240131"
             )
 
             assert isinstance(result, OverseasDailyCandleResponse)
@@ -123,8 +123,8 @@ class TestGetDailyCandles:
 
             # 주봉 조회
             result = api.get_daily_candles(
-                excd=OverseasAssetType.INDEX,
-                symb="AAPL",
+                asset_type=OverseasAssetType.INDEX,
+                symbol="AAPL",
                 start_date="20240101",
                 end_date="20240131",
                 period=OverseasCandlePeriod.WEEKLY,

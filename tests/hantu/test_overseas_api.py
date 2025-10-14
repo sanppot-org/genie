@@ -106,7 +106,7 @@ class TestGetBalance:
         mocker.patch('requests.get', return_value=mock_response)
 
         # When
-        result = api.get_balance(ovrs_excg_cd=OverseasExchangeCode.NASD, tr_crcy_cd=TradingCurrencyCode.USD)
+        result = api.get_balance(exchange_code=OverseasExchangeCode.NASD, trading_currency_code=TradingCurrencyCode.USD)
 
         # Then
         assert len(result.output1) == 1
@@ -221,7 +221,7 @@ class TestGetBalance:
         mock_get.side_effect = [first_response, second_response]
 
         # When
-        result = api.get_balance(ovrs_excg_cd=OverseasExchangeCode.NASD, tr_crcy_cd=TradingCurrencyCode.USD)
+        result = api.get_balance(exchange_code=OverseasExchangeCode.NASD, trading_currency_code=TradingCurrencyCode.USD)
 
         # Then
         assert len(result.output1) == 2
@@ -257,4 +257,4 @@ class TestGetBalance:
 
         # When & Then
         with pytest.raises(Exception, match="Error: Bad Request"):
-            api.get_balance(ovrs_excg_cd=OverseasExchangeCode.NASD, tr_crcy_cd=TradingCurrencyCode.USD)
+            api.get_balance(exchange_code=OverseasExchangeCode.NASD, trading_currency_code=TradingCurrencyCode.USD)

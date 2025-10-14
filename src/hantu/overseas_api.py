@@ -36,43 +36,43 @@ class HantuOverseasAPI(HantuBaseAPI):
 
     def get_balance(
             self,
-            ovrs_excg_cd: OverseasExchangeCode = OverseasExchangeCode.NASD,
-            tr_crcy_cd: TradingCurrencyCode = TradingCurrencyCode.USD,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+            trading_currency_code: TradingCurrencyCode = TradingCurrencyCode.USD,
     ) -> overseas_balance.OverseasBalanceResponse:
         """해외 주식 잔고 조회
 
         연속 조회를 통해 모든 보유 종목과 계좌 전체 정보를 반환합니다.
 
         Args:
-            ovrs_excg_cd: 해외거래소코드 (OverseasExchangeCode enum 사용)
-            tr_crcy_cd: 거래통화코드 (TradingCurrencyCode enum 사용)
+            exchange_code: 해외거래소코드 (OverseasExchangeCode enum 사용)
+            trading_currency_code: 거래통화코드 (TradingCurrencyCode enum 사용)
 
         Returns:
             overseas_balance.OverseasBalanceResponse: output1(개별 종목), output2(계좌 전체)
         """
         output1, output2 = self._get_balance_recursive(
-            ovrs_excg_cd=ovrs_excg_cd,
-            tr_crcy_cd=tr_crcy_cd
+            exchange_code=exchange_code,
+            trading_currency_code=trading_currency_code
         )
         return overseas_balance.OverseasBalanceResponse(output1=output1, output2=output2)
 
     def _get_balance_recursive(
             self,
-            ovrs_excg_cd: OverseasExchangeCode,
-            tr_crcy_cd: TradingCurrencyCode,
+            exchange_code: OverseasExchangeCode,
+            trading_currency_code: TradingCurrencyCode,
             ctx_area_fk200: str = "",
             ctx_area_nk200: str = "",
-            tr_cont: str = "",
+            continuation_flag: str = "",
             accumulated_output1=None,
     ) -> Tuple[List[overseas_balance.ResponseBodyoutput1], overseas_balance.ResponseBodyoutput2]:
         """해외 주식 잔고 조회 (연속 조회 지원) - 내부 메서드
 
         Args:
-            ovrs_excg_cd: 해외거래소코드 (OverseasExchangeCode enum 사용)
-            tr_crcy_cd: 거래통화코드 (TradingCurrencyCode enum 사용)
+            exchange_code: 해외거래소코드 (OverseasExchangeCode enum 사용)
+            trading_currency_code: 거래통화코드 (TradingCurrencyCode enum 사용)
             ctx_area_fk200: 연속조회검색조건200 (내부적으로 사용)
             ctx_area_nk200: 연속조회키200 (내부적으로 사용)
-            tr_cont: 연속거래여부 (내부적으로 사용)
+            continuation_flag: 연속거래여부 (내부적으로 사용)
             accumulated_output1: 누적된 output1 (내부적으로 사용)
 
         Returns:
@@ -91,14 +91,14 @@ class HantuOverseasAPI(HantuBaseAPI):
             appkey=self.app_key,
             appsecret=self.app_secret,
             tr_id=tr_id,
-            tr_cont=tr_cont if tr_cont else "",
+            tr_cont=continuation_flag if continuation_flag else "",
         )
 
         param = overseas_balance.RequestQueryParam(
             CANO=self.cano,
             ACNT_PRDT_CD=self.acnt_prdt_cd,
-            OVRS_EXCG_CD=ovrs_excg_cd,
-            TR_CRCY_CD=tr_crcy_cd,
+            OVRS_EXCG_CD=exchange_code,
+            TR_CRCY_CD=trading_currency_code,
             CTX_AREA_FK200=ctx_area_fk200,
             CTX_AREA_NK200=ctx_area_nk200,
         )
@@ -125,11 +125,11 @@ class HantuOverseasAPI(HantuBaseAPI):
             time.sleep(0.1)
             # 재귀 호출로 다음 페이지 가져오기
             return self._get_balance_recursive(
-                ovrs_excg_cd=ovrs_excg_cd,
-                tr_crcy_cd=tr_crcy_cd,
+                exchange_code=exchange_code,
+                trading_currency_code=trading_currency_code,
                 ctx_area_fk200=response_body.ctx_area_fk200,
                 ctx_area_nk200=response_body.ctx_area_nk200,
-                tr_cont="N",
+                continuation_flag="N",
                 accumulated_output1=accumulated_output1,
             )
         else:
@@ -137,13 +137,13 @@ class HantuOverseasAPI(HantuBaseAPI):
             return accumulated_output1, response_body.output2
 
     def get_current_price(
-            self, excd: OverseasMarketCode = OverseasMarketCode.NYS, symb: str = ""
+            self, exchange_code: OverseasMarketCode = OverseasMarketCode.NYS, symbol: str = ""
     ) -> OverseasCurrentPriceResponse:
         """해외 주식 현재체결가 조회
 
         Args:
-            excd: 거래소코드 (OverseasMarketCode enum, 기본값: NYS)
-            symb: 종목코드 (예: AAPL, TSLA 등)
+            exchange_code: 거래소코드 (OverseasMarketCode enum, 기본값: NYS)
+            symbol: 종목코드 (예: AAPL, TSLA 등)
 
         Returns:
             OverseasCurrentPriceResponse: 현재체결가 정보
@@ -152,8 +152,8 @@ class HantuOverseasAPI(HantuBaseAPI):
             ValueError: 필수 파라미터가 누락된 경우
             Exception: API 호출 실패 시
         """
-        if not symb:
-            raise ValueError("종목코드(symb)는 필수입니다")
+        if not symbol:
+            raise ValueError("종목코드(symbol)는 필수입니다")
 
         URL = f"{self.url_base}/uapi/overseas-price/v1/quotations/price"
         headers = {
@@ -165,8 +165,8 @@ class HantuOverseasAPI(HantuBaseAPI):
 
         params = {
             "AUTH": "",
-            "EXCD": excd.value,
-            "SYMB": symb,
+            "EXCD": exchange_code.value,
+            "SYMB": symbol,
         }
 
         res = requests.get(URL, headers=headers, params=params)
@@ -177,19 +177,19 @@ class HantuOverseasAPI(HantuBaseAPI):
 
     def get_daily_candles(
             self,
-            symb: str,
+            symbol: str,
             start_date: str,
             end_date: str,
-            excd: OverseasAssetType = OverseasAssetType.INDEX,
+            asset_type: OverseasAssetType = OverseasAssetType.INDEX,
             period: OverseasCandlePeriod = OverseasCandlePeriod.DAILY,
     ) -> OverseasDailyCandleResponse:
         """해외 주식 일/주/월/년 캔들 데이터 조회
 
         Args:
-            symb: 종목코드
+            symbol: 종목코드
             start_date: 시작일자 (YYYYMMDD)
             end_date: 종료일자 (YYYYMMDD)
-            excd: 자산 유형 코드 (OverseasAssetType enum)
+            asset_type: 자산 유형 코드 (OverseasAssetType enum)
             period: 기간구분 (OverseasCandlePeriod enum, 기본값: DAILY)
 
         Returns:
@@ -199,8 +199,8 @@ class HantuOverseasAPI(HantuBaseAPI):
             ValueError: 필수 파라미터가 누락된 경우
             Exception: API 호출 실패 시
         """
-        if not symb:
-            raise ValueError("종목코드(symb)는 필수입니다")
+        if not symbol:
+            raise ValueError("종목코드(symbol)는 필수입니다")
         if not start_date:
             raise ValueError("시작일자(start_date)는 필수입니다")
         if not end_date:
@@ -217,8 +217,8 @@ class HantuOverseasAPI(HantuBaseAPI):
         }
 
         params = {
-            "FID_COND_MRKT_DIV_CODE": excd.value,
-            "FID_INPUT_ISCD": symb,
+            "FID_COND_MRKT_DIV_CODE": asset_type.value,
+            "FID_INPUT_ISCD": symbol,
             "FID_INPUT_DATE_1": start_date,
             "FID_INPUT_DATE_2": end_date,
             "FID_PERIOD_DIV_CODE": period.value,
@@ -232,9 +232,9 @@ class HantuOverseasAPI(HantuBaseAPI):
 
     def get_minute_candles(
             self,
-            symb: str,
-            excd: OverseasMarketCode = OverseasMarketCode.NAS,
-            nmin: OverseasMinuteInterval = OverseasMinuteInterval.MIN_1,
+            symbol: str,
+            exchange_code: OverseasMarketCode = OverseasMarketCode.NAS,
+            minute_interval: OverseasMinuteInterval = OverseasMinuteInterval.MIN_1,
             include_previous: bool = False,
             limit: int = 120,
     ) -> OverseasMinuteCandleResponse:
@@ -243,9 +243,9 @@ class HantuOverseasAPI(HantuBaseAPI):
         연속 조회를 통해 모든 분봉 데이터를 반환합니다.
 
         Args:
-            symb: 종목코드 (예: TSLA, AAPL)
-            excd: 거래소코드 (기본값: NAS, OverseasMarketCode 사용)
-            nmin: 분 간격 (기본값: MIN_1, OverseasMinuteInterval 사용)
+            symbol: 종목코드 (예: TSLA, AAPL)
+            exchange_code: 거래소코드 (기본값: NAS, OverseasMarketCode 사용)
+            minute_interval: 분 간격 (기본값: MIN_1, OverseasMinuteInterval 사용)
             include_previous: 전일 포함 여부 (기본값: False)
             limit: 요청 개수 (최대 120, 기본값: 120)
 
@@ -256,15 +256,15 @@ class HantuOverseasAPI(HantuBaseAPI):
             ValueError: 필수 파라미터가 누락된 경우
             Exception: API 호출 실패 시
         """
-        if not symb:
-            raise ValueError("종목코드(symb)는 필수입니다")
+        if not symbol:
+            raise ValueError("종목코드(symbol)는 필수입니다")
         if limit > 120:
             raise ValueError("요청 개수(limit)는 최대 120입니다")
 
         result = self._get_minute_candles_recursive(
-            symb=symb,
-            excd=excd,
-            nmin=nmin,
+            symbol=symbol,
+            exchange_code=exchange_code,
+            minute_interval=minute_interval,
             include_previous=include_previous,
             limit=limit,
         )
@@ -272,28 +272,28 @@ class HantuOverseasAPI(HantuBaseAPI):
 
     def _get_minute_candles_recursive(
             self,
-            symb: str,
-            excd: OverseasMarketCode,
-            nmin: OverseasMinuteInterval,
+            symbol: str,
+            exchange_code: OverseasMarketCode,
+            minute_interval: OverseasMinuteInterval,
             include_previous: bool,
             limit: int,
             next_key: str = "",
-            key_buff: str = "",
-            tr_cont: str = "",
+            key_buffer: str = "",
+            continuation_flag: str = "",
             accumulated_output2=None,
             output1_metadata=None,
     ) -> OverseasMinuteCandleResponse:
         """해외 주식 분봉 조회 (연속 조회 지원) - 내부 메서드
 
         Args:
-            symb: 종목코드
-            excd: 거래소코드 (OverseasMarketCode enum)
-            nmin: 분 간격 (OverseasMinuteInterval enum)
+            symbol: 종목코드
+            exchange_code: 거래소코드 (OverseasMarketCode enum)
+            minute_interval: 분 간격 (OverseasMinuteInterval enum)
             include_previous: 전일 포함 여부
             limit: 요청 개수 (int, 최대 120)
             next_key: 다음 조회 키
-            key_buff: 키 버퍼
-            tr_cont: 연속 거래 여부
+            key_buffer: 키 버퍼
+            continuation_flag: 연속 거래 여부
             accumulated_output2: 누적된 output2 (분봉 데이터)
             output1_metadata: output1 메타데이터
 
@@ -311,19 +311,19 @@ class HantuOverseasAPI(HantuBaseAPI):
             "appkey": self.app_key,
             "appsecret": self.app_secret,
             "tr_id": tr_id,
-            "tr_cont": tr_cont if tr_cont else "",
+            "tr_cont": continuation_flag if continuation_flag else "",
         }
 
         params = {
             "AUTH": "",
-            "EXCD": excd.value,
-            "SYMB": symb,
-            "NMIN": nmin.value,
+            "EXCD": exchange_code.value,
+            "SYMB": symbol,
+            "NMIN": minute_interval.value,
             "PINC": "1" if include_previous else "0",
             "NEXT": next_key,
             "NREC": str(limit),
             "FILL": "",
-            "KEYB": key_buff,
+            "KEYB": key_buffer,
         }
 
         res = requests.get(URL, headers=headers, params=params)
@@ -348,14 +348,14 @@ class HantuOverseasAPI(HantuBaseAPI):
             time.sleep(0.1)
             # 재귀 호출로 다음 페이지 가져오기
             return self._get_minute_candles_recursive(
-                symb=symb,
-                excd=excd,
-                nmin=nmin,
+                symbol=symbol,
+                exchange_code=exchange_code,
+                minute_interval=minute_interval,
                 include_previous=include_previous,
                 limit=limit,
                 next_key="1",
-                key_buff=key_buff,
-                tr_cont="N",
+                key_buffer=key_buffer,
+                continuation_flag="N",
                 accumulated_output2=accumulated_output2,
                 output1_metadata=output1_metadata,
             )
@@ -387,14 +387,14 @@ class HantuOverseasAPI(HantuBaseAPI):
         """
         # 현재가 조회
         price_info = self.get_current_price(
-            excd=OverseasMarketCode(exchange_code.value),
-            symb=ticker
+            exchange_code=OverseasMarketCode(exchange_code.value),
+            symbol=ticker
         )
         current_price = price_info.output.last
 
         return self._order(
-            ord_dv=OrderDirection.BUY,
-            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            order_direction=OrderDirection.BUY,
+            order_division=overseas_order.OverseasOrderDivision.LIMIT,
             exchange_code=exchange_code,
             ticker=ticker,
             quantity=quantity,
@@ -420,8 +420,8 @@ class HantuOverseasAPI(HantuBaseAPI):
             overseas_order.ResponseBody: 주문 응답
         """
         return self._order(
-            ord_dv=OrderDirection.BUY,
-            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            order_direction=OrderDirection.BUY,
+            order_division=overseas_order.OverseasOrderDivision.LIMIT,
             exchange_code=exchange_code,
             ticker=ticker,
             quantity=quantity,
@@ -449,14 +449,14 @@ class HantuOverseasAPI(HantuBaseAPI):
         """
         # 현재가 조회
         price_info = self.get_current_price(
-            excd=OverseasMarketCode(exchange_code.value),
-            symb=ticker
+            exchange_code=OverseasMarketCode(exchange_code.value),
+            symbol=ticker
         )
         current_price = price_info.output.last
 
         return self._order(
-            ord_dv=OrderDirection.SELL,
-            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            order_direction=OrderDirection.SELL,
+            order_division=overseas_order.OverseasOrderDivision.LIMIT,
             exchange_code=exchange_code,
             ticker=ticker,
             quantity=quantity,
@@ -482,8 +482,8 @@ class HantuOverseasAPI(HantuBaseAPI):
             overseas_order.ResponseBody: 주문 응답
         """
         return self._order(
-            ord_dv=OrderDirection.SELL,
-            ord_dvsn=overseas_order.OverseasOrderDivision.LIMIT,
+            order_direction=OrderDirection.SELL,
+            order_division=overseas_order.OverseasOrderDivision.LIMIT,
             exchange_code=exchange_code,
             ticker=ticker,
             quantity=quantity,
@@ -492,8 +492,8 @@ class HantuOverseasAPI(HantuBaseAPI):
 
     def _order(
             self,
-            ord_dv: OrderDirection,
-            ord_dvsn: overseas_order.OverseasOrderDivision,
+            order_direction: OrderDirection,
+            order_division: overseas_order.OverseasOrderDivision,
             exchange_code: OverseasExchangeCode,
             ticker: str,
             quantity: int,
@@ -502,8 +502,8 @@ class HantuOverseasAPI(HantuBaseAPI):
         """해외주식 주문 (내부 메서드)
 
         Args:
-            ord_dv: 매수/매도 구분 (OrderDirection.BUY 또는 OrderDirection.SELL)
-            ord_dvsn: 주문 구분 (OverseasOrderDivision)
+            order_direction: 매수/매도 구분 (OrderDirection.BUY 또는 OrderDirection.SELL)
+            order_division: 주문 구분 (OverseasOrderDivision)
             exchange_code: 거래소 코드
             ticker: 종목코드 (예: AAPL, TSLA)
             quantity: 주문 수량
@@ -515,7 +515,7 @@ class HantuOverseasAPI(HantuBaseAPI):
         URL = f"{self.url_base}/uapi/overseas-stock/v1/trading/order"
 
         # TR_ID 설정 (계좌 타입, 거래소, 매수/매도 구분에 따라 다름)
-        tr_id = self.ORDER_TR_ID_MAP[self.account_type, exchange_code, ord_dv]
+        tr_id = self.ORDER_TR_ID_MAP[self.account_type, exchange_code, order_direction]
 
         header = overseas_order.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -525,7 +525,7 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
         # SLL_TYPE 설정 (매도: "00", 매수: "")
-        sll_type = "00" if ord_dv == OrderDirection.SELL else ""
+        sll_type = "00" if order_direction == OrderDirection.SELL else ""
 
         body = overseas_order.RequestBody(
             CANO=self.cano,
@@ -535,7 +535,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             ORD_QTY=str(quantity),
             OVRS_ORD_UNPR=str(price),
             SLL_TYPE=sll_type,
-            ORD_DVSN=ord_dvsn.value,
+            ORD_DVSN=order_division.value,
         )
 
         # 호출

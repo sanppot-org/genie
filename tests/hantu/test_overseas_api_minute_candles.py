@@ -71,7 +71,7 @@ class TestGetMinuteCandles:
         mocker.patch('requests.get', return_value=mock_response)
 
         # When
-        result = api.get_minute_candles(symb="TSLA", nmin=OverseasMinuteInterval.MIN_1)
+        result = api.get_minute_candles(symbol="TSLA", minute_interval=OverseasMinuteInterval.MIN_1)
 
         # Then
         assert result.output1.rsym == "DNASTSLA"
@@ -169,7 +169,7 @@ class TestGetMinuteCandles:
         mock_get.side_effect = [first_response, second_response]
 
         # When
-        result = api.get_minute_candles(symb="TSLA", nmin=OverseasMinuteInterval.MIN_1)
+        result = api.get_minute_candles(symbol="TSLA", minute_interval=OverseasMinuteInterval.MIN_1)
 
         # Then
         assert result.output1.rsym == "DNASTSLA"
@@ -218,9 +218,9 @@ class TestGetMinuteCandles:
 
         # When
         api.get_minute_candles(
-            symb="AAPL",
-            excd=OverseasMarketCode.NYS,
-            nmin=OverseasMinuteInterval.MIN_5,
+            symbol="AAPL",
+            exchange_code=OverseasMarketCode.NYS,
+            minute_interval=OverseasMinuteInterval.MIN_5,
             include_previous=True,
             limit=60
         )
@@ -250,4 +250,4 @@ class TestGetMinuteCandles:
 
         # When & Then
         with pytest.raises(Exception, match="Error: Bad Request"):
-            api.get_minute_candles(symb="TSLA", nmin=OverseasMinuteInterval.MIN_1)
+            api.get_minute_candles(symbol="TSLA", minute_interval=OverseasMinuteInterval.MIN_1)

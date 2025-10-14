@@ -40,9 +40,9 @@ class HantuDomesticAPI(HantuBaseAPI):
             self,
             ticker: str,
             price: str,
-            ord_dvsn: OrderDivision = OrderDivision.MARKET,
-            cma_evlu_amt_icld_yn: str = "N",
-            ovrs_icld_yn: str = "N"
+            order_division: OrderDivision = OrderDivision.MARKET,
+            cma_evaluation_amount_included: str = "N",
+            overseas_included: str = "N"
     ) -> psbl_order.ResponseBody:
         """매수가능 조회
 
@@ -51,9 +51,9 @@ class HantuDomesticAPI(HantuBaseAPI):
         Args:
             ticker: 종목코드 (예: 005930)
             price: 주문단가 (1주당 가격)
-            ord_dvsn: 주문구분 (기본값: MARKET - 시장가)
-            cma_evlu_amt_icld_yn: CMA평가금액포함여부 (기본값: N)
-            ovrs_icld_yn: 해외포함여부 (기본값: N)
+            order_division: 주문구분 (기본값: MARKET - 시장가)
+            cma_evaluation_amount_included: CMA평가금액포함여부 (기본값: N)
+            overseas_included: 해외포함여부 (기본값: N)
 
         Returns:
             psbl_order.ResponseBody: 매수가능 조회 결과
@@ -75,9 +75,9 @@ class HantuDomesticAPI(HantuBaseAPI):
             ACNT_PRDT_CD=self.acnt_prdt_cd,
             PDNO=ticker,
             ORD_UNPR=price,
-            ORD_DVSN=ord_dvsn.value,
-            CMA_EVLU_AMT_ICLD_YN=cma_evlu_amt_icld_yn,
-            OVRS_ICLD_YN=ovrs_icld_yn,
+            ORD_DVSN=order_division.value,
+            CMA_EVLU_AMT_ICLD_YN=cma_evaluation_amount_included,
+            OVRS_ICLD_YN=overseas_included,
         )
 
         # 호출
@@ -136,8 +136,8 @@ class HantuDomesticAPI(HantuBaseAPI):
             order.ResponseBody: 주문 응답
         """
         return self._order(
-            ord_dv=OrderDirection.SELL,
-            ord_dvsn=OrderDivision.MARKET,
+            order_direction=OrderDirection.SELL,
+            order_division=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
             price=0
@@ -155,8 +155,8 @@ class HantuDomesticAPI(HantuBaseAPI):
             order.ResponseBody: 주문 응답
         """
         return self._order(
-            ord_dv=OrderDirection.SELL,
-            ord_dvsn=OrderDivision.LIMIT,
+            order_direction=OrderDirection.SELL,
+            order_division=OrderDivision.LIMIT,
             ticker=ticker,
             quantity=quantity,
             price=price
@@ -173,8 +173,8 @@ class HantuDomesticAPI(HantuBaseAPI):
             order.ResponseBody: 주문 응답
         """
         return self._order(
-            ord_dv=OrderDirection.BUY,
-            ord_dvsn=OrderDivision.MARKET,
+            order_direction=OrderDirection.BUY,
+            order_division=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
             price=0
@@ -192,8 +192,8 @@ class HantuDomesticAPI(HantuBaseAPI):
             order.ResponseBody: 주문 응답
         """
         return self._order(
-            ord_dv=OrderDirection.BUY,
-            ord_dvsn=OrderDivision.LIMIT,
+            order_direction=OrderDirection.BUY,
+            order_division=OrderDivision.LIMIT,
             ticker=ticker,
             quantity=quantity,
             price=price
@@ -201,8 +201,8 @@ class HantuDomesticAPI(HantuBaseAPI):
 
     def _order(
             self,
-            ord_dv: OrderDirection,
-            ord_dvsn: OrderDivision,
+            order_direction: OrderDirection,
+            order_division: OrderDivision,
             ticker: str,
             quantity: int,
             price: int
@@ -210,8 +210,8 @@ class HantuDomesticAPI(HantuBaseAPI):
         """주식 주문 (내부 메서드)
 
         Args:
-            ord_dv: 매수/매도 구분 (OrderDirection.BUY 또는 OrderDirection.SELL)
-            ord_dvsn: 주문 구분 (OrderDivision.LIMIT 또는 OrderDivision.MARKET)
+            order_direction: 매수/매도 구분 (OrderDirection.BUY 또는 OrderDirection.SELL)
+            order_division: 주문 구분 (OrderDivision.LIMIT 또는 OrderDivision.MARKET)
             ticker: 종목코드 (예: 005930)
             quantity: 주문 수량
             price: 주문 단가 (시장가일 경우 0)
@@ -222,7 +222,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
 
         # TR_ID 설정 (계좌 타입과 매수/매도 구분에 따라 다름)
-        tr_id = self.ORDER_TR_ID_MAP[self.account_type, ord_dv]  # type: ignore[index]
+        tr_id = self.ORDER_TR_ID_MAP[self.account_type, order_direction]  # type: ignore[index]
 
         header = order.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -235,7 +235,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             CANO=self.cano,
             ACNT_PRDT_CD=self.acnt_prdt_cd,
             PDNO=ticker,
-            ORD_DVSN=ord_dvsn.value,
+            ORD_DVSN=order_division.value,
             ORD_QTY=str(quantity),
             ORD_UNPR=str(price),
         )
@@ -255,7 +255,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             self,
             ctx_area_fk100: str = "",
             ctx_area_nk100: str = "",
-            tr_cont: str = "",
+            continuation_flag: str = "",
             accumulated_output1=None,
     ) -> Tuple[List[balance.ResponseBodyoutput1], List[balance.ResponseBodyoutput2]]:
         """주식 잔고 조회 (연속 조회 지원) - 내부 메서드
@@ -263,7 +263,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Args:
             ctx_area_fk100: 연속조회검색조건100 (내부적으로 사용)
             ctx_area_nk100: 연속조회키100 (내부적으로 사용)
-            tr_cont: 연속거래여부 (내부적으로 사용)
+            continuation_flag: 연속거래여부 (내부적으로 사용)
             accumulated_output1: 누적된 output1 (내부적으로 사용)
 
         Returns:
@@ -279,7 +279,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             appkey=self.app_key,
             appsecret=self.app_secret,
             tr_id=("TTTC8434R" if self.account_type == AccountType.REAL else "VTTC8434R"),
-            tr_cont=tr_cont if tr_cont else "",
+            tr_cont=continuation_flag if continuation_flag else "",
         )
 
         param = balance.RequestQueryParam(
@@ -315,7 +315,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             return self._get_balance_recursive(
                 ctx_area_fk100=response_body.ctx_area_fk100,
                 ctx_area_nk100=response_body.ctx_area_nk100,
-                tr_cont="N",
+                continuation_flag="N",
                 accumulated_output1=accumulated_output1,
             )
         else:
