@@ -4,3 +4,4 @@ __pycache__
 .serena
 .DS_Store
 .pytest_cache
+data

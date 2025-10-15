@@ -7,13 +7,14 @@
 import logging
 from enum import Enum
 
+import pandas as pd
 import pyupbit  # type: ignore
-from pandas import DataFrame
+from pandera.typing import DataFrame
 
 from src import constants as const
 from src.config import UpbitConfig
 from src.upbit.model.balance import BalanceInfo
-from src.upbit.model.candle import CandleData
+from src.upbit.model.candle import CandleSchema
 from src.upbit.model.error import UpbitAPIError
 from src.upbit.model.order import OrderResult
 
@@ -52,7 +53,7 @@ def get_candles(
         ticker: str = const.KRW_BTC,
         interval: CandleInterval = CandleInterval.MINUTE_60,
         count: int = 24
-) -> list[CandleData]:
+) -> DataFrame[CandleSchema]:
     """
     캔들 데이터 조회
 
@@ -62,18 +63,18 @@ def get_candles(
         count: 조회할 캔들 개수 (기본값: 24)
 
     Returns:
-        CandleData 리스트, 실패 시 빈 리스트
+        CandleSchema를 따르는 DataFrame, 실패 시 빈 DataFrame
     """
     try:
-        df: DataFrame = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count)
+        df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count)
 
         if df is None or df.empty:
-            return []
+            return pd.DataFrame()
 
-        return [CandleData.from_dataframe_row(row) for _, row in df.iterrows()]
+        return CandleSchema.validate(df)
     except Exception:
         logger.exception(f"캔들 데이터 조회 실패: ticker={ticker}, interval={interval.value}, count={count}")
-        return []
+        return pd.DataFrame()
 
 
 class UpbitAPI:
