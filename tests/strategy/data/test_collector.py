@@ -64,44 +64,6 @@ class TestDataCollector:
         assert result.close == 52800.0  # 24번째 캔들의 종가 (50500 + 23*100)
 
     @patch('src.strategy.data.collector.upbit_api.get_candles')
-    def test_collect_daily_data(self, mock_get_candles, collector):
-        """어제 데이터 수집 테스트"""
-        # 어제 날짜로 Mock 데이터 생성 (48시간치)
-        yesterday = datetime.datetime.now() - timedelta(days=1)
-        yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
-
-        data = []
-        index = []
-        for i in range(48):
-            data.append({
-                'open': 50000.0 + i * 100,
-                'high': 51000.0 + i * 100,
-                'low': 49000.0 + i * 100,
-                'close': 50500.0 + i * 100,
-                'volume': 100.0 + i,
-                'value': 5000000.0 + i * 10000
-            })
-            index.append(yesterday_start + timedelta(hours=i))
-
-        mock_df = pd.DataFrame(data, index=index)
-        mock_get_candles.return_value = mock_df
-
-        # 실행
-        morning, afternoon = collector.collect_daily_data("KRW-BTC")
-
-        # 검증
-        mock_get_candles.assert_called_once_with(
-            ticker="KRW-BTC",
-            interval=CandleInterval.MINUTE_60,
-            count=48
-        )
-
-        assert morning.date == yesterday.date()
-        assert morning.period == Period.MORNING
-        assert afternoon.date == yesterday.date()
-        assert afternoon.period == Period.AFTERNOON
-
-    @patch('src.strategy.data.collector.upbit_api.get_candles')
     def test_collect_initial_data(self, mock_get_candles, collector):
         """초기 20일치 데이터 수집 테스트"""
         # 어제부터 21일 전까지 시간봉 생성 (504개)
@@ -124,7 +86,7 @@ class TestDataCollector:
         mock_get_candles.return_value = pd.DataFrame(data, index=index)
 
         # 실행
-        result = collector.collect_initial_data("KRW-BTC", days=20)
+        result = collector.collect_data("KRW-BTC", days=20)
 
         # 검증
         mock_get_candles.assert_called_once_with(
@@ -165,7 +127,7 @@ class TestDataCollector:
         mock_get_candles.return_value = pd.DataFrame(data, index=index)
 
         # 실행
-        result = collector.collect_initial_data("KRW-BTC", days=20)
+        result = collector.collect_data("KRW-BTC", days=20)
 
         # 타임스탬프 필터링 후 정확히 40개 (20일 * 2)
         assert len(result) == 40

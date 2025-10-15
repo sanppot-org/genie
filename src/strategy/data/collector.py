@@ -4,7 +4,7 @@
 """
 
 import datetime as dt
-from datetime import timedelta, datetime
+from datetime import datetime
 
 import pandas as pd
 from pandera.typing import DataFrame, Series
@@ -23,7 +23,7 @@ class DataCollector:
     반일봉으로 집계합니다.
     """
 
-    def collect_initial_data(self, ticker: str, days: int = 20) -> list[HalfDayCandle]:
+    def collect_data(self, ticker: str, days: int = 20) -> list[HalfDayCandle]:
         """
         초기 데이터 수집
 
@@ -45,31 +45,6 @@ class DataCollector:
         )
 
         return self._aggregate_all(df, days)
-
-    def collect_daily_data(self, ticker: str) -> tuple[HalfDayCandle, HalfDayCandle]:
-        """
-        일일 데이터 수집 (어제)
-
-        48시간치 시간봉을 가져와서 어제 날짜로 집계합니다.
-        여유분은 00:00 정확히 실행 안 될 수 있고, 봉 누락 가능성에 대응합니다.
-
-        Args:
-            ticker: 티커 코드
-
-        Returns:
-            (오전 반일봉, 오후 반일봉) 튜플
-        """
-        # 여유분 포함하여 데이터 수집
-        df = upbit_api.get_candles(
-            ticker=ticker,
-            interval=upbit_api.CandleInterval.MINUTE_60,
-            count=48
-        )
-
-        # 어제 날짜 계산
-        yesterday = (dt.datetime.now() - timedelta(days=1)).date()
-
-        return self._aggregate_day(df, yesterday)
 
     def _aggregate_all(
             self,

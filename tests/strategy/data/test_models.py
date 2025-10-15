@@ -89,6 +89,81 @@ class TestHalfDayCandle:
         # 0으로 나누면 inf
         assert candle.volatility == float('inf')
 
+    def test_noise_property(self):
+        """noise 프로퍼티 계산 테스트"""
+        candle = HalfDayCandle(
+            date=datetime.date(2025, 10, 13),
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,
+            low=49000.0,
+            close=50500.0,
+            volume=1234.56
+        )
+
+        # 1 - |50000 - 50500| / (51000 - 49000) = 1 - 500/2000 = 1 - 0.25 = 0.75
+        assert candle.noise == pytest.approx(0.75, rel=1e-9)
+
+    def test_noise_with_zero_range(self):
+        """레인지가 0일 때 noise 계산"""
+        candle = HalfDayCandle(
+            date=datetime.date(2025, 10, 13),
+            period=Period.MORNING,
+            open=50000.0,
+            high=50000.0,  # 고가 = 저가
+            low=50000.0,
+            close=50000.0,
+            volume=1234.56
+        )
+
+        # 레인지가 0이면 0 반환
+        assert candle.noise == 0.0
+
+    def test_return_rate_property(self):
+        """return_rate 프로퍼티 계산 테스트"""
+        candle = HalfDayCandle(
+            date=datetime.date(2025, 10, 13),
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,
+            low=49000.0,
+            close=50500.0,
+            volume=1234.56
+        )
+
+        # (50500 - 50000) / 50000 = 500 / 50000 = 0.01
+        assert candle.return_rate == pytest.approx(0.01, rel=1e-9)
+
+    def test_return_rate_with_negative(self):
+        """음수 수익률 계산"""
+        candle = HalfDayCandle(
+            date=datetime.date(2025, 10, 13),
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,
+            low=48000.0,
+            close=49000.0,
+            volume=1234.56
+        )
+
+        # (49000 - 50000) / 50000 = -1000 / 50000 = -0.02
+        assert candle.return_rate == pytest.approx(-0.02, rel=1e-9)
+
+    def test_return_rate_with_zero_open(self):
+        """시가가 0일 때 return_rate 계산"""
+        candle = HalfDayCandle(
+            date=datetime.date(2025, 10, 13),
+            period=Period.MORNING,
+            open=0.0,
+            high=51000.0,
+            low=49000.0,
+            close=50500.0,
+            volume=1234.56
+        )
+
+        # 0으로 나누면 inf
+        assert candle.return_rate == float('inf')
+
     def test_from_dict(self):
         """from_dict 메서드 테스트"""
         data = {
@@ -169,3 +244,343 @@ class TestHalfDayCandle:
                 close=50500.0,
                 volume=1234.56
             )
+
+
+class TestRecent20DaysHalfDayCandles:
+    """Recent20DaysHalfDayCandles 래퍼 클래스 테스트"""
+
+    def test_create_with_candles(self):
+        """캔들 리스트로 생성"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        for i in range(20):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        assert len(history.candles) == 40
+
+    def test_morning_candles_property(self):
+        """오전 캔들만 필터링"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        for i in range(20):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+        morning = history.morning_candles
+
+        assert len(morning) == 20
+        assert all(c.period == Period.MORNING for c in morning)
+
+    def test_afternoon_candles_property(self):
+        """오후 캔들만 필터링"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        for i in range(20):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+        afternoon = history.afternoon_candles
+
+        assert len(afternoon) == 20
+        assert all(c.period == Period.AFTERNOON for c in afternoon)
+
+    def test_yesterday_morning_property(self):
+        """전일 오전 캔들 조회"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        for i in range(20):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0 + i * 1000,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+        yesterday_morning = history.yesterday_morning
+
+        # 마지막 오전 캔들 (20일째)
+        assert yesterday_morning.open == 69000.0
+        assert yesterday_morning.period == Period.MORNING
+
+    def test_yesterday_afternoon_property(self):
+        """전일 오후 캔들 조회"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        for i in range(20):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0 + i * 1000,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+        yesterday_afternoon = history.yesterday_afternoon
+
+        # 마지막 오후 캔들 (20일째)
+        assert yesterday_afternoon.open == 69500.0
+        assert yesterday_afternoon.period == Period.AFTERNOON
+
+    def test_calculate_morning_noise_average(self):
+        """오전 노이즈 평균 계산"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        for i in range(20):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            # 오전: noise = 0.5
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,  # |50000-50500|/1000 = 0.5, noise = 0.5
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+        avg = history.calculate_morning_noise_average()
+
+        assert avg == pytest.approx(0.5, rel=1e-9)
+
+    def test_calculate_threshold(self):
+        """변동성 돌파 임계값 계산"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+        from src.strategy.strategies.volatility_breakout import _calculate_threshold
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 20일치 데이터 생성 (모든 오전 노이즈 = 0.5)
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,  # range=1000
+                low=50000.0,
+                close=50500.0,  # noise=0.5
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51000.0,  # 이것이 다음날 오전 시가가 됨
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 전일 오전 range = 1000
+        # k값 (20일 평균 노이즈) = 0.5
+        # 전일 오후 종가 = 51000 (= 당일 시가)
+        # 임계값 = 51000 + (1000 * 0.5) = 51500
+        threshold = _calculate_threshold(history)
+
+        assert threshold == pytest.approx(51500.0, rel=1e-9)
+
+    def test_calculate_threshold_uses_yesterday_afternoon_close(self):
+        """임계값 계산 시 전일 오후 종가를 당일 시가로 사용"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+        from src.strategy.strategies.volatility_breakout import _calculate_threshold
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 19일은 동일한 데이터
+        for i in range(19):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51000.0,
+                volume=1500.0
+            ))
+
+        # 20일째 (전일): 오후 종가를 다르게 설정
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,  # range=1000
+            low=50000.0,
+            close=50500.0,
+            volume=1000.0
+        ))
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.AFTERNOON,
+            open=50500.0,
+            high=52000.0,
+            low=50000.0,
+            close=60000.0,  # 특별히 높은 종가 (당일 시가가 됨)
+            volume=1500.0
+        ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # k = 0.5, 전일 오전 range = 1000
+        # 당일 시가 = 전일 오후 종가 = 60000
+        # 임계값 = 60000 + (1000 * 0.5) = 60500
+        threshold = _calculate_threshold(history)
+
+        assert threshold == pytest.approx(60500.0, rel=1e-9)
+
+    def test_calculate_threshold_with_different_k(self):
+        """다양한 k값으로 임계값 계산"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+        from src.strategy.strategies.volatility_breakout import _calculate_threshold
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 노이즈가 0.05, 0.1, 0.15, ..., 1.0인 20일치
+        for i in range(1, 21):
+            date = base_date + datetime.timedelta(days=i)
+            noise = i * 0.05
+            range_value = 1000.0
+            body_size = range_value * (1 - noise)
+
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=50000.0 + range_value,
+                low=50000.0,
+                close=50000.0 + body_size,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=52000.0,  # 당일 시가
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # k값 = (0.05 + 0.1 + ... + 1.0) / 20 = 0.525
+        # 전일 오전 range = 1000
+        # 당일 시가 = 52000
+        # 임계값 = 52000 + (1000 * 0.525) = 52525
+        threshold = _calculate_threshold(history)
+
+        assert threshold == pytest.approx(52525.0, rel=1e-9)

@@ -5,6 +5,7 @@
 
 import datetime
 from enum import Enum
+from functools import total_ordering
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +16,7 @@ class Period(str, Enum):
     AFTERNOON = "afternoon"
 
 
+@total_ordering
 class HalfDayCandle(BaseModel):
     """
     반일 캔들 데이터
@@ -32,7 +34,7 @@ class HalfDayCandle(BaseModel):
     """
 
     date: datetime.date = Field(..., description="날짜 (YYYY-MM-DD)")
-    period: Period = Field(..., description="기간")
+    period: Period = Field(..., description="기간 (오전 or 오후)")
     open: float = Field(..., description="시가")
     high: float = Field(..., description="고가")
     low: float = Field(..., description="저가")
@@ -60,6 +62,33 @@ class HalfDayCandle(BaseModel):
         if self.open == 0.0:
             return float('inf')
         return self.range / self.open
+
+    @property
+    def noise(self) -> float:
+        """
+        노이즈 비율 (1 - |시가 - 종가| / (고가 - 저가))
+
+        캔들에서 꼬리가 차지하는 비율을 나타냅니다.
+        꼬리가 클수록 노이즈가 커집니다.
+
+        Returns:
+            노이즈 비율 (레인지가 0이면 0 반환)
+        """
+        if self.range == 0.0:
+            return 0.0
+        return 1 - abs(self.open - self.close) / self.range
+
+    @property
+    def return_rate(self) -> float:
+        """
+        수익률 ((종가 - 시가) / 시가)
+
+        Returns:
+            수익률 (시가가 0이면 inf 반환)
+        """
+        if self.open == 0.0:
+            return float('inf')
+        return (self.close - self.open) / self.open
 
     @classmethod
     def from_dict(cls, data: dict) -> "HalfDayCandle":
@@ -90,3 +119,81 @@ class HalfDayCandle(BaseModel):
             "close": self.close,
             "volume": self.volume
         }
+
+    def __lt__(self, other: "HalfDayCandle") -> bool:
+        """
+        정렬을 위한 비교 연산자 (<)
+
+        날짜 → 기간(오전 < 오후) 순서로 정렬됩니다.
+        동등성 비교(__eq__)는 Pydantic의 기본 동작(모든 필드 비교)을 사용합니다.
+
+        Args:
+            other: 비교할 다른 HalfDayCandle 인스턴스
+
+        Returns:
+            self가 other보다 작으면 True
+        """
+        if self.date != other.date:
+            return self.date < other.date
+        # 같은 날짜면 오전이 오후보다 작음
+        return self.period == Period.MORNING and other.period == Period.AFTERNOON
+
+
+class Recent20DaysHalfDayCandles:
+    """
+    최근 20일의 반일봉 데이터 컬렉션
+
+    최근 20일의 반일봉 데이터(총 40개: 오전 20개, 오후 20개)를 래핑하여
+    변동성 돌파 전략 등에서 사용할 수 있는 메서드를 제공합니다.
+    """
+
+    def __init__(self, candles: list[HalfDayCandle]):
+        """
+        Args:
+            candles: 최근 20일의 반일봉 데이터 리스트 (총 40개)
+                    - 오전 캔들 20개, 오후 캔들 20개
+                    - 입력 순서와 무관하게 자동으로 시간순 정렬됨
+        """
+        if len(candles) != 40:
+            raise ValueError(f"Expected 40 candles, got {len(candles)}")
+
+        # HalfDayCandle의 __lt__ 메서드를 사용하여 시간순 정렬
+        self._candles = sorted(candles)
+
+    @property
+    def candles(self) -> list[HalfDayCandle]:
+        """전체 캔들 데이터"""
+        return self._candles
+
+    @property
+    def morning_candles(self) -> list[HalfDayCandle]:
+        """오전 캔들만 필터링"""
+        return [c for c in self._candles if c.period == Period.MORNING]
+
+    @property
+    def afternoon_candles(self) -> list[HalfDayCandle]:
+        """오후 캔들만 필터링"""
+        return [c for c in self._candles if c.period == Period.AFTERNOON]
+
+    @property
+    def yesterday_morning(self) -> HalfDayCandle:
+        """전일 오전 캔들 (가장 최근 오전)"""
+        return self.morning_candles[-1]
+
+    @property
+    def yesterday_afternoon(self) -> HalfDayCandle:
+        """전일 오후 캔들 (가장 최근 오후)"""
+        return self.afternoon_candles[-1]
+
+    def calculate_morning_noise_average(self) -> float:
+        """
+        최근 20일간 오전 노이즈의 평균 계산
+
+        Returns:
+            오전 노이즈 평균값
+        """
+        morning = self.morning_candles
+
+        noise_sum = sum(candle.noise for candle in morning)
+
+        return noise_sum / len(morning)
