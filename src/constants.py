@@ -80,3 +80,5 @@ SELL_SIDE = 'ask'
 FIELD_UUID = 'uuid'
 FIELD_SIDE = 'side'
 FIELD_MARKET = 'market'
+
+UTF_8 = 'utf-8'

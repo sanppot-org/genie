@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 from src.upbit.model.balance import BalanceInfo
-from src.upbit.model.candle import CandleData
 from src.upbit.model.error import UpbitAPIError
 from src.upbit.model.order import OrderResult, OrderSide, OrderType
 from src.upbit.upbit_api import get_candles, get_current_price, UpbitAPI
@@ -17,7 +16,7 @@ class TestGetCandles:
 
     @patch('src.upbit.upbit_api.pyupbit.get_ohlcv')
     def test_get_candles_여러_캔들_반환(self, mock_get_ohlcv):
-        """get_candles는 여러 개의 캔들 데이터를 반환할 수 있다"""
+        """get_candles는 여러 개의 캔들 데이터를 DataFrame으로 반환할 수 있다"""
 
         # Mock DataFrame 생성
         mock_df = pd.DataFrame({
@@ -38,19 +37,19 @@ class TestGetCandles:
         result = get_candles(count=2)
 
         # 검증
-        assert isinstance(result, list)
+        assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
-        assert all(isinstance(candle, CandleData) for candle in result)
+        assert list(result.columns) == ['open', 'high', 'low', 'close', 'volume', 'value']
 
     @patch('src.upbit.upbit_api.pyupbit.get_ohlcv')
-    def test_get_candles_API_호출_실패시_빈_리스트_반환(self, mock_get_ohlcv):
-        """API 호출 실패 시 빈 리스트를 반환한다"""
+    def test_get_candles_API_호출_실패시_빈_DataFrame_반환(self, mock_get_ohlcv):
+        """API 호출 실패 시 빈 DataFrame을 반환한다"""
         mock_get_ohlcv.return_value = None
 
         result = get_candles()
 
-        assert result == []
-        assert isinstance(result, list)
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
 
 
 class TestGetCurrentPrice:
