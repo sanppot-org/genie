@@ -10,7 +10,7 @@ import pandas as pd
 from pandera.typing import DataFrame, Series
 
 import constants
-from src.strategy.data.models import HalfDayCandle, Period
+from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.upbit import upbit_api
 from src.upbit.model.candle import CandleSchema
 
@@ -23,7 +23,7 @@ class DataCollector:
     반일봉으로 집계합니다.
     """
 
-    def collect_data(self, ticker: str, days: int = 20) -> list[HalfDayCandle]:
+    def collect_data(self, ticker: str, days: int = 20) -> Recent20DaysHalfDayCandles:
         """
         초기 데이터 수집
 
@@ -35,7 +35,7 @@ class DataCollector:
             days: 수집할 일수 (기본값: 20)
 
         Returns:
-            반일봉 리스트 (일수 * 2개)
+            Recent20DaysHalfDayCandles 객체 (20일 * 2 = 40개 캔들)
         """
         # 여유분 포함하여 데이터 수집
         df = upbit_api.get_candles(
@@ -44,7 +44,8 @@ class DataCollector:
             count=(days + 1) * 24
         )
 
-        return self._aggregate_all(df, days)
+        candles = self._aggregate_all(df, days)
+        return Recent20DaysHalfDayCandles(candles)
 
     def _aggregate_all(
             self,

@@ -3,29 +3,37 @@
 오전 시간대에 현재가가 일정 수준 이상 상승하면 매수 시그널을 발생시킵니다.
 """
 
+from datetime import datetime
+
 from src.strategy.data.models import Recent20DaysHalfDayCandles
+from src.strategy.utils import is_morning
 
 
 def check_buy_signal(
         history: Recent20DaysHalfDayCandles,
-        current_price: float
+        current_price: float,
+        now: datetime | None = None
 ) -> bool:
     """
     변동성 돌파 매수 시그널 체크
 
-    현재가 > 당일 시가 + (전일 오전 레인지 × 최근 20일 오전 노이즈 평균)
-    - 당일 시가는 전일 오후 종가로부터 자동 계산됨
+    조건:
+    1. 현재 시간이 오전(00:00~12:00 KST)
+    2. 현재가 > 당일 시가 + (전일 오전 레인지 × 최근 20일 오전 노이즈 평균)
+       - 당일 시가는 전일 오후 종가로부터 자동 계산됨
 
     Args:
         history: 반일봉 데이터 컬렉션 (최소 20일치)
         current_price: 현재가
+        now: 확인할 시간 (None이면 현재 시간 사용)
 
     Returns:
         매수 시그널 여부 (True: 매수, False: 대기)
     """
     try:
+        # 조건 1: 현재 시간이 오전이어야 함
         threshold = _calculate_threshold(history)
-        return current_price > threshold
+        return is_morning(now) and current_price > threshold
 
     except (ValueError, IndexError):
         # 데이터 부족이나 기타 에러 시 False 반환

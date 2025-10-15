@@ -1,6 +1,7 @@
 """오전오후 전략 테스트"""
 
 import datetime
+from zoneinfo import ZoneInfo
 
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.strategy.strategies.morning_afternoon import check_buy_signal
@@ -8,6 +9,85 @@ from src.strategy.strategies.morning_afternoon import check_buy_signal
 
 class TestMorningAfternoonSignal:
     """오전오후 매수 시그널 테스트"""
+
+    def test_signal_false_when_not_morning(self):
+        """오전 시간이 아닐 때 False 반환"""
+        # 20일치 데이터 생성
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+
+            morning = HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            )
+
+            afternoon = HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,  # 조건 만족
+                volume=1500.0
+            )
+
+            candles.extend([morning, afternoon])
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 오후 3시 (KST)
+        afternoon_time = datetime.datetime(2025, 10, 20, 15, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=afternoon_time)
+
+        assert result is False
+
+    def test_signal_true_when_morning_and_conditions_met(self):
+        """오전이고 모든 조건을 만족할 때 True 반환"""
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+
+            morning = HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            )
+
+            afternoon = HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            )
+
+            candles.extend([morning, afternoon])
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
+
+        assert result is True
 
     def test_signal_true_when_all_conditions_met(self):
         """모든 조건을 만족할 때 True 반환"""
@@ -42,7 +122,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         assert result is True
 
@@ -78,7 +161,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         assert result is False
 
@@ -114,7 +200,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         assert result is False
 
@@ -150,7 +239,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         assert result is False
 
@@ -186,7 +278,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         assert result is False
 
@@ -247,7 +342,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         # 전일 데이터가 조건 만족하므로 True
         assert result is True
@@ -284,7 +382,10 @@ class TestMorningAfternoonSignal:
 
         history = Recent20DaysHalfDayCandles(candles)
 
-        result = check_buy_signal(history)
+        # 오전 10시 (KST)
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, now=morning_time)
 
         assert result is True
 

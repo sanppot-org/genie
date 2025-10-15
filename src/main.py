@@ -5,8 +5,9 @@ from src.config import UpbitConfig, HantuConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
 from src.strategy.data.collector import DataCollector
-from src.upbit.upbit_api import UpbitAPI, get_candles
+from src.upbit.upbit_api import UpbitAPI, get_current_price
 from strategy.data import storage
+from strategy.strategies import volatility_breakout
 
 # 로깅 설정
 logging.basicConfig(
@@ -21,11 +22,10 @@ hantu_overseas_api = HantuOverseasAPI(HantuConfig())  # type: ignore
 
 v_hantu_domestic_api = HantuDomesticAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
-# result = get_current_price()
-
 
 # Upbit
 
+# result = get_current_price()
 # result = get_candles()
 # result = upbit_api.get_balance()
 # result = upbit_api.get_balances()
@@ -69,6 +69,12 @@ filename = f'{ticker}-{datetime.now().date()}.json'
 # data = collector.collect_initial_data(ticker=ticker)
 # storage.save(data, filename)
 
-result = storage.load(filename)
+# result = storage.load(filename)
+
+### Strategy ###
+history = storage.load(filename)
+# result = morning_afternoon.check_buy_signal(history=history)
+
+result = volatility_breakout.check_buy_signal(history=history, current_price=get_current_price())
 
 print(result)

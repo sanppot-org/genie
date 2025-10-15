@@ -96,13 +96,13 @@ class TestDataCollector:
         )
 
         # 20일 * 2(오전/오후) = 40개의 반일봉
-        assert len(result) == 40
+        assert len(result.candles) == 40
 
         # 첫 번째와 마지막 캔들 확인
-        assert result[0].period == Period.MORNING
-        assert result[1].period == Period.AFTERNOON
-        assert result[-2].period == Period.MORNING
-        assert result[-1].period == Period.AFTERNOON
+        assert result.candles[0].period == Period.MORNING
+        assert result.candles[1].period == Period.AFTERNOON
+        assert result.candles[-2].period == Period.MORNING
+        assert result.candles[-1].period == Period.AFTERNOON
 
     @patch('src.strategy.data.collector.upbit_api.get_candles')
     def test_collect_initial_data_filters_by_timestamp(self, mock_get_candles, collector):
@@ -130,7 +130,7 @@ class TestDataCollector:
         result = collector.collect_data("KRW-BTC", days=20)
 
         # 타임스탬프 필터링 후 정확히 40개 (20일 * 2)
-        assert len(result) == 40
+        assert len(result.candles) == 40
 
     def test_aggregate_all(self, collector):
         """전체 기간 집계 테스트"""

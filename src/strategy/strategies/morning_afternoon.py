@@ -3,19 +3,27 @@
 전일 오후에 상승했고 거래량도 오후에 많았다면 당일도 상승 가능성이 높다고 판단합니다.
 """
 
+from datetime import datetime
+
 from src.strategy.data.models import Recent20DaysHalfDayCandles
+from src.strategy.utils import is_morning
 
 
-def check_buy_signal(history: Recent20DaysHalfDayCandles) -> bool:
+def check_buy_signal(
+        history: Recent20DaysHalfDayCandles,
+        now: datetime | None = None
+) -> bool:
     """
     오전오후 매수 시그널 체크
 
     조건:
-    1. 전일 오후 수익률 > 0
-    2. 전일 오전 거래량 < 전일 오후 거래량
+    1. 현재 시간이 오전(00:00~12:00 KST)
+    2. 전일 오후 수익률 > 0
+    3. 전일 오전 거래량 < 전일 오후 거래량
 
     Args:
         history: 반일봉 데이터 컬렉션 (최소 2일치)
+        now: 확인할 시간 (None이면 현재 시간 사용)
 
     Returns:
         매수 시그널 여부 (True: 매수, False: 대기)
@@ -27,9 +35,12 @@ def check_buy_signal(history: Recent20DaysHalfDayCandles) -> bool:
 
         afternoon_return = yesterday_afternoon.return_rate
 
-        # 조건 1: 전일 오후 수익률 > 0
-        # 조건 2: 전일 오전 거래량 < 전일 오후 거래량
-        return afternoon_return > 0 and yesterday_morning.volume < yesterday_afternoon.volume
+        # 조건 1: 현재 오전
+        # 조건 2: 전일 오후 수익률 > 0
+        # 조건 3: 전일 오전 거래량 < 전일 오후 거래량
+        return (is_morning(now)
+                and afternoon_return > 0
+                and yesterday_morning.volume < yesterday_afternoon.volume)
 
     except (ValueError, IndexError):
         # 데이터 부족이나 기타 에러 시 False 반환

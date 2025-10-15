@@ -1,6 +1,7 @@
 """변동성 돌파 전략 테스트"""
 
 import datetime
+from zoneinfo import ZoneInfo
 
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.strategy.strategies.volatility_breakout import check_buy_signal
@@ -8,6 +9,85 @@ from src.strategy.strategies.volatility_breakout import check_buy_signal
 
 class TestVolatilityBreakoutSignal:
     """변동성 돌파 매수 시그널 테스트"""
+
+    def test_signal_false_when_not_morning(self):
+        """오전 시간이 아닐 때 False 반환"""
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+
+            morning = HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            )
+
+            afternoon = HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=51500.0,
+                low=50000.0,
+                close=51000.0,
+                volume=1500.0
+            )
+
+            candles.extend([morning, afternoon])
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 가격은 임계값보다 높지만 오후 시간
+        current_price = 51600.0
+        afternoon_time = datetime.datetime(2025, 10, 20, 15, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, current_price, now=afternoon_time)
+
+        assert result is False
+
+    def test_signal_true_when_morning_and_price_above_threshold(self):
+        """오전이고 현재가가 임계값보다 높을 때 True 반환"""
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+
+            morning = HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            )
+
+            afternoon = HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=51500.0,
+                low=50000.0,
+                close=51000.0,
+                volume=1500.0
+            )
+
+            candles.extend([morning, afternoon])
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        current_price = 51600.0
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        result = check_buy_signal(history, current_price, now=morning_time)
+
+        assert result is True
 
     def test_signal_true_when_price_above_threshold(self):
         """현재가가 임계값보다 높을 때 True 반환"""
@@ -50,8 +130,9 @@ class TestVolatilityBreakoutSignal:
         # 임계값 = 51000 + (1000 * 0.5) = 51500
 
         current_price = 51600.0  # 임계값(51500)보다 높음
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
 
-        result = check_buy_signal(history, current_price)
+        result = check_buy_signal(history, current_price, now=morning_time)
 
         assert result is True
 
@@ -89,8 +170,9 @@ class TestVolatilityBreakoutSignal:
 
         # 임계값 = 51000 + (1000 * 0.5) = 51500
         current_price = 51400.0  # 임계값보다 낮음
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
 
-        result = check_buy_signal(history, current_price)
+        result = check_buy_signal(history, current_price, now=morning_time)
 
         assert result is False
 
@@ -128,8 +210,9 @@ class TestVolatilityBreakoutSignal:
 
         # 임계값 = 51000 + (1000 * 0.5) = 51500
         current_price = 51500.0  # 임계값과 정확히 같음
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
 
-        result = check_buy_signal(history, current_price)
+        result = check_buy_signal(history, current_price, now=morning_time)
 
         assert result is False
 
@@ -176,8 +259,9 @@ class TestVolatilityBreakoutSignal:
         # 임계값 = 50500 + (1000 * 0.525) = 51025
 
         current_price = 51100.0  # 임계값보다 높음
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
 
-        result = check_buy_signal(history, current_price)
+        result = check_buy_signal(history, current_price, now=morning_time)
 
         assert result is True
 
@@ -244,8 +328,9 @@ class TestVolatilityBreakoutSignal:
         # 임계값 = 51500 + (2000 * 0.5) = 52500
 
         current_price = 52600.0  # 임계값보다 높음
+        morning_time = datetime.datetime(2025, 10, 20, 10, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
 
-        result = check_buy_signal(history, current_price)
+        result = check_buy_signal(history, current_price, now=morning_time)
 
         assert result is True
 
