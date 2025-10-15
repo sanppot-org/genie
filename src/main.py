@@ -1,9 +1,12 @@
 import logging
+from datetime import datetime
 
 from src.config import UpbitConfig, HantuConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
-from src.upbit.upbit_api import UpbitAPI
+from src.strategy.data.collector import DataCollector
+from src.upbit.upbit_api import UpbitAPI, get_candles
+from strategy.data import storage
 
 # 로깅 설정
 logging.basicConfig(
@@ -19,10 +22,11 @@ hantu_overseas_api = HantuOverseasAPI(HantuConfig())  # type: ignore
 v_hantu_domestic_api = HantuDomesticAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 # result = get_current_price()
-# result = get_candles()
+
 
 # Upbit
 
+# result = get_candles()
 # result = upbit_api.get_balance()
 # result = upbit_api.get_balances()
 # result = upbit_api.buy_market_order(ticker='KRW-ETH', price=11000)
@@ -50,6 +54,21 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 # result = hantu_overseas_api.get_balance()
 # result = hantu_overseas_api.get_current_price(excd=OverseasMarketCode.NAS, symb="QQQ")
 # result = hantu_overseas_api.get_minute_candles(symb='AAPL')
-result = v_hantu_overseas_api.get_minute_candles(symb='AAPL')
+# result = v_hantu_overseas_api.get_minute_candles(symb='AAPL')
+
+
+#################################### Candle ####################################
+
+collector = DataCollector()
+# result = collector.collect_initial_data(ticker="KRW-BTC")
+
+
+###### storage #########
+ticker = "KRW-BTC"
+filename = f'{ticker}-{datetime.now().date()}.json'
+# data = collector.collect_initial_data(ticker=ticker)
+# storage.save(data, filename)
+
+result = storage.load(filename)
 
 print(result)
