@@ -287,3 +287,204 @@ class TestMorningAfternoonSignal:
         result = check_buy_signal(history)
 
         assert result is True
+
+
+class TestMorningAfternoonPositionSize:
+    """오전오후 매수 비중 계산 테스트"""
+
+    def test_calculate_position_size_normal(self):
+        """정상 케이스: 비중 계산"""
+        from src.strategy.strategies.morning_afternoon import calculate_position_size
+        import pytest
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 19일
+        for i in range(19):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        # 전일 (변동성 = 0.02)
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,  # range=1000, volatility=1000/50000=0.02
+            low=50000.0,
+            close=50500.0,
+            volume=1000.0
+        ))
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.AFTERNOON,
+            open=50500.0,
+            high=52000.0,
+            low=50000.0,
+            close=51500.0,
+            volume=1500.0
+        ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # target_vol = 0.01, volatility = 0.02
+        # position_size = 0.01 / 0.02 = 0.5
+        target_vol = 0.01
+        result = calculate_position_size(history, target_vol)
+
+        assert result == pytest.approx(0.5, rel=1e-9)
+
+    def test_calculate_position_size_low_volatility(self):
+        """변동성 < 0.1%일 때 0 반환"""
+        from src.strategy.strategies.morning_afternoon import calculate_position_size
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=50010.0,  # range=10, volatility=10/50000=0.0002 < 0.001
+                low=50000.0,
+                close=50005.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        target_vol = 0.01
+        result = calculate_position_size(history, target_vol)
+
+        assert result == 0.0
+
+    def test_calculate_position_size_capped_at_one(self):
+        """계산 결과 > 1.0일 때 1.0 반환"""
+        from src.strategy.strategies.morning_afternoon import calculate_position_size
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(19):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        # 전일: 낮은 변동성
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.MORNING,
+            open=50000.0,
+            high=50100.0,  # range=100, volatility=100/50000=0.002
+            low=50000.0,
+            close=50050.0,
+            volume=1000.0
+        ))
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.AFTERNOON,
+            open=50500.0,
+            high=52000.0,
+            low=50000.0,
+            close=51500.0,
+            volume=1500.0
+        ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # target_vol = 0.02, volatility = 0.002
+        # position_size = 0.02 / 0.002 = 10 > 1.0 → 1.0
+        target_vol = 0.02
+        result = calculate_position_size(history, target_vol)
+
+        assert result == 1.0
+
+    def test_calculate_position_size_various_targets(self):
+        """다양한 타겟 변동성으로 비중 계산"""
+        from src.strategy.strategies.morning_afternoon import calculate_position_size
+        import pytest
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,  # volatility = 0.02
+                low=50000.0,
+                close=50500.0,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 다양한 타겟 테스트
+        # target_vol = 0.005 (0.5%), volatility = 0.02
+        result1 = calculate_position_size(history, 0.005)
+        assert result1 == pytest.approx(0.25, rel=1e-9)
+
+        # target_vol = 0.01 (1%), volatility = 0.02
+        result2 = calculate_position_size(history, 0.01)
+        assert result2 == pytest.approx(0.5, rel=1e-9)
+
+        # target_vol = 0.015 (1.5%), volatility = 0.02
+        result3 = calculate_position_size(history, 0.015)
+        assert result3 == pytest.approx(0.75, rel=1e-9)

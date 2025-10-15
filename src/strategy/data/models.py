@@ -197,3 +197,31 @@ class Recent20DaysHalfDayCandles:
         noise_sum = sum(candle.noise for candle in morning)
 
         return noise_sum / len(morning)
+
+    def calculate_ma_score(self) -> float:
+        """
+        3,5,10,20일 오전 이동평균선 스코어 계산
+
+        각 이평선이 전일 오전 종가보다 큰지 확인하여
+        조건을 만족하는 이평선 개수를 4로 나눈 값을 반환합니다.
+
+        Returns:
+            이평선 스코어 (0.0 ~ 1.0)
+        """
+        morning = self.morning_candles
+        yesterday_morning_close = self.yesterday_morning.close
+
+        # 각 기간별 이동평균 계산
+        periods = [3, 5, 10, 20]
+        count = 0
+
+        for period in periods:
+            # 최근 N일간 오전 종가 평균
+            recent_closes = [c.close for c in morning[-period:]]
+            ma = sum(recent_closes) / len(recent_closes)
+
+            # 이평선이 전일 오전 종가보다 크면 카운트
+            if ma > yesterday_morning_close:
+                count += 1
+
+        return count / 4.0

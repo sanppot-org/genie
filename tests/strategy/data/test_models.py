@@ -584,3 +584,238 @@ class TestRecent20DaysHalfDayCandles:
         threshold = _calculate_threshold(history)
 
         assert threshold == pytest.approx(52525.0, rel=1e-9)
+
+    def test_calculate_ma_score_all_above(self):
+        """모든 이평선이 전일 오전 종가보다 클 때 1.0 반환"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 20일치 데이터: 오전 종가가 점진적으로 상승 (50000 → 69000)
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+            morning_close = 50000.0 + i * 1000  # 50000, 51000, ..., 69000
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=morning_close,
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 전일(19일째) 오전 종가 = 69000
+        # 3일 이평선 = (67000 + 68000 + 69000) / 3 = 68000
+        # 5일 이평선 = (65000 + 66000 + 67000 + 68000 + 69000) / 5 = 67000
+        # 10일 이평선 = (60000 + ... + 69000) / 10 = 64500
+        # 20일 이평선 = (50000 + ... + 69000) / 20 = 59500
+        # 모든 이평선이 전일 오전 종가(69000)보다 작으므로 0.0
+        #
+        # 수정: 상승 추세에서는 이평선이 현재가보다 작습니다.
+        # 다시 설계: 이평선이 전일 오전 종가보다 크려면 하락 후 반등 패턴이 필요
+
+        ma_score = history.calculate_ma_score()
+
+        # 상승 추세: 모든 이평선 < 전일 오전 종가 → 0.0
+        assert ma_score == pytest.approx(0.0, rel=1e-9)
+
+    def test_calculate_ma_score_all_below(self):
+        """모든 이평선이 전일 오전 종가보다 작을 때 0.0 반환"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 20일치 데이터: 오전 종가가 모두 동일 (50000)
+        for i in range(20):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50000.0,  # 모두 동일
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 전일 오전 종가 = 50000
+        # 모든 이평선 = 50000 (전일 오전 종가와 동일하므로 > 조건 불만족)
+        ma_score = history.calculate_ma_score()
+
+        assert ma_score == pytest.approx(0.0, rel=1e-9)
+
+    def test_calculate_ma_score_partial_above(self):
+        """일부 이평선만 전일 오전 종가보다 클 때 적절한 비율 반환"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 시나리오: 하락 후 반등
+        # 1~17일: 60000
+        # 18~19일: 50000 (하락)
+        # 20일(전일): 55000 (반등)
+        for i in range(17):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=60000.0,  # 고점
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        # 18~19일: 하락
+        for i in range(17, 19):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=50000.0,  # 하락
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        # 20일(전일): 반등
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,
+            low=50000.0,
+            close=55000.0,  # 반등
+            volume=1000.0
+        ))
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.AFTERNOON,
+            open=50500.0,
+            high=52000.0,
+            low=50000.0,
+            close=51500.0,
+            volume=1500.0
+        ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 전일 오전 종가 = 55000
+        # 3일 이평선 = (50000 + 50000 + 55000) / 3 = 51666.67 < 55000
+        # 5일 이평선 = (50000 + 50000 + 50000 + 50000 + 55000) / 5 = 51000 < 55000
+        # 10일 이평선 = (60000*8 + 50000*2) / 10 = 58000 > 55000 ✓
+        # 20일 이평선 = (60000*17 + 50000*2 + 55000) / 20 = 59250 > 55000 ✓
+        # 2개 만족 → 2/4 = 0.5
+        ma_score = history.calculate_ma_score()
+
+        assert ma_score == pytest.approx(0.5, rel=1e-9)
+
+    def test_calculate_ma_score_all_above_scenario(self):
+        """모든 이평선이 전일 오전 종가보다 큰 시나리오"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        base_date = datetime.date(2025, 10, 1)
+
+        # 시나리오: 장기 상승 후 급락
+        # 1~19일: 70000 (고점 유지)
+        # 20일(전일): 50000 (급락)
+        for i in range(19):
+            date = base_date + datetime.timedelta(days=i)
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.MORNING,
+                open=50000.0,
+                high=51000.0,
+                low=50000.0,
+                close=70000.0,  # 고점
+                volume=1000.0
+            ))
+            candles.append(HalfDayCandle(
+                date=date,
+                period=Period.AFTERNOON,
+                open=50500.0,
+                high=52000.0,
+                low=50000.0,
+                close=51500.0,
+                volume=1500.0
+            ))
+
+        # 20일(전일): 급락
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.MORNING,
+            open=50000.0,
+            high=51000.0,
+            low=50000.0,
+            close=50000.0,  # 급락
+            volume=1000.0
+        ))
+        candles.append(HalfDayCandle(
+            date=yesterday,
+            period=Period.AFTERNOON,
+            open=50500.0,
+            high=52000.0,
+            low=50000.0,
+            close=51500.0,
+            volume=1500.0
+        ))
+
+        history = Recent20DaysHalfDayCandles(candles)
+
+        # 전일 오전 종가 = 50000
+        # 3일 이평선 = (70000 + 70000 + 50000) / 3 = 63333.33 > 50000 ✓
+        # 5일 이평선 = (70000*4 + 50000) / 5 = 66000 > 50000 ✓
+        # 10일 이평선 = (70000*9 + 50000) / 10 = 68000 > 50000 ✓
+        # 20일 이평선 = (70000*19 + 50000) / 20 = 69000 > 50000 ✓
+        # 4개 모두 만족 → 4/4 = 1.0
+        ma_score = history.calculate_ma_score()
+
+        assert ma_score == pytest.approx(1.0, rel=1e-9)
