@@ -78,7 +78,7 @@ def get_candles(
 
 
 class UpbitAPI:
-    def __init__(self, config: UpbitConfig):
+    def __init__(self, config: UpbitConfig = UpbitConfig()):
         self.upbit = pyupbit.Upbit(config.upbit_access_key, config.upbit_secret_key)
 
     def get_balance(self, currency: str = const.CURRENCY_KRW) -> float:

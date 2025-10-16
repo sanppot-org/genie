@@ -3,7 +3,6 @@
 
 모든 문자열 상수와 매직 넘버를 중앙에서 관리합니다.
 """
-
 # 거래 관련 상수
 KRW_BTC = 'KRW-BTC'
 CURRENCY_KRW = 'KRW'
