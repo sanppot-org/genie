@@ -4,12 +4,16 @@
 """
 
 import datetime as dt
-from datetime import datetime
+import logging
+from datetime import date
+
+logger = logging.getLogger(__name__)
 
 import pandas as pd
 from pandera.typing import DataFrame, Series
 
-import constants
+from src import constants
+from src.strategy.clock import Clock
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.upbit import upbit_api
 from src.upbit.model.candle import CandleSchema
@@ -21,7 +25,22 @@ class DataCollector:
 
     60분봉 캔들 데이터를 수집하고 오전(00:00-11:59) / 오후(12:00-23:59)
     반일봉으로 집계합니다.
+    
+    캐싱 전략:
+    - 캐시 키: (ticker, date, days)
+    - 날짜가 바뀌면 이전 캐시 자동 정리
     """
+
+    def __init__(self, clock: Clock):
+        """DataCollector 초기화
+
+        Args:
+            clock: 시간 제공자
+        """
+        # 캐시: (ticker, date, days) -> Recent20DaysHalfDayCandles
+        self._cache: dict[tuple[str, date, int], Recent20DaysHalfDayCandles] = {}
+        self._last_cleanup_date: date | None = None
+        self._clock = clock
 
     def collect_data(self, ticker: str, days: int = 20) -> Recent20DaysHalfDayCandles:
         """
@@ -30,6 +49,10 @@ class DataCollector:
         21일치 시간봉을 가져와서 타임스탬프 기준으로 정확히 지정된 일수만 필터링합니다.
         여유분은 스케줄러 지연, API 응답 시간, 봉 누락에 대응하기 위함입니다.
 
+        캐싱:
+        - 같은 날짜, 같은 티커, 같은 일수로 요청하면 캐시된 데이터 반환
+        - 날짜가 바뀌면 이전 날짜 캐시 자동 정리
+
         Args:
             ticker: 티커 코드
             days: 수집할 일수 (기본값: 20)
@@ -37,6 +60,19 @@ class DataCollector:
         Returns:
             Recent20DaysHalfDayCandles 객체 (20일 * 2 = 40개 캔들)
         """
+        today = self._clock.now().date()
+        cache_key = (ticker, today, days)
+
+        # 날짜가 바뀌면 캐시 정리
+        self._cleanup_cache_if_needed(today)
+
+        # 캐시 확인
+        if cache_key in self._cache:
+            logger.debug(f"캐시 히트: {cache_key}")
+            return self._cache[cache_key]
+
+        logger.debug(f"캐시 미스: {cache_key}")
+
         # 여유분 포함하여 데이터 수집
         df = upbit_api.get_candles(
             ticker=ticker,
@@ -45,7 +81,35 @@ class DataCollector:
         )
 
         candles = self._aggregate_all(df, days)
-        return Recent20DaysHalfDayCandles(candles)
+        result = Recent20DaysHalfDayCandles(candles)
+
+        # 캐시 저장
+        self._cache[cache_key] = result
+
+        return result
+
+    def _cleanup_cache_if_needed(self, today: date) -> None:
+        """
+        날짜가 바뀌면 이전 날짜 캐시 삭제
+
+        Args:
+            today: 오늘 날짜
+        """
+        if self._last_cleanup_date is None or self._last_cleanup_date < today:
+            # 이전 날짜 캐시 모두 삭제
+            old_keys = [k for k in self._cache.keys() if k[1] < today]
+            for key in old_keys:
+                del self._cache[key]
+
+            self._last_cleanup_date = today
+
+            if old_keys:
+                logger.debug(f"캐시 정리 완료: {len(old_keys)}개 삭제")
+
+    def clear_cache(self) -> None:
+        """캐시 초기화 (테스트용)"""
+        self._cache.clear()
+        self._last_cleanup_date = None
 
     def _aggregate_all(
             self,
@@ -69,7 +133,7 @@ class DataCollector:
             return []
 
         # 오늘 날짜 계산
-        today = datetime.now().date()
+        today = self._clock.now().date()
 
         # DataFrame에서 고유한 날짜들 추출 (순서와 무관) 오늘 데이터 제외
         dates = pd.Series([idx.date() for idx in df.index if idx.date() < today])

@@ -11,7 +11,7 @@ import pandas as pd
 import pyupbit  # type: ignore
 from pandera.typing import DataFrame
 
-from src import constants as const
+from src import constants
 from src.config import UpbitConfig
 from src.upbit.model.balance import BalanceInfo
 from src.upbit.model.candle import CandleSchema
@@ -36,7 +36,7 @@ class CandleInterval(Enum):
     MONTH = "month"
 
 
-def get_current_price(ticker: str = const.KRW_BTC) -> float:
+def get_current_price(ticker: str = constants.KRW_BTC) -> float:
     """
     현재가 조회
 
@@ -50,7 +50,7 @@ def get_current_price(ticker: str = const.KRW_BTC) -> float:
 
 
 def get_candles(
-        ticker: str = const.KRW_BTC,
+        ticker: str = constants.KRW_BTC,
         interval: CandleInterval = CandleInterval.MINUTE_60,
         count: int = 24
 ) -> DataFrame[CandleSchema]:
@@ -78,10 +78,12 @@ def get_candles(
 
 
 class UpbitAPI:
-    def __init__(self, config: UpbitConfig = UpbitConfig()):
+    def __init__(self, config: UpbitConfig | None = None) -> None:
+        if config is None:
+            config = UpbitConfig()
         self.upbit = pyupbit.Upbit(config.upbit_access_key, config.upbit_secret_key)
 
-    def get_balance(self, currency: str = const.CURRENCY_KRW) -> float:
+    def get_available_amount(self, currency: str = constants.CURRENCY_KRW) -> float:
         """
         특정 통화의 사용 가능 수량 조회
 
@@ -168,7 +170,7 @@ class UpbitAPI:
         return self.sell_market_order(ticker, volume)
 
     @staticmethod
-    def _check_api_error(result: dict | list | None):
+    def _check_api_error(result: dict | list | None) -> None:
         """
         API 응답에서 에러 확인 및 예외 발생
 

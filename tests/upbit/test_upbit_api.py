@@ -107,7 +107,7 @@ class TestUpbitAPIGetBalance:
             mock_config.upbit_secret_key = "test_secret"
 
             api = UpbitAPI(mock_config)
-            result = api.get_balance()
+            result = api.get_available_amount()
 
             assert result == 1000000.0
             assert isinstance(result, float)
@@ -128,7 +128,7 @@ class TestUpbitAPIGetBalance:
             mock_config.upbit_secret_key = "test_secret"
 
             api = UpbitAPI(mock_config)
-            result = api.get_balance()
+            result = api.get_available_amount()
 
             assert result == 0.0
             assert isinstance(result, float)
@@ -148,12 +148,12 @@ class TestUpbitAPIGetBalance:
 
             # 정상 케이스
             mock_upbit_instance.get_balance.return_value = 500000.5
-            result1 = api.get_balance()
+            result1 = api.get_available_amount()
             assert isinstance(result1, float)
 
             # None 케이스
             mock_upbit_instance.get_balance.return_value = None
-            result2 = api.get_balance()
+            result2 = api.get_available_amount()
             assert isinstance(result2, float)
 
     @patch('src.upbit.upbit_api.pyupbit.Upbit')
@@ -169,7 +169,7 @@ class TestUpbitAPIGetBalance:
             mock_config.upbit_secret_key = "test_secret"
 
             api = UpbitAPI(mock_config)
-            result = api.get_balance(currency="BTC")
+            result = api.get_available_amount(currency="BTC")
 
             assert result == 1.5
             mock_upbit_instance.get_balance.assert_called_once_with("BTC")

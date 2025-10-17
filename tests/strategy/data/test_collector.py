@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from src.strategy.clock import FixedClock, SystemClock
 from src.strategy.data.collector import DataCollector
 from src.strategy.data.models import Period
 from src.upbit.upbit_api import CandleInterval
@@ -18,7 +19,7 @@ class TestDataCollector:
     @pytest.fixture
     def collector(self):
         """DataCollector 인스턴스 생성"""
-        return DataCollector()
+        return DataCollector(SystemClock())
 
     @pytest.fixture
     def mock_hourly_df(self):
@@ -199,3 +200,111 @@ class TestDataCollector:
 
         result_dates = set([half_day.date for half_day in result])
         assert result_dates == {yesterday, day_before_yesterday}
+
+    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    def test_caching_same_request(self, mock_get_candles, collector):
+        """같은 요청을 두 번 하면 API는 한 번만 호출됨"""
+        # Mock 데이터 준비
+        data = []
+        index = []
+        yesterday = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        for day in range(21):
+            base_time = yesterday - timedelta(days=day)
+            for hour in range(24):
+                data.append({
+                    'open': 50000.0,
+                    'high': 51000.0,
+                    'low': 49000.0,
+                    'close': 50500.0,
+                    'volume': 100.0,
+                    'value': 5000000.0
+                })
+                index.append(base_time + timedelta(hours=hour))
+
+        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+
+        # 첫 번째 호출
+        result1 = collector.collect_data("KRW-BTC", days=20)
+
+        # 두 번째 호출 (캐시에서 가져와야 함)
+        result2 = collector.collect_data("KRW-BTC", days=20)
+
+        # API는 한 번만 호출되어야 함
+        assert mock_get_candles.call_count == 1
+
+        # 결과는 동일해야 함
+        assert result1 == result2
+
+    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    def test_caching_different_ticker(self, mock_get_candles, collector):
+        """다른 티커는 별도로 캐시됨"""
+        # Mock 데이터 준비
+        data = []
+        index = []
+        yesterday = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=1)
+        for day in range(21):
+            base_time = yesterday - timedelta(days=day)
+            for hour in range(24):
+                data.append({
+                    'open': 50000.0,
+                    'high': 51000.0,
+                    'low': 49000.0,
+                    'close': 50500.0,
+                    'volume': 100.0,
+                    'value': 5000000.0
+                })
+                index.append(base_time + timedelta(hours=hour))
+
+        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+
+        # 서로 다른 티커로 호출
+        collector.collect_data("KRW-BTC", days=20)
+        collector.collect_data("KRW-ETH", days=20)
+
+        # API는 두 번 호출되어야 함 (각 티커마다)
+        assert mock_get_candles.call_count == 2
+
+    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    def test_cache_cleanup_on_date_change(self, mock_get_candles):
+        """날짜가 바뀌면 이전 캐시가 정리됨"""
+        # Mock 데이터 준비
+        data = []
+        index = []
+        base_date = datetime.datetime(2025, 10, 15, 0, 0, 0)
+        for day in range(21):
+            base_time = base_date - timedelta(days=day + 1)
+            for hour in range(24):
+                data.append({
+                    'open': 50000.0,
+                    'high': 51000.0,
+                    'low': 49000.0,
+                    'close': 50500.0,
+                    'volume': 100.0,
+                    'value': 5000000.0
+                })
+                index.append(base_time + timedelta(hours=hour))
+
+        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+
+        # 10월 15일에 첫 호출
+        clock = FixedClock(datetime.datetime(2025, 10, 15, 10, 0, 0))
+        collector = DataCollector(clock=clock)
+        collector.collect_data("KRW-BTC", days=20)
+        assert mock_get_candles.call_count == 1
+
+        # 같은 날짜에 다시 호출 (캐시 히트)
+        collector.collect_data("KRW-BTC", days=20)
+        assert mock_get_candles.call_count == 1  # 여전히 1
+
+        # 10월 16일로 날짜 변경
+        clock.set_time(datetime.datetime(2025, 10, 16, 10, 0, 0))
+        collector.collect_data("KRW-BTC", days=20)
+
+        # 날짜가 바뀌어서 캐시가 정리되고 다시 API 호출
+        assert mock_get_candles.call_count == 2
+
+        # 캐시가 정리되었는지 확인 (내부 캐시 딕셔너리 확인)
+        # 10월 15일 캐시는 없고 10월 16일 캐시만 있어야 함
+        cache_dates = [key[1] for key in collector._cache.keys()]
+        assert datetime.date(2025, 10, 15) not in cache_dates
+        assert datetime.date(2025, 10, 16) in cache_dates
