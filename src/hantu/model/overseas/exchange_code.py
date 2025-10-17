@@ -1,4 +1,5 @@
 """해외 거래소 코드 정의"""
+
 from enum import Enum
 
 
@@ -27,6 +28,7 @@ class OverseasExchangeCode(str, Enum):
         HASE: 베트남 하노이 증권거래소
         VNSE: 베트남 호치민 증권거래소
     """
+
     NASD = "NASD"  # 미국 전체
     NAS = "NAS"  # 나스닥
     NYSE = "NYSE"  # 뉴욕

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class OrderSide(Enum):
@@ -52,11 +52,11 @@ class OrderResult:
     uuid: str
     side: OrderSide
     ord_type: OrderType
-    price: Optional[float]
+    price: float | None
     state: OrderState
     created_at: datetime
-    volume: Optional[float]
-    remaining_volume: Optional[float]  # 매수의 경우 없다.
+    volume: float | None
+    remaining_volume: float | None  # 매수의 경우 없다.
     executed_volume: float
     reserved_fee: float
     remaining_fee: float

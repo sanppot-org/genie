@@ -1,5 +1,4 @@
 from decimal import Decimal
-from typing import Optional, List
 
 from pydantic import BaseModel, Field
 
@@ -9,27 +8,27 @@ class RequestHeader(BaseModel):
     authorization: str  # 접근토큰
     appkey: str  # 앱키
     appsecret: str  # 앱시크릿키
-    personalseckey: Optional[str] = None  # 고객식별키
+    personalseckey: str | None = None  # 고객식별키
     tr_id: str  # 거래ID
     tr_cont: str = ""  # 연속 거래 여부
-    custtype: Optional[str] = None  # 고객타입
-    seq_no: Optional[str] = None  # 일련번호
-    mac_address: Optional[str] = None  # 맥주소
-    phone_number: Optional[str] = None  # 핸드폰번호
-    ip_addr: Optional[str] = None  # 접속 단말 공인 IP
-    gt_uid: Optional[str] = None  # Global UID
+    custtype: str | None = None  # 고객타입
+    seq_no: str | None = None  # 일련번호
+    mac_address: str | None = None  # 맥주소
+    phone_number: str | None = None  # 핸드폰번호
+    ip_addr: str | None = None  # 접속 단말 공인 IP
+    gt_uid: str | None = None  # Global UID
 
 
 class RequestQueryParam(BaseModel):
     CANO: str  # 종합계좌번호
     ACNT_PRDT_CD: str  # 계좌상품코드
-    AFHR_FLPR_YN: str = 'N'  # 시간외단일가, 거래소여부 [N:기본값, Y:시간외단일가, X: NXT 정규장]
+    AFHR_FLPR_YN: str = "N"  # 시간외단일가, 거래소여부 [N:기본값, Y:시간외단일가, X: NXT 정규장]
     OFL_YN: str = ""  # 오프라인여부
-    INQR_DVSN: str = '02'  # 조회구분 [01:대출일별, 02:종목별]
-    UNPR_DVSN: str = '01'  # 단가구분
-    FUND_STTL_ICLD_YN: str = 'N'  # 펀드결제분포함여부 [N, Y]
-    FNCG_AMT_AUTO_RDPT_YN: str = 'N'  # 융자금액자동상환여부
-    PRCS_DVSN: str = '01'  # 처리구분 [00:전일매매포함, 01:전일매매미포함]
+    INQR_DVSN: str = "02"  # 조회구분 [01:대출일별, 02:종목별]
+    UNPR_DVSN: str = "01"  # 단가구분
+    FUND_STTL_ICLD_YN: str = "N"  # 펀드결제분포함여부 [N, Y]
+    FNCG_AMT_AUTO_RDPT_YN: str = "N"  # 융자금액자동상환여부
+    PRCS_DVSN: str = "01"  # 처리구분 [00:전일매매포함, 01:전일매매미포함]
     CTX_AREA_FK100: str = ""  # 연속조회검색조건100
     CTX_AREA_NK100: str = ""  # 연속조회키100
 
@@ -69,7 +68,7 @@ class ResponseBodyoutput1(BaseModel):
     sbst_pric: str  # 대용가격
     stck_loan_unpr: str  # 주식대출단가
 
-    def to_simple(self) -> 'StockBalance':
+    def to_simple(self) -> "StockBalance":
         """핵심 필드만 추출하여 StockBalance로 변환"""
         return StockBalance(
             stock_code=self.pdno,
@@ -91,6 +90,7 @@ class StockBalance(BaseModel):
     ResponseBodyoutput1의 27개 필드 중
     실무에서 가장 많이 사용되는 10개 필드만 추출
     """
+
     # 종목 정보
     stock_code: str  # 종목코드 (예: "005930")
     stock_name: str  # 종목명 (예: "삼성전자")
@@ -145,14 +145,15 @@ class ResponseBody(BaseModel):
     msg1: str  # 응답메세지
     ctx_area_fk100: str  # 연속조회검색조건100
     ctx_area_nk100: str  # 연속조회키100
-    output1: List[ResponseBodyoutput1] = []  # 응답상세1
-    output2: List[ResponseBodyoutput2] = []  # 응답상세2
+    output1: list[ResponseBodyoutput1] = []  # 응답상세1
+    output2: list[ResponseBodyoutput2] = []  # 응답상세2
 
 
 class BalanceResponse(BaseModel):
     """잔고 조회 전체 응답
-    
+
     연속 조회를 통해 수집된 전체 잔고 정보
     """
-    output1: List[ResponseBodyoutput1] = []  # 개별 종목 보유 정보
-    output2: List[ResponseBodyoutput2] = []  # 계좌 전체 정보
+
+    output1: list[ResponseBodyoutput1] = []  # 개별 종목 보유 정보
+    output2: list[ResponseBodyoutput2] = []  # 계좌 전체 정보

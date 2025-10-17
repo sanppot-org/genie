@@ -1,7 +1,6 @@
 """해외주식 주문 관련 모델"""
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -22,6 +21,7 @@ class OverseasOrderDivision(str, Enum):
     기타 거래소:
         - 00(지정가)
     """
+
     LIMIT = "00"  # 지정가
     MOO = "31"  # 장개시시장가 (미국 매도만)
     LOO = "32"  # 장개시지정가 (미국)
@@ -32,17 +32,19 @@ class OverseasOrderDivision(str, Enum):
 
 class RequestHeader(BaseModel):
     """해외주식 주문 요청 헤더"""
+
     content_type: str = Field(default="application/json; charset=utf-8", alias="Content-Type")
     authorization: str
     appkey: str
     appsecret: str
     tr_id: str  # 거래소 및 매수/매도에 따라 다름
-    custtype: Optional[str] = None
-    personalseckey: Optional[str] = None
+    custtype: str | None = None
+    personalseckey: str | None = None
 
 
 class RequestBody(BaseModel):
     """해외주식 주문 요청 바디"""
+
     CANO: str = Field(description="종합계좌번호")
     ACNT_PRDT_CD: str = Field(description="계좌상품코드")
     OVRS_EXCG_CD: str = Field(description="해외거래소코드 (NASD/NYSE/AMEX/SEHK/SHAA/SZAA/TKSE/HASE/VNSE)")
@@ -58,6 +60,7 @@ class RequestBody(BaseModel):
 
 class OrderOutput(BaseModel):
     """해외주식 주문 응답 output"""
+
     KRX_FWDG_ORD_ORGNO: str = Field(description="한국거래소전송주문조직번호")
     ODNO: str = Field(description="주문번호")
     ORD_TMD: str = Field(description="주문시각")
@@ -65,6 +68,7 @@ class OrderOutput(BaseModel):
 
 class ResponseBody(BaseModel):
     """해외주식 주문 응답 전체"""
+
     rt_cd: str = Field(description="성공 실패 여부(0:성공, 0 이외:실패)")
     msg_cd: str = Field(description="응답코드")
     msg1: str = Field(description="응답메시지")

@@ -1,7 +1,7 @@
 import logging
 import time
-from datetime import date, time as time_obj
-from typing import List, Tuple
+from datetime import date
+from datetime import time as time_obj
 
 import requests
 
@@ -58,7 +58,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             psbl_order.ResponseBody: 매수가능 조회 결과
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-psbl-order"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-psbl-order"
 
         # TR_ID 설정 (계좌 타입에 따라 다름)
         tr_id = "TTTC8908R" if self.account_type == AccountType.REAL else "VTTC8908R"
@@ -82,7 +82,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         # 호출
         res = requests.get(
-            URL,
+            url,
             headers=header.model_dump(by_alias=True),
             params=param.model_dump()
         )
@@ -101,7 +101,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             stock_price.ResponseBody: 주식 현재가 시세 정보
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-price"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-price"
 
         header = stock_price.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -116,7 +116,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         # 호출
         res = requests.get(
-            URL,
+            url,
             headers=header.model_dump(by_alias=True),
             params=param.model_dump()
         )
@@ -219,7 +219,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             order.ResponseBody: 주문 응답
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
 
         # TR_ID 설정 (계좌 타입과 매수/매도 구분에 따라 다름)
         tr_id = self.ORDER_TR_ID_MAP[self.account_type, order_direction]  # type: ignore[index]
@@ -242,7 +242,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         # 호출
         res = requests.post(
-            URL,
+            url,
             headers=header.model_dump(by_alias=True),
             data=body.model_dump_json()
         )
@@ -256,8 +256,8 @@ class HantuDomesticAPI(HantuBaseAPI):
             ctx_area_fk100: str = "",
             ctx_area_nk100: str = "",
             continuation_flag: str = "",
-            accumulated_output1=None,
-    ) -> Tuple[List[balance.ResponseBodyoutput1], List[balance.ResponseBodyoutput2]]:
+            accumulated_output1: list[balance.ResponseBodyoutput1] | None = None,
+    ) -> tuple[list[balance.ResponseBodyoutput1], list[balance.ResponseBodyoutput2]]:
         """주식 잔고 조회 (연속 조회 지원) - 내부 메서드
 
         Args:
@@ -272,7 +272,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         if accumulated_output1 is None:
             accumulated_output1 = []
 
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
 
         header = balance.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -291,7 +291,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         # 호출
         res = requests.get(
-            URL,
+            url,
             headers=header.model_dump(by_alias=True),
             params=param.model_dump()
         )
@@ -344,7 +344,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             chart.DailyChartResponseBody: 일/주/월/년봉 차트 데이터
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
 
         header = chart.DailyChartRequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -363,7 +363,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         # 호출
         res = requests.get(
-            URL,
+            url,
             headers=header.model_dump(by_alias=True),
             params=param.model_dump()
         )
@@ -392,7 +392,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             chart.MinuteChartResponseBody: 분봉 차트 데이터
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice"
 
         header = chart.MinuteChartRequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -409,7 +409,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         # 호출
         res = requests.get(
-            URL,
+            url,
             headers=header.model_dump(by_alias=True),
             params=param.model_dump()
         )

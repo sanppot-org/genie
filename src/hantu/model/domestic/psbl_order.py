@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -9,7 +7,7 @@ class RequestHeader(BaseModel):
     appkey: str
     appsecret: str
     tr_id: str
-    custtype: Optional[str] = None
+    custtype: str | None = None
 
 
 class RequestQueryParam(BaseModel):

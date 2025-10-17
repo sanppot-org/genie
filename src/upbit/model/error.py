@@ -5,7 +5,7 @@ class UpbitAPIError(Exception):
     업비트 API 호출 시 발생하는 에러를 나타냅니다.
     """
 
-    def __init__(self, error_info: dict[str, str]):
+    def __init__(self, error_info: dict[str, str]) -> None:
         self.message = error_info['message']
         self.name = error_info['name']
         super().__init__(f"Upbit API Error [{self.name}]: {self.message}")

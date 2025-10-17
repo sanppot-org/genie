@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -10,13 +8,13 @@ class RequestHeader(BaseModel):
     appsecret: str
     tr_id: str
     tr_cont: str = ""
-    custtype: Optional[str] = None
-    personalseckey: Optional[str] = None
-    seq_no: Optional[str] = None
-    mac_address: Optional[str] = None
-    phone_number: Optional[str] = None
-    ip_addr: Optional[str] = None
-    gt_uid: Optional[str] = None
+    custtype: str | None = None
+    personalseckey: str | None = None
+    seq_no: str | None = None
+    mac_address: str | None = None
+    phone_number: str | None = None
+    ip_addr: str | None = None
+    gt_uid: str | None = None
 
 
 class RequestQueryParam(BaseModel):
@@ -37,6 +35,7 @@ class ResponseHeader(BaseModel):
 
 class ResponseBodyoutput1(BaseModel):
     """개별 종목 보유 정보"""
+
     cano: str = ""  # 종합계좌번호
     acnt_prdt_cd: str = ""  # 계좌상품코드
     prdt_type_cd: str = ""  # 상품유형코드
@@ -59,6 +58,7 @@ class ResponseBodyoutput1(BaseModel):
 
 class ResponseBodyoutput2(BaseModel):
     """계좌 전체 정보"""
+
     frcr_pchs_amt1: str = ""  # 외화매입금액1
     ovrs_rlzt_pfls_amt: str = ""  # 해외실현손익금액
     ovrs_tot_pfls: str = ""  # 해외총손익
@@ -76,7 +76,7 @@ class ResponseBody(BaseModel):
     msg1: str  # 응답메세지
     ctx_area_fk200: str = ""  # 연속조회검색조건200
     ctx_area_nk200: str = ""  # 연속조회키200
-    output1: List[ResponseBodyoutput1] = []  # 응답상세1 (개별 종목)
+    output1: list[ResponseBodyoutput1] = []  # 응답상세1 (개별 종목)
     output2: ResponseBodyoutput2  # 응답상세2 (계좌 전체)
 
 
@@ -85,5 +85,6 @@ class OverseasBalanceResponse(BaseModel):
 
     연속 조회를 통해 수집된 전체 잔고 정보
     """
-    output1: List[ResponseBodyoutput1] = []  # 개별 종목 보유 정보
+
+    output1: list[ResponseBodyoutput1] = []  # 개별 종목 보유 정보
     output2: ResponseBodyoutput2  # 계좌 전체 정보
