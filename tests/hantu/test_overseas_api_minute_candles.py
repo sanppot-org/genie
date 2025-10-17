@@ -18,11 +18,11 @@ class TestGetMinuteCandles:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
-        mock_response.headers = {'tr_cont': 'D'}  # 마지막 페이지
+        mock_response.headers = {"tr_cont": "D"}  # 마지막 페이지
         mock_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -68,7 +68,7 @@ class TestGetMinuteCandles:
             ],
         }
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When
         result = api.get_minute_candles(symbol="TSLA", minute_interval=OverseasMinuteInterval.MIN_1)
@@ -91,12 +91,12 @@ class TestGetMinuteCandles:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         # 첫 번째 페이지 응답
         first_response = mocker.Mock()
         first_response.status_code = 200
-        first_response.headers = {'tr_cont': 'M'}  # 다음 페이지 존재
+        first_response.headers = {"tr_cont": "M"}  # 다음 페이지 존재
         first_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -132,7 +132,7 @@ class TestGetMinuteCandles:
         # 두 번째 페이지 응답
         second_response = mocker.Mock()
         second_response.status_code = 200
-        second_response.headers = {'tr_cont': 'D'}  # 마지막 페이지
+        second_response.headers = {"tr_cont": "D"}  # 마지막 페이지
         second_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -165,7 +165,7 @@ class TestGetMinuteCandles:
             ],
         }
 
-        mock_get = mocker.patch('requests.get')
+        mock_get = mocker.patch("requests.get")
         mock_get.side_effect = [first_response, second_response]
 
         # When
@@ -191,11 +191,11 @@ class TestGetMinuteCandles:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
-        mock_response.headers = {'tr_cont': 'D'}
+        mock_response.headers = {"tr_cont": "D"}
         mock_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -214,7 +214,7 @@ class TestGetMinuteCandles:
             "output2": [],
         }
 
-        mock_get = mocker.patch('requests.get', return_value=mock_response)
+        mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
         api.get_minute_candles(
@@ -222,16 +222,16 @@ class TestGetMinuteCandles:
             exchange_code=OverseasMarketCode.NYS,
             minute_interval=OverseasMinuteInterval.MIN_5,
             include_previous=True,
-            limit=60
+            limit=60,
         )
 
         # Then
-        call_params = mock_get.call_args[1]['params']
-        assert call_params['SYMB'] == "AAPL"
-        assert call_params['EXCD'] == "NYS"
-        assert call_params['NMIN'] == "5"
-        assert call_params['PINC'] == "1"
-        assert call_params['NREC'] == "60"
+        call_params = mock_get.call_args[1]["params"]
+        assert call_params["SYMB"] == "AAPL"
+        assert call_params["EXCD"] == "NYS"
+        assert call_params["NMIN"] == "5"
+        assert call_params["PINC"] == "1"
+        assert call_params["NREC"] == "60"
 
     def test_get_minute_candles_error(self, mocker):
         """API 에러 응답"""
@@ -240,13 +240,13 @@ class TestGetMinuteCandles:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When & Then
         with pytest.raises(Exception, match="Error: Bad Request"):

@@ -68,11 +68,11 @@ class TestGetBalance:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
-        mock_response.headers = {'tr_cont': 'D'}  # 마지막 페이지
+        mock_response.headers = {"tr_cont": "D"}  # 마지막 페이지
         mock_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -106,7 +106,7 @@ class TestGetBalance:
                     "item_mgna_rt_name": "",
                     "grta_rt_name": "",
                     "sbst_pric": "0",
-                    "stck_loan_unpr": "0"
+                    "stck_loan_unpr": "0",
                 }
             ],
             "output2": [
@@ -134,12 +134,12 @@ class TestGetBalance:
                     "tot_stln_slng_chgs": "0",
                     "bfdy_tot_asst_evlu_amt": "1700000",
                     "asst_icdc_amt": "10000",
-                    "asst_icdc_erng_rt": "0.59"
+                    "asst_icdc_erng_rt": "0.59",
                 }
-            ]
+            ],
         }
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When
         result = api.get_balance()
@@ -162,12 +162,12 @@ class TestGetBalance:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         # 첫 번째 페이지 응답
         first_response = mocker.Mock()
         first_response.status_code = 200
-        first_response.headers = {'tr_cont': 'M'}  # 다음 페이지 존재
+        first_response.headers = {"tr_cont": "M"}  # 다음 페이지 존재
         first_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -201,16 +201,16 @@ class TestGetBalance:
                     "item_mgna_rt_name": "",
                     "grta_rt_name": "",
                     "sbst_pric": "0",
-                    "stck_loan_unpr": "0"
+                    "stck_loan_unpr": "0",
                 }
             ],
-            "output2": []
+            "output2": [],
         }
 
         # 두 번째 페이지 응답
         second_response = mocker.Mock()
         second_response.status_code = 200
-        second_response.headers = {'tr_cont': 'D'}  # 마지막 페이지
+        second_response.headers = {"tr_cont": "D"}  # 마지막 페이지
         second_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -244,7 +244,7 @@ class TestGetBalance:
                     "item_mgna_rt_name": "",
                     "grta_rt_name": "",
                     "sbst_pric": "0",
-                    "stck_loan_unpr": "0"
+                    "stck_loan_unpr": "0",
                 }
             ],
             "output2": [
@@ -272,12 +272,12 @@ class TestGetBalance:
                     "tot_stln_slng_chgs": "0",
                     "bfdy_tot_asst_evlu_amt": "1950000",
                     "asst_icdc_amt": "20000",
-                    "asst_icdc_erng_rt": "1.03"
+                    "asst_icdc_erng_rt": "1.03",
                 }
-            ]
+            ],
         }
 
-        mock_get = mocker.patch('requests.get')
+        mock_get = mocker.patch("requests.get")
         mock_get.side_effect = [first_response, second_response]
 
         # When
@@ -297,9 +297,9 @@ class TestGetBalance:
 
         # 두 번째 호출 시 연속 조회 키가 전달되었는지 확인
         assert mock_get.call_count == 2
-        second_call_params = mock_get.call_args_list[1][1]['params']
-        assert second_call_params['CTX_AREA_FK100'] == "CTX_FK_001"
-        assert second_call_params['CTX_AREA_NK100'] == "CTX_NK_001"
+        second_call_params = mock_get.call_args_list[1][1]["params"]
+        assert second_call_params["CTX_AREA_FK100"] == "CTX_FK_001"
+        assert second_call_params["CTX_AREA_NK100"] == "CTX_NK_001"
 
     def test_get_balance_error(self, mocker):
         """API 에러 응답"""
@@ -308,15 +308,16 @@ class TestGetBalance:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When & Then
         import pytest
+
         with pytest.raises(Exception):
             api.get_balance()

@@ -18,123 +18,45 @@ ENV_FILE_PATH = PROJECT_ROOT / "config" / "genie" / ".env"
 class UpbitConfig(BaseSettings):
     """업비트 API 설정"""
 
-    model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE_PATH),
-        env_file_encoding='utf-8',
-        extra='ignore'
-    )
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
 
-    upbit_access_key: str = Field(
-        ...,
-        min_length=1,
-        description="업비트 액세스 키",
-        alias="UPBIT_ACCESS_KEY"
-    )
+    upbit_access_key: str = Field(..., min_length=1, description="업비트 액세스 키", alias="UPBIT_ACCESS_KEY")
 
-    upbit_secret_key: str = Field(
-        ...,
-        min_length=1,
-        description="업비트 시크릿 키",
-        alias="UPBIT_SECRET_KEY"
-    )
+    upbit_secret_key: str = Field(..., min_length=1, description="업비트 시크릿 키", alias="UPBIT_SECRET_KEY")
 
 
 class HantuConfig(BaseSettings):
     """한국투자증권 API 설정"""
 
-    model_config = SettingsConfigDict(
-        env_file=str(ENV_FILE_PATH),
-        env_file_encoding='utf-8',
-        extra='ignore'
-    )
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
 
     # 한국투자증권 실계좌 설정
-    cano: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 계좌번호",
-        alias="CANO"
-    )
+    cano: str = Field(..., min_length=1, description="한국투자증권 계좌번호", alias="CANO")
 
-    acnt_prdt_cd: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 계좌상품코드",
-        alias="ACNT_PRDT_CD"
-    )
+    acnt_prdt_cd: str = Field(..., min_length=1, description="한국투자증권 계좌상품코드", alias="ACNT_PRDT_CD")
 
-    app_key: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 앱 키",
-        alias="APP_KEY"
-    )
+    app_key: str = Field(..., min_length=1, description="한국투자증권 앱 키", alias="APP_KEY")
 
-    app_secret: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 앱 시크릿",
-        alias="APP_SECRET"
-    )
+    app_secret: str = Field(..., min_length=1, description="한국투자증권 앱 시크릿", alias="APP_SECRET")
 
-    url_base: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 API 기본 URL",
-        alias="URL_BASE"
-    )
+    url_base: str = Field(..., min_length=1, description="한국투자증권 API 기본 URL", alias="URL_BASE")
 
-    token_path: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 토큰 저장 경로",
-        alias="TOKEN_PATH"
-    )
+    token_path: str = Field(..., min_length=1, description="한국투자증권 토큰 저장 경로", alias="TOKEN_PATH")
 
     # 한국투자증권 가상계좌 설정
-    v_cano: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 가상계좌번호",
-        alias="V_CANO"
-    )
+    v_cano: str = Field(..., min_length=1, description="한국투자증권 가상계좌번호", alias="V_CANO")
 
-    v_acnt_prdt_cd: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 가상계좌상품코드",
-        alias="V_ACNT_PRDT_CD"
-    )
+    v_acnt_prdt_cd: str = Field(..., min_length=1, description="한국투자증권 가상계좌상품코드", alias="V_ACNT_PRDT_CD")
 
-    v_app_key: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 가상 앱 키",
-        alias="V_APP_KEY"
-    )
+    v_app_key: str = Field(..., min_length=1, description="한국투자증권 가상 앱 키", alias="V_APP_KEY")
 
-    v_app_secret: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 가상 앱 시크릿",
-        alias="V_APP_SECRET"
-    )
+    v_app_secret: str = Field(..., min_length=1, description="한국투자증권 가상 앱 시크릿", alias="V_APP_SECRET")
 
-    v_url_base: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 가상 API 기본 URL",
-        alias="V_URL_BASE"
-    )
+    v_url_base: str = Field(..., min_length=1, description="한국투자증권 가상 API 기본 URL", alias="V_URL_BASE")
 
-    v_token_path: str = Field(
-        ...,
-        min_length=1,
-        description="한국투자증권 가상 토큰 저장 경로",
-        alias="V_TOKEN_PATH"
-    )
+    v_token_path: str = Field(..., min_length=1, description="한국투자증권 가상 토큰 저장 경로", alias="V_TOKEN_PATH")
 
-    @field_validator('token_path', 'v_token_path')
+    @field_validator("token_path", "v_token_path")
     @classmethod
     def resolve_path(cls, v: str) -> str:
         """상대 경로를 프로젝트 루트 기준 절대 경로로 변환"""

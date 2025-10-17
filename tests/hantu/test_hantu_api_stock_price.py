@@ -1,6 +1,7 @@
 """
 한투 API 주식 시세 조회 테스트
 """
+
 import pytest
 
 from src.config import HantuConfig
@@ -19,7 +20,7 @@ class TestGetStockPrice:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -30,24 +31,20 @@ class TestGetStockPrice:
             "output": {
                 "stck_prpr": "71000",
                 "stck_oprc": "70500",
-                "stck_hgpr": "71500",
-                "stck_lwpr": "70000",
-                "stck_mxpr": "91000",
-                "stck_llam": "51000",
-                "stck_sdpr": "71000",
+                "stck_hgpr": "0",
+                "stck_lwpr": "0",
+                "stck_mxpr": "0",
+                "stck_llam": "0",
+                "stck_sdpr": "0",
                 "acml_vol": "15000000",
-                "acml_tr_pbmn": "1065000000000",
+                "acml_tr_pbmn": "0",
                 "prdy_vrss": "1000",
-                "prdy_vrss_sign": "2",
+                "prdy_vrss_sign": "0",
                 "prdy_ctrt": "1.43",
-                "per": "10.5",
-                "pbr": "1.2",
-                "eps": "6800",
-                "bps": "59000"
-            }
+            },
         }
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When
         response = api.get_stock_price("005930")
@@ -68,7 +65,7 @@ class TestGetStockPrice:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -78,21 +75,21 @@ class TestGetStockPrice:
             "msg1": "정상처리 되었습니다.",
             "output": {
                 "stck_prpr": "71000",
-                "stck_oprc": "70500",
-                "stck_hgpr": "71500",
-                "stck_lwpr": "70000",
-                "stck_mxpr": "91000",
-                "stck_llam": "51000",
-                "stck_sdpr": "71000",
-                "acml_vol": "15000000",
-                "acml_tr_pbmn": "1065000000000",
-                "prdy_vrss": "1000",
-                "prdy_vrss_sign": "2",
-                "prdy_ctrt": "1.43"
-            }
+                "stck_oprc": "0",
+                "stck_hgpr": "0",
+                "stck_lwpr": "0",
+                "stck_mxpr": "0",
+                "stck_llam": "0",
+                "stck_sdpr": "0",
+                "acml_vol": "0",
+                "acml_tr_pbmn": "0",
+                "prdy_vrss": "0",
+                "prdy_vrss_sign": "0",
+                "prdy_ctrt": "0",
+            },
         }
 
-        mock_get = mocker.patch('requests.get', return_value=mock_response)
+        mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
         response = api.get_stock_price("005930", MarketCode.KRX)
@@ -102,8 +99,8 @@ class TestGetStockPrice:
         assert response.output is not None
 
         # MarketCode enum 값이 올바르게 전달되었는지 확인
-        call_params = mock_get.call_args[1]['params']
-        assert call_params['FID_COND_MRKT_DIV_CODE'] == MarketCode.KRX
+        call_params = mock_get.call_args[1]["params"]
+        assert call_params["FID_COND_MRKT_DIV_CODE"] == MarketCode.KRX
 
     def test_get_stock_price_error(self, mocker):
         """API 에러 응답"""
@@ -112,18 +109,14 @@ class TestGetStockPrice:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
-        mock_response.json.return_value = {
-            "rt_cd": "1",
-            "msg_cd": "EGW00123",
-            "msg1": "종목코드 오류"
-        }
+        mock_response.json.return_value = {"rt_cd": "1", "msg_cd": "EGW00123", "msg1": "종목코드 오류"}
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When & Then
         with pytest.raises(Exception, match="Error: Bad Request"):

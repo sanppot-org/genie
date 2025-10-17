@@ -26,11 +26,13 @@ class BaseStrategyConfig(BaseModel):
         allocation_ratio: 전체 잔고 대비 전략 할당 비율 (기본 0.5 = 50%)
         min_order_amount: 최소 주문 금액 (기본 5000원)
     """
+
     timezone: ZoneInfo = Field(default=ZoneInfo("Asia/Seoul"), description="타임존")
     ticker: str = Field(default="KRW-BTC", description="거래할 티커")
     target_vol: float = Field(default=0.01, description="타겟 변동성 (0.5% ~ 2%)", ge=0.005, le=0.02)
-    allocation_ratio: float = Field(default=0.5, description="전체 잔고 대비 전략 할당 비율", gt=0.0, le=1.0)
     min_order_amount: float = Field(default=5000.0, description="최소 주문 금액 (KRW)", ge=5000.0)
+    total_balance: float = Field(description="총 자산")
+    allocated_balance: float = Field(description="할당된 금액")
 
 
 class MorningAfternoonConfig(BaseStrategyConfig):

@@ -19,7 +19,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         assert candle.date == datetime.date(2025, 10, 13)
@@ -39,7 +39,7 @@ class TestHalfDayCandle:
             high=52000.0,
             low=50000.0,
             close=51500.0,
-            volume=2345.67
+            volume=2345.67,
         )
 
         assert candle.period == Period.AFTERNOON
@@ -53,7 +53,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         assert candle.range == 2000.0  # 51000 - 49000
@@ -67,7 +67,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # (51000 - 49000) / 50000 = 0.04
@@ -82,7 +82,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # 시가가 0이면 예외 발생
@@ -98,7 +98,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # 1 - |50000 - 50500| / (51000 - 49000) = 1 - 500/2000 = 1 - 0.25 = 0.75
@@ -113,7 +113,7 @@ class TestHalfDayCandle:
             high=50000.0,  # 고가 = 저가
             low=50000.0,
             close=50000.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # 레인지가 0이면 0 반환
@@ -128,7 +128,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # (50500 - 50000) / 50000 = 500 / 50000 = 0.01
@@ -143,7 +143,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=48000.0,
             close=49000.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # (49000 - 50000) / 50000 = -1000 / 50000 = -0.02
@@ -158,7 +158,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         # 시가가 0이면 예외 발생
@@ -174,7 +174,7 @@ class TestHalfDayCandle:
             "high": 51000.0,
             "low": 49000.0,
             "close": 50500.0,
-            "volume": 1234.56
+            "volume": 1234.56,
         }
 
         candle = HalfDayCandle.from_dict(data)
@@ -192,7 +192,7 @@ class TestHalfDayCandle:
             high=51000.0,
             low=49000.0,
             close=50500.0,
-            volume=1234.56
+            volume=1234.56,
         )
 
         result = candle.to_dict()
@@ -204,7 +204,7 @@ class TestHalfDayCandle:
             "high": 51000.0,
             "low": 49000.0,
             "close": 50500.0,
-            "volume": 1234.56
+            "volume": 1234.56,
         }
 
 
@@ -218,26 +218,30 @@ class TestRecent20DaysHalfDayCandles:
         candles = []
         for i in range(20):
             date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=50500.0,
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
 
         assert len(history.candles) == 40
 
@@ -248,26 +252,30 @@ class TestRecent20DaysHalfDayCandles:
         candles = []
         for i in range(20):
             date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=50500.0,
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
         morning = history.morning_candles
 
         assert len(morning) == 20
@@ -280,26 +288,30 @@ class TestRecent20DaysHalfDayCandles:
         candles = []
         for i in range(20):
             date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=50500.0,
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
         afternoon = history.afternoon_candles
 
         assert len(afternoon) == 20
@@ -312,26 +324,30 @@ class TestRecent20DaysHalfDayCandles:
         candles = []
         for i in range(20):
             date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0 + i * 1000,
-                high=51000.0,
-                low=50000.0,
-                close=50500.0,
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0 + i * 1000,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
         yesterday_morning = history.yesterday_morning
 
         # 마지막 오전 캔들 (20일째)
@@ -345,26 +361,30 @@ class TestRecent20DaysHalfDayCandles:
         candles = []
         for i in range(20):
             date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=50500.0,
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0 + i * 1000,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0 + i * 1000,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
         yesterday_afternoon = history.yesterday_afternoon
 
         # 마지막 오후 캔들 (20일째)
@@ -379,26 +399,30 @@ class TestRecent20DaysHalfDayCandles:
         for i in range(20):
             date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
             # 오전: noise = 0.5
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=50500.0,  # |50000-50500|/1000 = 0.5, noise = 0.5
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,  # |50000-50500|/1000 = 0.5, noise = 0.5
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
         avg = history.calculate_morning_noise_average()
 
         assert avg == pytest.approx(0.5, rel=1e-9)
@@ -414,26 +438,30 @@ class TestRecent20DaysHalfDayCandles:
         for i in range(20):
             date = base_date + datetime.timedelta(days=i)
             morning_close = 50000.0 + i * 1000  # 50000, 51000, ..., 69000
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=morning_close,
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=morning_close,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
 
         # 전일(19일째) 오전 종가 = 69000
         # 3일 이평선 = (67000 + 68000 + 69000) / 3 = 68000
@@ -460,26 +488,30 @@ class TestRecent20DaysHalfDayCandles:
         # 20일치 데이터: 오전 종가가 모두 동일 (50000)
         for i in range(20):
             date = base_date + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=50000.0,  # 모두 동일
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50000.0,  # 모두 동일
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
 
         # 전일 오전 종가 = 50000
         # 모든 이평선 = 50000 (전일 오전 종가와 동일하므로 > 조건 불만족)
@@ -500,69 +532,81 @@ class TestRecent20DaysHalfDayCandles:
         # 20일(전일): 55000 (반등)
         for i in range(17):
             date = base_date + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.MORNING,
-                open=50000.0,
-                high=51000.0,
-                low=50000.0,
-                close=60000.0,  # 고점
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
-                period=Period.AFTERNOON,
-                open=50500.0,
-                high=52000.0,
-                low=50000.0,
-                close=51500.0,
-                volume=1500.0
-            ))
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=60000.0,  # 고점
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
 
         # 18~19일: 하락
         for i in range(17, 19):
             date = base_date + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50000.0,  # 하락
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
+
+        # 20일(전일): 반등
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(
+            HalfDayCandle(
+                date=yesterday,
                 period=Period.MORNING,
                 open=50000.0,
                 high=51000.0,
                 low=50000.0,
-                close=50000.0,  # 하락
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
+                close=55000.0,  # 반등
+                volume=1000.0,
+            )
+        )
+        candles.append(
+            HalfDayCandle(
+                date=yesterday,
                 period=Period.AFTERNOON,
                 open=50500.0,
                 high=52000.0,
                 low=50000.0,
                 close=51500.0,
-                volume=1500.0
-            ))
+                volume=1500.0,
+            )
+        )
 
-        # 20일(전일): 반등
-        yesterday = base_date + datetime.timedelta(days=19)
-        candles.append(HalfDayCandle(
-            date=yesterday,
-            period=Period.MORNING,
-            open=50000.0,
-            high=51000.0,
-            low=50000.0,
-            close=55000.0,  # 반등
-            volume=1000.0
-        ))
-        candles.append(HalfDayCandle(
-            date=yesterday,
-            period=Period.AFTERNOON,
-            open=50500.0,
-            high=52000.0,
-            low=50000.0,
-            close=51500.0,
-            volume=1500.0
-        ))
-
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
 
         # 전일 오전 종가 = 55000
         # 3일 이평선 = (50000 + 50000 + 55000) / 3 = 51666.67 < 55000
@@ -586,47 +630,55 @@ class TestRecent20DaysHalfDayCandles:
         # 20일(전일): 50000 (급락)
         for i in range(19):
             date = base_date + datetime.timedelta(days=i)
-            candles.append(HalfDayCandle(
-                date=date,
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=70000.0,  # 고점
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
+
+        # 20일(전일): 급락
+        yesterday = base_date + datetime.timedelta(days=19)
+        candles.append(
+            HalfDayCandle(
+                date=yesterday,
                 period=Period.MORNING,
                 open=50000.0,
                 high=51000.0,
                 low=50000.0,
-                close=70000.0,  # 고점
-                volume=1000.0
-            ))
-            candles.append(HalfDayCandle(
-                date=date,
+                close=50000.0,  # 급락
+                volume=1000.0,
+            )
+        )
+        candles.append(
+            HalfDayCandle(
+                date=yesterday,
                 period=Period.AFTERNOON,
                 open=50500.0,
                 high=52000.0,
                 low=50000.0,
                 close=51500.0,
-                volume=1500.0
-            ))
+                volume=1500.0,
+            )
+        )
 
-        # 20일(전일): 급락
-        yesterday = base_date + datetime.timedelta(days=19)
-        candles.append(HalfDayCandle(
-            date=yesterday,
-            period=Period.MORNING,
-            open=50000.0,
-            high=51000.0,
-            low=50000.0,
-            close=50000.0,  # 급락
-            volume=1000.0
-        ))
-        candles.append(HalfDayCandle(
-            date=yesterday,
-            period=Period.AFTERNOON,
-            open=50500.0,
-            high=52000.0,
-            low=50000.0,
-            close=51500.0,
-            volume=1500.0
-        ))
-
-        history = Recent20DaysHalfDayCandles(candles)
+        history = Recent20DaysHalfDayCandles(candles=candles)
 
         # 전일 오전 종가 = 50000
         # 3일 이평선 = (70000 + 70000 + 50000) / 3 = 63333.33 > 50000 ✓

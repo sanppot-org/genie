@@ -17,9 +17,9 @@ from src.strategy.data.models import HalfDayCandle, Recent20DaysHalfDayCandles
 
 logger = logging.getLogger(__name__)
 
-base_filepath = str(PROJECT_ROOT / 'data' / 'candles') + '/'
+base_filepath = str(PROJECT_ROOT / "data" / "candles") + "/"
 
-T = TypeVar('T', bound=BaseModel)
+T = TypeVar("T", bound=BaseModel)
 
 
 def save(candles: Recent20DaysHalfDayCandles, filename: str) -> None:
@@ -40,7 +40,7 @@ def save(candles: Recent20DaysHalfDayCandles, filename: str) -> None:
         data = [candle.to_dict() for candle in candles.candles]
 
         # 파일에 저장
-        with open(filepath, 'w', encoding=constants.UTF_8) as f:
+        with open(filepath, "w", encoding=constants.UTF_8) as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     except Exception:
@@ -79,7 +79,7 @@ def load(filename: str) -> Recent20DaysHalfDayCandles | None:
             return None
 
         logger.info(f"데이터 로드 완료: {filepath} ({len(candles)}개)")
-        return Recent20DaysHalfDayCandles(candles)
+        return Recent20DaysHalfDayCandles(candles=candles)
 
     except json.JSONDecodeError:
         logger.exception(f"JSON 파싱 실패: {filepath}")
@@ -90,7 +90,7 @@ def load(filename: str) -> Recent20DaysHalfDayCandles | None:
         return None
 
 
-def save_signal(signal: BaseModel, filename: str, base_dir: str = 'signals') -> None:
+def save_signal(signal: BaseModel, filename: str, base_dir: str = "signals") -> None:
     """
     시그널을 JSON 파일로 저장
 
@@ -99,17 +99,17 @@ def save_signal(signal: BaseModel, filename: str, base_dir: str = 'signals') -> 
         filename: 저장할 파일명
         base_dir: 기본 디렉토리 (data/ 하위, 기본값: 'signals')
     """
-    filepath = str(PROJECT_ROOT / 'data' / base_dir / filename)
+    filepath = str(PROJECT_ROOT / "data" / base_dir / filename)
 
     try:
         # 디렉토리가 없으면 생성
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
         # JSON 형태로 변환
-        data = signal.model_dump(mode='json')
+        data = signal.model_dump(mode="json")
 
         # 파일에 저장
-        with open(filepath, 'w', encoding=constants.UTF_8) as f:
+        with open(filepath, "w", encoding=constants.UTF_8) as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     except Exception:
@@ -117,7 +117,7 @@ def save_signal(signal: BaseModel, filename: str, base_dir: str = 'signals') -> 
         raise
 
 
-def load_signal(model_class: type[T], filename: str, base_dir: str = 'signals') -> T | None:
+def load_signal[T: BaseModel](model_class: type[T], filename: str, base_dir: str = "signals") -> T | None:
     """
     JSON 파일에서 시그널 로드
 
@@ -129,7 +129,7 @@ def load_signal(model_class: type[T], filename: str, base_dir: str = 'signals') 
     Returns:
         시그널 객체, 실패 시 None
     """
-    filepath = str(PROJECT_ROOT / 'data' / base_dir / filename)
+    filepath = str(PROJECT_ROOT / "data" / base_dir / filename)
 
     try:
         # 파일이 없으면 None 반환

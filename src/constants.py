@@ -3,9 +3,10 @@
 
 모든 문자열 상수와 매직 넘버를 중앙에서 관리합니다.
 """
+
 # 거래 관련 상수
-KRW_BTC = 'KRW-BTC'
-CURRENCY_KRW = 'KRW'
+KRW_BTC = "KRW-BTC"
+CURRENCY_KRW = "KRW"
 
 # 캔들 데이터 관련 상수
 CANDLE_COUNT_24H = 24
@@ -18,27 +19,27 @@ AFTERNOON_START_HOUR = 12
 AFTERNOON_END_HOUR = 24
 
 # 데이터 필드명 상수
-FIELD_PRICE = 'price'
-FIELD_OPEN = 'open'
-FIELD_CLOSE = 'close'
-FIELD_HIGH = 'high'
-FIELD_LOW = 'low'
-FIELD_VOLUME = 'volume'
-FIELD_VALUE = 'value'
+FIELD_PRICE = "price"
+FIELD_OPEN = "open"
+FIELD_CLOSE = "close"
+FIELD_HIGH = "high"
+FIELD_LOW = "low"
+FIELD_VOLUME = "volume"
+FIELD_VALUE = "value"
 
 # 거래 결과 메시지
-MSG_NO_BUY_SIGNAL = '매수 신호가 없습니다.'
-MSG_KRW_BALANCE_FAIL = 'KRW 잔고 조회에 실패했습니다.'
-MSG_INSUFFICIENT_FUNDS = '투자 가능한 금액이 부족합니다. (현재: {current:,.0f}원, 최소: {minimum:,.0f}원)'
-MSG_BUY_ORDER_FAIL = '매수 주문 실행에 실패했습니다.'
-MSG_BUY_ORDER_SUCCESS = '매수 주문이 성공적으로 실행되었습니다. (투자금액: {amount:,.0f}원)'
-MSG_BUY_ERROR = '매수 실행 중 오류가 발생했습니다: {error}'
+MSG_NO_BUY_SIGNAL = "매수 신호가 없습니다."
+MSG_KRW_BALANCE_FAIL = "KRW 잔고 조회에 실패했습니다."
+MSG_INSUFFICIENT_FUNDS = "투자 가능한 금액이 부족합니다. (현재: {current:,.0f}원, 최소: {minimum:,.0f}원)"
+MSG_BUY_ORDER_FAIL = "매수 주문 실행에 실패했습니다."
+MSG_BUY_ORDER_SUCCESS = "매수 주문이 성공적으로 실행되었습니다. (투자금액: {amount:,.0f}원)"
+MSG_BUY_ERROR = "매수 실행 중 오류가 발생했습니다: {error}"
 
-MSG_BTC_BALANCE_FAIL = 'BTC 잔고 조회에 실패했습니다.'
-MSG_NO_BTC_TO_SELL = '매도할 BTC가 없습니다.'
-MSG_SELL_ORDER_FAIL = '매도 주문 실행에 실패했습니다.'
-MSG_SELL_ORDER_SUCCESS = '매도 주문이 성공적으로 실행되었습니다. (수량: {amount:.6f} BTC)'
-MSG_SELL_ERROR = '매도 실행 중 오류가 발생했습니다: {error}'
+MSG_BTC_BALANCE_FAIL = "BTC 잔고 조회에 실패했습니다."
+MSG_NO_BTC_TO_SELL = "매도할 BTC가 없습니다."
+MSG_SELL_ORDER_FAIL = "매도 주문 실행에 실패했습니다."
+MSG_SELL_ORDER_SUCCESS = "매도 주문이 성공적으로 실행되었습니다. (수량: {amount:.6f} BTC)"
+MSG_SELL_ERROR = "매도 실행 중 오류가 발생했습니다: {error}"
 
 # 수익률 계산 관련 상수
 ESTIMATED_BUY_PRICE_RATIO = 0.95  # 임시 매수가 추정용 (현재가의 95%)
@@ -46,9 +47,9 @@ PERCENT_MULTIPLIER = 100
 ZERO_BALANCE_THRESHOLD = 0
 
 # 기본값 상수
-DEFAULT_INVESTMENT_RATIO = '0.01'
-DEFAULT_MIN_INVESTMENT_AMOUNT = '5000'
-DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_INVESTMENT_RATIO = "0.01"
+DEFAULT_MIN_INVESTMENT_AMOUNT = "5000"
+DEFAULT_LOG_LEVEL = "INFO"
 
 # 설정 에러 메시지
 ERR_INVALID_INVESTMENT_RATIO = "투자 비율이 유효하지 않습니다: {ratio} ({min}~{max} 범위여야 함)"
@@ -73,10 +74,10 @@ DEFAULT_INVESTMENT_AMOUNT = 0.0
 LAST_INDEX = -1
 
 # 거래 상태 상수
-BUY_SIDE = 'bid'
-SELL_SIDE = 'ask'
-FIELD_UUID = 'uuid'
-FIELD_SIDE = 'side'
-FIELD_MARKET = 'market'
+BUY_SIDE = "bid"
+SELL_SIDE = "ask"
+FIELD_UUID = "uuid"
+FIELD_SIDE = "side"
+FIELD_MARKET = "market"
 
-UTF_8 = 'utf-8'
+UTF_8 = "utf-8"

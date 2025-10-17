@@ -19,6 +19,7 @@ class CandleSchema(pa.DataFrameModel):
     Index:
         DatetimeIndex: 캔들 일시
     """
+
     open: Series[float]
     high: Series[float]
     low: Series[float]

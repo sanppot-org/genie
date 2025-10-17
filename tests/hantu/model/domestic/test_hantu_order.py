@@ -1,6 +1,6 @@
 """주문 모델 테스트"""
 
-from src.hantu.model.domestic.order import RequestHeader, RequestBody, OrderOutput, ResponseBody
+from src.hantu.model.domestic.order import OrderOutput, RequestBody, RequestHeader, ResponseBody
 
 
 class TestRequestHeader:
@@ -10,10 +10,7 @@ class TestRequestHeader:
         """요청 헤더 생성 테스트"""
         # Given & When
         header = RequestHeader(
-            authorization="Bearer test_token",
-            appkey="test_app_key",
-            appsecret="test_app_secret",
-            tr_id="VTTC0011U"
+            authorization="Bearer test_token", appkey="test_app_key", appsecret="test_app_secret", tr_id="VTTC0011U"
         )
 
         # Then
@@ -27,10 +24,7 @@ class TestRequestHeader:
         """alias를 통한 헤더 생성 테스트"""
         # Given & When
         header = RequestHeader(
-            authorization="Bearer test_token",
-            appkey="test_app_key",
-            appsecret="test_app_secret",
-            tr_id="VTTC0011U"
+            authorization="Bearer test_token", appkey="test_app_key", appsecret="test_app_secret", tr_id="VTTC0011U"
         )
 
         # Then
@@ -51,7 +45,7 @@ class TestRequestBody:
             PDNO="005930",
             ORD_DVSN="01",  # 시장가
             ORD_QTY="10",
-            ORD_UNPR="0"  # 시장가는 0
+            ORD_UNPR="0",  # 시장가는 0
         )
 
         # Then
@@ -70,11 +64,7 @@ class TestOrderOutput:
     def test_order_output_from_api_response(self):
         """API 응답으로부터 OrderOutput 생성 테스트"""
         # Given
-        api_response = {
-            "KRX_FWDG_ORD_ORGNO": "91252",
-            "ODNO": "0000117057",
-            "ORD_TMD": "121052"
-        }
+        api_response = {"KRX_FWDG_ORD_ORGNO": "91252", "ODNO": "0000117057", "ORD_TMD": "121052"}
 
         # When
         output = OrderOutput.model_validate(api_response)
@@ -95,11 +85,7 @@ class TestResponseBody:
             "rt_cd": "0",
             "msg_cd": "MCA00000",
             "msg1": "정상처리 되었습니다.",
-            "output": {
-                "KRX_FWDG_ORD_ORGNO": "91252",
-                "ODNO": "0000117057",
-                "ORD_TMD": "121052"
-            }
+            "output": {"KRX_FWDG_ORD_ORGNO": "91252", "ODNO": "0000117057", "ORD_TMD": "121052"},
         }
 
         # When
@@ -118,11 +104,7 @@ class TestResponseBody:
             "rt_cd": "1",
             "msg_cd": "EGW00123",
             "msg1": "주문가능수량을 초과하였습니다.",
-            "output": {
-                "KRX_FWDG_ORD_ORGNO": "",
-                "ODNO": "",
-                "ORD_TMD": ""
-            }
+            "output": {"KRX_FWDG_ORD_ORGNO": "", "ODNO": "", "ORD_TMD": ""},
         }
 
         # When

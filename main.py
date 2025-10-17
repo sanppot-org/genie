@@ -4,7 +4,11 @@ from datetime import datetime
 from src.config import HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
+from src.strategy.clock import SystemClock
+from src.strategy.config import BaseStrategyConfig
+from src.strategy.data.collector import DataCollector
 from src.upbit.upbit_api import UpbitAPI
+from strategy import TradingService
 
 # 로깅 설정
 logging.basicConfig(
@@ -24,10 +28,13 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 
 # result = upbit_api.get_current_price()
 # result = upbit_api.get_candles()
-result = upbit_api.get_available_amount()
+# result = upbit_api.get_available_amount()
 # result = upbit_api.get_balances()
 # result = upbit_api.buy_market_order(ticker='KRW-ETH', amount=11000)
 # result = upbit_api.sell_market_order(ticker='KRW-ETH', volume=0.0009) # 6000원 정도
+# result = upbit_api.buy_market_order_and_wait(ticker='KRW-ETH', amount=5000)
+# result = upbit_api.sell_market_order_and_wait(ticker='KRW-ETH', volume=0.0009)
+# result = upbit_api.upbit.get_order('e9e04adc-b0dc-47a4-bd98-ff544e2846da')
 
 #################################### KIS ####################################
 ### Domastic ###
@@ -76,4 +83,13 @@ filename = f'{ticker}-{datetime.now().date()}.json'
 
 # result = breakout_strategy._check_buy_signal(history=history, current_price=get_current_price())
 
-print(result)
+
+#### Strategy ####
+strategy_config = BaseStrategyConfig(total_balance=100_000_000, allocated_balance=10_000_000)
+clock = SystemClock(strategy_config.timezone)
+
+trading_service = TradingService(upbit_api, strategy_config, clock, DataCollector(clock))
+
+trading_service.run()
+
+# print(result)

@@ -7,11 +7,12 @@ import datetime
 from enum import Enum
 from functools import total_ordering
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Period(str, Enum):
     """반일봉 기간"""
+
     MORNING = "morning"
     AFTERNOON = "afternoon"
 
@@ -126,7 +127,7 @@ class HalfDayCandle(BaseModel):
             "high": self.high,
             "low": self.low,
             "close": self.close,
-            "volume": self.volume
+            "volume": self.volume,
         }
 
     def __lt__(self, other: "HalfDayCandle") -> bool:
@@ -148,41 +149,48 @@ class HalfDayCandle(BaseModel):
         return self.period == Period.MORNING and other.period == Period.AFTERNOON
 
 
-class Recent20DaysHalfDayCandles:
+class Recent20DaysHalfDayCandles(BaseModel):
     """
     최근 20일의 반일봉 데이터 컬렉션
 
     최근 20일의 반일봉 데이터(총 40개: 오전 20개, 오후 20개)를 래핑하여
     변동성 돌파 전략 등에서 사용할 수 있는 메서드를 제공합니다.
+
+    Attributes:
+        candles: 최근 20일의 반일봉 데이터 리스트 (총 40개)
+                - 오전 캔들 20개, 오후 캔들 20개
+                - 입력 순서와 무관하게 자동으로 시간순 정렬됨
     """
 
-    def __init__(self, candles: list[HalfDayCandle]):
+    candles: list[HalfDayCandle] = Field(..., description="최근 20일의 반일봉 데이터 (40개)")
+
+    @model_validator(mode="after")
+    def validate_and_sort(self) -> "Recent20DaysHalfDayCandles":
         """
-        Args:
-            candles: 최근 20일의 반일봉 데이터 리스트 (총 40개)
-                    - 오전 캔들 20개, 오후 캔들 20개
-                    - 입력 순서와 무관하게 자동으로 시간순 정렬됨
+        캔들 개수 검증 및 시간순 정렬
+
+        Returns:
+            검증 및 정렬된 인스턴스
+
+        Raises:
+            ValueError: 캔들 개수가 40개가 아닐 때
         """
-        if len(candles) != 40:
-            raise ValueError(f"Expected 40 candles, got {len(candles)}")
+        if len(self.candles) != 40:
+            raise ValueError(f"Expected 40 candles, got {len(self.candles)}")
 
         # HalfDayCandle의 __lt__ 메서드를 사용하여 시간순 정렬
-        self._candles = sorted(candles)
-
-    @property
-    def candles(self) -> list[HalfDayCandle]:
-        """전체 캔들 데이터"""
-        return self._candles
+        self.candles = sorted(self.candles)
+        return self
 
     @property
     def morning_candles(self) -> list[HalfDayCandle]:
         """오전 캔들만 필터링"""
-        return [c for c in self._candles if c.period == Period.MORNING]
+        return [c for c in self.candles if c.period == Period.MORNING]
 
     @property
     def afternoon_candles(self) -> list[HalfDayCandle]:
         """오후 캔들만 필터링"""
-        return [c for c in self._candles if c.period == Period.AFTERNOON]
+        return [c for c in self.candles if c.period == Period.AFTERNOON]
 
     @property
     def yesterday_morning(self) -> HalfDayCandle:

@@ -42,7 +42,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             price: str,
             order_division: OrderDivision = OrderDivision.MARKET,
             cma_evaluation_amount_included: str = "N",
-            overseas_included: str = "N"
+            overseas_included: str = "N",
     ) -> psbl_order.ResponseBody:
         """매수가능 조회
 
@@ -81,11 +81,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            url,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -115,11 +111,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            url,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -140,7 +132,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
-            price=0
+            price=0,
         )
 
     def sell_limit_order(self, ticker: str, quantity: int, price: int) -> order.ResponseBody:
@@ -159,7 +151,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.LIMIT,
             ticker=ticker,
             quantity=quantity,
-            price=price
+            price=price,
         )
 
     def buy_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
@@ -177,7 +169,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
-            price=0
+            price=0,
         )
 
     def buy_limit_order(self, ticker: str, quantity: int, price: int) -> order.ResponseBody:
@@ -196,16 +188,11 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.LIMIT,
             ticker=ticker,
             quantity=quantity,
-            price=price
+            price=price,
         )
 
     def _order(
-            self,
-            order_direction: OrderDirection,
-            order_division: OrderDivision,
-            ticker: str,
-            quantity: int,
-            price: int
+            self, order_direction: OrderDirection, order_division: OrderDivision, ticker: str, quantity: int, price: int
     ) -> order.ResponseBody:
         """주식 주문 (내부 메서드)
 
@@ -241,11 +228,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.post(
-            url,
-            headers=header.model_dump(by_alias=True),
-            data=body.model_dump_json()
-        )
+        res = requests.post(url, headers=header.model_dump(by_alias=True), data=body.model_dump_json())
 
         self._validate_response(res)
 
@@ -290,11 +273,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            url,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -306,9 +285,9 @@ class HantuDomesticAPI(HantuBaseAPI):
         accumulated_output2 = response_body.output2
 
         # 연속 조회 필요 여부 확인
-        response_tr_cont = res.headers.get('tr_cont', '')
+        response_tr_cont = res.headers.get("tr_cont", "")
 
-        if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
+        if response_tr_cont in ["M", "F"]:  # 다음 페이지 존재
             # API 호출 간격 (과부하 방지)
             time.sleep(0.1)
             # 재귀 호출로 다음 페이지 가져오기
@@ -329,7 +308,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             end_date: date,
             interval: ChartInterval = ChartInterval.DAY,
             price_type: PriceType = PriceType.ADJUSTED,
-            market_code: MarketCode = MarketCode.KRX
+            market_code: MarketCode = MarketCode.KRX,
     ) -> chart.DailyChartResponseBody:
         """일/주/월/년봉 차트 조회
 
@@ -362,22 +341,14 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            url,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
         return chart.DailyChartResponseBody.model_validate(res.json())
 
     def get_minute_chart(
-            self,
-            ticker: str,
-            target_date: date,
-            target_time: time_obj,
-            market_code: MarketCode = MarketCode.KRX
+            self, ticker: str, target_date: date, target_time: time_obj, market_code: MarketCode = MarketCode.KRX
     ) -> chart.MinuteChartResponseBody:
         """분봉 차트 조회
 
@@ -408,11 +379,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            url,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 

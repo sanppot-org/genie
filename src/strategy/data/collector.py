@@ -7,10 +7,6 @@ import datetime as dt
 import logging
 from datetime import date
 
-from upbit.upbit_api import UpbitAPI
-
-logger = logging.getLogger(__name__)
-
 import pandas as pd
 from pandera.typing import DataFrame, Series
 
@@ -19,6 +15,9 @@ from src.strategy.clock import Clock
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.upbit import upbit_api
 from src.upbit.model.candle import CandleSchema
+from upbit.upbit_api import UpbitAPI
+
+logger = logging.getLogger(__name__)
 
 
 class DataCollector:
@@ -27,13 +26,13 @@ class DataCollector:
 
     60분봉 캔들 데이터를 수집하고 오전(00:00-11:59) / 오후(12:00-23:59)
     반일봉으로 집계합니다.
-    
+
     캐싱 전략:
     - 캐시 키: (ticker, date, days)
     - 날짜가 바뀌면 이전 캐시 자동 정리
     """
 
-    def __init__(self, clock: Clock):
+    def __init__(self, clock: Clock) -> None:
         """DataCollector 초기화
 
         Args:
@@ -62,7 +61,7 @@ class DataCollector:
         Returns:
             Recent20DaysHalfDayCandles 객체 (20일 * 2 = 40개 캔들)
         """
-        today = self._clock.now().date()
+        today = self._clock.today()
         cache_key = (ticker, today, days)
 
         # 날짜가 바뀌면 캐시 정리
@@ -76,14 +75,10 @@ class DataCollector:
         logger.debug(f"캐시 미스: {cache_key}")
 
         # 여유분 포함하여 데이터 수집
-        df = UpbitAPI.get_candles(
-            ticker=ticker,
-            interval=upbit_api.CandleInterval.MINUTE_60,
-            count=(days + 1) * 24
-        )
+        df = UpbitAPI.get_candles(ticker=ticker, interval=upbit_api.CandleInterval.MINUTE_60, count=(days + 1) * 24)
 
         candles = self._aggregate_all(df, days)
-        result = Recent20DaysHalfDayCandles(candles)
+        result = Recent20DaysHalfDayCandles(candles=candles)
 
         # 캐시 저장
         self._cache[cache_key] = result
@@ -113,11 +108,7 @@ class DataCollector:
         self._cache.clear()
         self._last_cleanup_date = None
 
-    def _aggregate_all(
-            self,
-            df: DataFrame[CandleSchema],
-            days: int
-    ) -> list[HalfDayCandle]:
+    def _aggregate_all(self, df: DataFrame[CandleSchema], days: int) -> list[HalfDayCandle]:
         """
         어제부터 지정된 일수만큼 시간봉을 반일봉으로 집계
 
@@ -135,7 +126,7 @@ class DataCollector:
             return []
 
         # 오늘 날짜 계산
-        today = self._clock.now().date()
+        today = self._clock.today()
 
         # DataFrame에서 고유한 날짜들 추출 (순서와 무관) 오늘 데이터 제외
         dates = pd.Series([idx.date() for idx in df.index if idx.date() < today])
@@ -145,18 +136,14 @@ class DataCollector:
         target_dates = unique_dates[-days:] if len(unique_dates) >= days else unique_dates
 
         result = []
-        for date in target_dates:
+        for target_date in target_dates:
             # 집계
-            morning, afternoon = self._aggregate_day(df, date)
+            morning, afternoon = self._aggregate_day(df, target_date)
             result.extend([morning, afternoon])
 
         return result
 
-    def _aggregate_day(
-            self,
-            df: DataFrame[CandleSchema],
-            target_date: dt.date
-    ) -> tuple[HalfDayCandle, HalfDayCandle]:
+    def _aggregate_day(self, df: DataFrame[CandleSchema], target_date: dt.date) -> tuple[HalfDayCandle, HalfDayCandle]:
         """
         전체 시간봉에서 특정 날짜 데이터를 추출하여 오전/오후 반일봉으로 집계
 
@@ -181,11 +168,7 @@ class DataCollector:
         return morning, afternoon
 
     @staticmethod
-    def _aggregate(
-            hourly_df: Series[CandleSchema],
-            target_date: dt.date,
-            period: Period
-    ) -> HalfDayCandle:
+    def _aggregate(hourly_df: Series[CandleSchema], target_date: dt.date, period: Period) -> HalfDayCandle:
         """
         12개 시간봉을 하나의 반일봉으로 집계
 
@@ -204,5 +187,5 @@ class DataCollector:
             high=hourly_df[constants.FIELD_HIGH].max(),
             low=hourly_df[constants.FIELD_LOW].min(),
             close=hourly_df[constants.FIELD_CLOSE].iloc[-1],
-            volume=hourly_df[constants.FIELD_VOLUME].sum()
+            volume=hourly_df[constants.FIELD_VOLUME].sum(),
         )

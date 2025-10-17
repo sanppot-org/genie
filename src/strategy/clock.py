@@ -4,19 +4,19 @@
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime, time
+from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
 
 class Clock(ABC):
     """시간 제공 인터페이스"""
 
-    def __init__(self, timezone: ZoneInfo = ZoneInfo("Asia/Seoul")):
+    def __init__(self, timezone: ZoneInfo | None = None) -> None:
         """
         Args:
             timezone: 사용할 타임존 (기본값: KST)
         """
-        self.timezone = timezone
+        self.timezone = timezone if timezone is not None else ZoneInfo("Asia/Seoul")
 
     @abstractmethod
     def now(self) -> datetime:
@@ -27,6 +27,9 @@ class Clock(ABC):
             현재 시간 (지정된 timezone 포함)
         """
         pass
+
+    def today(self) -> date:
+        return self.now().date()
 
     def is_morning(self) -> bool:
         """
@@ -67,13 +70,13 @@ class SystemClock(Clock):
 class FixedClock(Clock):
     """테스트용 고정 시간을 제공하는 Clock 구현"""
 
-    def __init__(self, fixed_time: datetime, timezone: ZoneInfo = ZoneInfo("Asia/Seoul")):
+    def __init__(self, fixed_time: datetime, timezone: ZoneInfo | None = None) -> None:
         """
         Args:
             fixed_time: 고정할 시간 (timezone 없으면 지정된 timezone으로 간주)
             timezone: 사용할 타임존 (기본값: KST)
         """
-        super().__init__(timezone)
+        super().__init__(timezone if timezone is not None else None)
         if fixed_time.tzinfo is None:
             self._fixed_time = fixed_time.replace(tzinfo=self.timezone)
         else:

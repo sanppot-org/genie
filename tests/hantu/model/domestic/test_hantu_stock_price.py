@@ -10,10 +10,7 @@ class TestRequestQueryParam:
     def test_market_code_enum_serialization(self):
         """MarketCode enum이 올바르게 직렬화되는지 테스트"""
         # Given
-        param = stock_price.RequestQueryParam(
-            FID_COND_MRKT_DIV_CODE=MarketCode.KRX,
-            FID_INPUT_ISCD="005930"
-        )
+        param = stock_price.RequestQueryParam(FID_COND_MRKT_DIV_CODE=MarketCode.KRX, FID_INPUT_ISCD="005930")
 
         # When
         serialized = param.model_dump()
@@ -25,20 +22,11 @@ class TestRequestQueryParam:
     def test_market_code_enum_values(self):
         """다양한 MarketCode enum 값들이 올바르게 직렬화되는지 테스트"""
         # Given & When & Then
-        krx_param = stock_price.RequestQueryParam(
-            FID_COND_MRKT_DIV_CODE=MarketCode.KRX,
-            FID_INPUT_ISCD="005930"
-        )
+        krx_param = stock_price.RequestQueryParam(FID_COND_MRKT_DIV_CODE=MarketCode.KRX, FID_INPUT_ISCD="005930")
         assert krx_param.model_dump()["FID_COND_MRKT_DIV_CODE"] == "J"
 
-        nxt_param = stock_price.RequestQueryParam(
-            FID_COND_MRKT_DIV_CODE=MarketCode.NXT,
-            FID_INPUT_ISCD="005930"
-        )
+        nxt_param = stock_price.RequestQueryParam(FID_COND_MRKT_DIV_CODE=MarketCode.NXT, FID_INPUT_ISCD="005930")
         assert nxt_param.model_dump()["FID_COND_MRKT_DIV_CODE"] == "NX"
 
-        all_param = stock_price.RequestQueryParam(
-            FID_COND_MRKT_DIV_CODE=MarketCode.ALL,
-            FID_INPUT_ISCD="005930"
-        )
+        all_param = stock_price.RequestQueryParam(FID_COND_MRKT_DIV_CODE=MarketCode.ALL, FID_INPUT_ISCD="005930")
         assert all_param.model_dump()["FID_COND_MRKT_DIV_CODE"] == "UN"

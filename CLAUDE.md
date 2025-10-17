@@ -57,12 +57,6 @@ tests/
 ### 환경 설정
 
 ```bash
-# 가상 환경 활성화
-source .venv/bin/activate
-
-# 의존성 설치
-uv pip install -e .
-
 # 테스트 실행 (항상 uv 사용)
 uv run pytest tests/
 

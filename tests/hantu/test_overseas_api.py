@@ -57,11 +57,11 @@ class TestGetBalance:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
-        mock_response.headers = {'tr_cont': 'D'}  # 마지막 페이지
+        mock_response.headers = {"tr_cont": "D"}  # 마지막 페이지
         mock_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -87,7 +87,7 @@ class TestGetBalance:
                     "ovrs_excg_cd": "NASD",
                     "loan_type_cd": "",
                     "loan_dt": "",
-                    "expd_dt": ""
+                    "expd_dt": "",
                 }
             ],
             "output2": {
@@ -99,11 +99,11 @@ class TestGetBalance:
                 "tot_pftrt": "6.67",
                 "frcr_buy_amt_smtl1": "1500.00",
                 "ovrs_rlzt_pfls_amt2": "0.00",
-                "frcr_buy_amt_smtl2": "1500.00"
-            }
+                "frcr_buy_amt_smtl2": "1500.00",
+            },
         }
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When
         result = api.get_balance(exchange_code=OverseasExchangeCode.NASD, trading_currency_code=TradingCurrencyCode.USD)
@@ -125,12 +125,12 @@ class TestGetBalance:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         # 첫 번째 페이지 응답
         first_response = mocker.Mock()
         first_response.status_code = 200
-        first_response.headers = {'tr_cont': 'M'}  # 다음 페이지 존재
+        first_response.headers = {"tr_cont": "M"}  # 다음 페이지 존재
         first_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -156,7 +156,7 @@ class TestGetBalance:
                     "ovrs_excg_cd": "NASD",
                     "loan_type_cd": "",
                     "loan_dt": "",
-                    "expd_dt": ""
+                    "expd_dt": "",
                 }
             ],
             "output2": {
@@ -168,14 +168,14 @@ class TestGetBalance:
                 "tot_pftrt": "0.00",
                 "frcr_buy_amt_smtl1": "0.00",
                 "ovrs_rlzt_pfls_amt2": "0.00",
-                "frcr_buy_amt_smtl2": "0.00"
-            }
+                "frcr_buy_amt_smtl2": "0.00",
+            },
         }
 
         # 두 번째 페이지 응답
         second_response = mocker.Mock()
         second_response.status_code = 200
-        second_response.headers = {'tr_cont': 'D'}  # 마지막 페이지
+        second_response.headers = {"tr_cont": "D"}  # 마지막 페이지
         second_response.json.return_value = {
             "rt_cd": "0",
             "msg_cd": "MCA00000",
@@ -201,7 +201,7 @@ class TestGetBalance:
                     "ovrs_excg_cd": "NASD",
                     "loan_type_cd": "",
                     "loan_dt": "",
-                    "expd_dt": ""
+                    "expd_dt": "",
                 }
             ],
             "output2": {
@@ -213,11 +213,11 @@ class TestGetBalance:
                 "tot_pftrt": "6.00",
                 "frcr_buy_amt_smtl1": "2500.00",
                 "ovrs_rlzt_pfls_amt2": "0.00",
-                "frcr_buy_amt_smtl2": "2500.00"
-            }
+                "frcr_buy_amt_smtl2": "2500.00",
+            },
         }
 
-        mock_get = mocker.patch('requests.get')
+        mock_get = mocker.patch("requests.get")
         mock_get.side_effect = [first_response, second_response]
 
         # When
@@ -236,9 +236,9 @@ class TestGetBalance:
 
         # 두 번째 호출 시 연속 조회 키가 전달되었는지 확인
         assert mock_get.call_count == 2
-        second_call_params = mock_get.call_args_list[1][1]['params']
-        assert second_call_params['CTX_AREA_FK200'] == "CTX_FK_001"
-        assert second_call_params['CTX_AREA_NK200'] == "CTX_NK_001"
+        second_call_params = mock_get.call_args_list[1][1]["params"]
+        assert second_call_params["CTX_AREA_FK200"] == "CTX_FK_001"
+        assert second_call_params["CTX_AREA_NK200"] == "CTX_NK_001"
 
     def test_get_balance_error(self, mocker):
         """API 에러 응답"""
@@ -247,13 +247,13 @@ class TestGetBalance:
         api = HantuOverseasAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When & Then
         with pytest.raises(Exception, match="Error: Bad Request"):
