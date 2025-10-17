@@ -6,7 +6,6 @@
 # 거래 관련 상수
 KRW_BTC = 'KRW-BTC'
 CURRENCY_KRW = 'KRW'
-CURRENCY_BTC = 'BTC'
 
 # 캔들 데이터 관련 상수
 CANDLE_COUNT_24H = 24

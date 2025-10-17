@@ -64,7 +64,7 @@ class TestDataCollector:
         assert result.open == 51200.0  # 13번째 캔들의 시가 (50000 + 12*100)
         assert result.close == 52800.0  # 24번째 캔들의 종가 (50500 + 23*100)
 
-    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    @patch('src.strategy.data.collector.upbit_api.UpbitAPI.get_candles')
     def test_collect_initial_data(self, mock_get_candles, collector):
         """초기 20일치 데이터 수집 테스트"""
         # 어제부터 21일 전까지 시간봉 생성 (504개)
@@ -105,7 +105,7 @@ class TestDataCollector:
         assert result.candles[-2].period == Period.MORNING
         assert result.candles[-1].period == Period.AFTERNOON
 
-    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    @patch('src.strategy.data.collector.upbit_api.UpbitAPI.get_candles')
     def test_collect_initial_data_filters_by_timestamp(self, mock_get_candles, collector):
         """타임스탬프 기준으로 정확히 20일치만 추출하는지 테스트"""
         # 어제부터 넉넉하게 25일치 생성
@@ -201,7 +201,7 @@ class TestDataCollector:
         result_dates = set([half_day.date for half_day in result])
         assert result_dates == {yesterday, day_before_yesterday}
 
-    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    @patch('src.strategy.data.collector.upbit_api.UpbitAPI.get_candles')
     def test_caching_same_request(self, mock_get_candles, collector):
         """같은 요청을 두 번 하면 API는 한 번만 호출됨"""
         # Mock 데이터 준비
@@ -235,7 +235,7 @@ class TestDataCollector:
         # 결과는 동일해야 함
         assert result1 == result2
 
-    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    @patch('src.strategy.data.collector.upbit_api.UpbitAPI.get_candles')
     def test_caching_different_ticker(self, mock_get_candles, collector):
         """다른 티커는 별도로 캐시됨"""
         # Mock 데이터 준비
@@ -264,7 +264,7 @@ class TestDataCollector:
         # API는 두 번 호출되어야 함 (각 티커마다)
         assert mock_get_candles.call_count == 2
 
-    @patch('src.strategy.data.collector.upbit_api.get_candles')
+    @patch('src.strategy.data.collector.upbit_api.UpbitAPI.get_candles')
     def test_cache_cleanup_on_date_change(self, mock_get_candles):
         """날짜가 바뀌면 이전 캐시가 정리됨"""
         # Mock 데이터 준비

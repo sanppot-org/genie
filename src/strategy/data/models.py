@@ -56,11 +56,17 @@ class HalfDayCandle(BaseModel):
         """
         변동성 ((고가 - 저가) / 시가)
 
+        최소: 0
+        최대: 무한
+
         Returns:
             변동성
+
+        Raises:
+            ValueError: 시가가 0 이하일 때
         """
-        if self.open == 0.0:
-            return float('inf')
+        if self.open <= 0.0:
+            raise ValueError("시가가 0 이하입니다")
         return self.range / self.open
 
     @property
@@ -84,10 +90,13 @@ class HalfDayCandle(BaseModel):
         수익률 ((종가 - 시가) / 시가)
 
         Returns:
-            수익률 (시가가 0이면 inf 반환)
+            수익률
+
+        Raises:
+            ValueError: 시가가 0 이하일 때
         """
-        if self.open == 0.0:
-            return float('inf')
+        if self.open <= 0.0:
+            raise ValueError("시가가 0 이하입니다")
         return (self.close - self.open) / self.open
 
     @classmethod
@@ -204,6 +213,9 @@ class Recent20DaysHalfDayCandles:
 
         각 이평선이 전일 오전 종가보다 큰지 확인하여
         조건을 만족하는 이평선 개수를 4로 나눈 값을 반환합니다.
+
+        최소: 0
+        최대: 1
 
         Returns:
             이평선 스코어 (0.0 ~ 1.0)

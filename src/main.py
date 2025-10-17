@@ -1,13 +1,10 @@
 import logging
 from datetime import datetime
 
-from src.config import UpbitConfig, HantuConfig
+from src.config import HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
-from src.strategy.data.collector import DataCollector
-from src.upbit.upbit_api import UpbitAPI, get_current_price
-from strategy.data import storage
-from strategy.strategies import volatility_breakout
+from src.upbit.upbit_api import UpbitAPI
 
 # 로깅 설정
 logging.basicConfig(
@@ -25,11 +22,11 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 
 # Upbit
 
-# result = get_current_price()
-# result = get_candles()
-# result = upbit_api.get_balance()
+# result = upbit_api.get_current_price()
+# result = upbit_api.get_candles()
+result = upbit_api.get_available_amount()
 # result = upbit_api.get_balances()
-# result = upbit_api.buy_market_order(ticker='KRW-ETH', price=11000)
+# result = upbit_api.buy_market_order(ticker='KRW-ETH', amount=11000)
 # result = upbit_api.sell_market_order(ticker='KRW-ETH', volume=0.0009) # 6000원 정도
 
 #################################### KIS ####################################
@@ -59,7 +56,7 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 
 #################################### Candle ####################################
 
-collector = DataCollector()
+# collector = DataCollector()  # 필요한 clock 인자 추가 필요
 # result = collector.collect_initial_data(ticker="KRW-BTC")
 
 
@@ -72,9 +69,11 @@ filename = f'{ticker}-{datetime.now().date()}.json'
 # result = storage.load(filename)
 
 ### Strategy ###
-history = storage.load(filename)
+# history = storage.load(filename)
 # result = morning_afternoon.check_buy_signal(history=history)
 
-result = volatility_breakout.check_buy_signal(history=history, current_price=get_current_price())
+# breakout_strategy = VolatilityBreakoutStrategy()  # 필요한 인자 추가 필요
+
+# result = breakout_strategy._check_buy_signal(history=history, current_price=get_current_price())
 
 print(result)

@@ -36,64 +36,64 @@ class CandleInterval(Enum):
     MONTH = "month"
 
 
-def get_current_price(ticker: str = constants.KRW_BTC) -> float:
-    """
-    현재가 조회
+class UpbitAPI:
+    @staticmethod
+    def get_current_price(ticker: str = constants.KRW_BTC) -> float:
+        """
+        현재가 조회
 
-    Args:
-        ticker: 티커 코드 (기본값: 'KRW-BTC')
+        Args:
+            ticker: 티커 코드 (기본값: 'KRW-BTC')
 
-    Returns:
-        현재가, 실패 시 0.0
-    """
-    return pyupbit.get_current_price(ticker) or 0.0
+        Returns:
+            현재가, 실패 시 0.0
+        """
+        return pyupbit.get_current_price(ticker) or 0.0
 
+    @staticmethod
+    def get_candles(
+            ticker: str = constants.KRW_BTC,
+            interval: CandleInterval = CandleInterval.MINUTE_60,
+            count: int = 24
+    ) -> DataFrame[CandleSchema]:
+        """
+        캔들 데이터 조회
 
-def get_candles(
-        ticker: str = constants.KRW_BTC,
-        interval: CandleInterval = CandleInterval.MINUTE_60,
-        count: int = 24
-) -> DataFrame[CandleSchema]:
-    """
-    캔들 데이터 조회
+        Args:
+            ticker: 티커 코드 (기본값: 'KRW-BTC')
+            interval: 캔들 간격 (기본값: CandleInterval.HOUR)
+            count: 조회할 캔들 개수 (기본값: 24)
 
-    Args:
-        ticker: 티커 코드 (기본값: 'KRW-BTC')
-        interval: 캔들 간격 (기본값: CandleInterval.HOUR)
-        count: 조회할 캔들 개수 (기본값: 24)
+        Returns:
+            CandleSchema를 따르는 DataFrame, 실패 시 빈 DataFrame
+        """
+        try:
+            df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count)
 
-    Returns:
-        CandleSchema를 따르는 DataFrame, 실패 시 빈 DataFrame
-    """
-    try:
-        df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count)
+            if df is None or df.empty:
+                return pd.DataFrame()
 
-        if df is None or df.empty:
+            return CandleSchema.validate(df)
+        except Exception:
+            logger.exception(f"캔들 데이터 조회 실패: ticker={ticker}, interval={interval.value}, count={count}")
             return pd.DataFrame()
 
-        return CandleSchema.validate(df)
-    except Exception:
-        logger.exception(f"캔들 데이터 조회 실패: ticker={ticker}, interval={interval.value}, count={count}")
-        return pd.DataFrame()
-
-
-class UpbitAPI:
     def __init__(self, config: UpbitConfig | None = None) -> None:
         if config is None:
             config = UpbitConfig()
         self.upbit = pyupbit.Upbit(config.upbit_access_key, config.upbit_secret_key)
 
-    def get_available_amount(self, currency: str = constants.CURRENCY_KRW) -> float:
+    def get_available_amount(self, ticker: str = constants.CURRENCY_KRW) -> float:
         """
         특정 통화의 사용 가능 수량 조회
 
         Args:
-            currency: 통화 코드 (기본값: 'KRW')
+            ticker: 티커 ('KRW-BTC') 또는 통화 코드 ('KRW', 'BTC')
 
         Returns:
             사용 가능 수량, 실패 시 0.0
         """
-        return self.upbit.get_balance(currency) or 0.0
+        return self.upbit.get_balance(ticker) or 0.0
 
     def get_balances(self) -> list[BalanceInfo]:
         """
@@ -110,21 +110,25 @@ class UpbitAPI:
 
         return [BalanceInfo.from_dict(balance) for balance in balances] if balances else []
 
-    def buy_market_order(self, ticker: str, price: float) -> OrderResult:
+    def buy_market_order(self, ticker: str, amount: float) -> OrderResult:
         """
         시장가 매수 주문
 
         Args:
             ticker: 마켓 ID
-            price: 주문 금액 (ticker를 얼마나 살건지 - 절대 금액)
+            amount: 주문 금액 (ticker를 얼마나 살건지 - 절대 금액)
 
         Returns:
             주문 결과
 
         Raises:
+            ValueError: amount가 0 이하인 경우
             UpbitAPIError: API 호출 중 에러가 발생한 경우
         """
-        result = self.upbit.buy_market_order(ticker, price)
+        if amount <= 0:
+            raise ValueError("amount는 0보다 커야 합니다")
+
+        result = self.upbit.buy_market_order(ticker, amount)
         self._check_api_error(result)
         return OrderResult.from_dict(result)
 
@@ -140,8 +144,12 @@ class UpbitAPI:
             주문 결과
 
         Raises:
+            ValueError: volume이 0 이하인 경우
             UpbitAPIError: API 호출 중 에러가 발생한 경우
         """
+        if volume <= 0:
+            raise ValueError("volume은 0보다 커야 합니다")
+
         result = self.upbit.sell_market_order(ticker, volume)
         self._check_api_error(result)
         return OrderResult.from_dict(result)
@@ -158,15 +166,40 @@ class UpbitAPI:
             주문 결과
 
         Raises:
-            ValueError: 현재가가 0이거나 조회 실패 시
+            ValueError: price가 0 이하이거나 현재가가 0이거나 조회 실패 시
             UpbitAPIError: API 호출 중 에러가 발생한 경우
         """
-        current_price = get_current_price(ticker)
+        if price <= 0:
+            raise ValueError("price는 0보다 커야 합니다")
+
+        current_price = UpbitAPI.get_current_price(ticker)
 
         if current_price == 0.0:
             raise ValueError(f"현재가를 조회할 수 없습니다: {ticker}")
 
         volume = price / current_price
+
+        return self.sell_market_order(ticker, volume)
+
+    def sell_all(self, ticker: str) -> OrderResult | None:
+        """
+        보유 중인 특정 티커를 전량 매도
+
+        Args:
+            ticker: 마켓 ID (예: 'KRW-BTC')
+
+        Returns:
+            주문 결과. 보유 수량이 없으면 None
+
+        Raises:
+            UpbitAPIError: API 호출 중 에러가 발생한 경우
+        """
+        # 보유 수량 조회
+        volume = self.get_available_amount(ticker)
+
+        if volume == 0.0:
+            return None
+
         return self.sell_market_order(ticker, volume)
 
     @staticmethod

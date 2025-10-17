@@ -85,8 +85,9 @@ class TestHalfDayCandle:
             volume=1234.56
         )
 
-        # 0으로 나누면 inf
-        assert candle.volatility == float('inf')
+        # 시가가 0이면 예외 발생
+        with pytest.raises(ValueError, match="시가가 0 이하입니다"):
+            _ = candle.volatility
 
     def test_noise_property(self):
         """noise 프로퍼티 계산 테스트"""
@@ -160,8 +161,9 @@ class TestHalfDayCandle:
             volume=1234.56
         )
 
-        # 0으로 나누면 inf
-        assert candle.return_rate == float('inf')
+        # 시가가 0이면 예외 발생
+        with pytest.raises(ValueError, match="시가가 0 이하입니다"):
+            _ = candle.return_rate
 
     def test_from_dict(self):
         """from_dict 메서드 테스트"""

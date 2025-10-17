@@ -115,7 +115,7 @@ balances = api.get_balances()
 eth_balance = api.get_available_amount(ticker='ETH')
 
 # 주문
-buy_order = api.buy_market_order(ticker='KRW-ETH', price=10000)
+buy_order = api.buy_market_order(ticker='KRW-ETH', amount=10000)
 sell_order = api.sell_market_order(ticker='KRW-ETH', volume=0.001)
 ```
 

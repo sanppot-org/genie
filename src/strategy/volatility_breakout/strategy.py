@@ -12,7 +12,6 @@ from src.strategy.base import BaseStrategy
 from src.strategy.clock import Clock
 from src.strategy.config import VolatilityBreakoutConfig
 from src.strategy.data.collector import DataCollector
-from src.upbit import upbit_api
 from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
@@ -195,7 +194,7 @@ class VolatilityBreakoutStrategy(BaseStrategy):
                 logger.debug("[변동성돌파] 오전 시간대가 아님")
                 return
 
-            current_price = upbit_api.get_current_price(self.config.ticker)
+            current_price = UpbitAPI.get_current_price(self.config.ticker)
 
             # 저장된 threshold로 시그널 체크
             if current_price <= self.threshold:
@@ -261,14 +260,11 @@ class VolatilityBreakoutStrategy(BaseStrategy):
             logger.info("==" * 30)
             logger.info("[변동성돌파 매도] 12:00 전량 매도 시작")
 
-            # 티커에서 코인 심볼 추출 (예: "KRW-BTC" -> "BTC")
-            coin_symbol = self.config.ticker.split("-")[1]
-
             # 보유 수량 조회
-            balance = self.upbit.get_available_amount(coin_symbol)
+            balance = self.upbit.get_available_amount(self.config.ticker)
 
             if balance <= 0:
-                logger.info(f"[변동성돌파 매도] 보유 수량 없음: {coin_symbol}")
+                logger.info(f"[변동성돌파 매도] 보유 수량 없음: {self.config.ticker}")
                 logger.info("[변동성돌파 매도] 완료")
                 logger.info("==" * 30)
                 return

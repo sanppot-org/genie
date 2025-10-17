@@ -7,6 +7,8 @@ import datetime as dt
 import logging
 from datetime import date
 
+from upbit.upbit_api import UpbitAPI
+
 logger = logging.getLogger(__name__)
 
 import pandas as pd
@@ -74,7 +76,7 @@ class DataCollector:
         logger.debug(f"캐시 미스: {cache_key}")
 
         # 여유분 포함하여 데이터 수집
-        df = upbit_api.get_candles(
+        df = UpbitAPI.get_candles(
             ticker=ticker,
             interval=upbit_api.CandleInterval.MINUTE_60,
             count=(days + 1) * 24
@@ -137,10 +139,10 @@ class DataCollector:
 
         # DataFrame에서 고유한 날짜들 추출 (순서와 무관) 오늘 데이터 제외
         dates = pd.Series([idx.date() for idx in df.index if idx.date() < today])
-        unique_dates = sorted(dates.unique())  # 최신순 정렬
+        unique_dates = sorted(dates.unique())  # 오름차순 정렬 (오래된 것 → 최신)
 
-        # 지정된 일수만큼만 처리 (어제부터)
-        target_dates = unique_dates[:days]
+        # 지정된 일수만큼만 처리 (최근 n일)
+        target_dates = unique_dates[-days:] if len(unique_dates) >= days else unique_dates
 
         result = []
         for date in target_dates:
@@ -153,35 +155,35 @@ class DataCollector:
     def _aggregate_day(
             self,
             df: DataFrame[CandleSchema],
-            date: dt.date
+            target_date: dt.date
     ) -> tuple[HalfDayCandle, HalfDayCandle]:
         """
         전체 시간봉에서 특정 날짜 데이터를 추출하여 오전/오후 반일봉으로 집계
 
         Args:
             df: 전체 시간봉 DataFrame
-            date: 집계할 날짜
+            target_date: 집계할 날짜
 
         Returns:
             (오전 반일봉, 오후 반일봉) 튜플
         """
         # 해당 날짜의 데이터만 필터링
-        date_df = df[df.index.date == date]
+        date_df = df[df.index.normalize() == pd.Timestamp(target_date)]
 
         # 오전(0-11시) / 오후(12-23시) 분리
         morning_df = date_df[date_df.index.hour < 12]
         afternoon_df = date_df[date_df.index.hour >= 12]
 
         # 집계
-        morning = self._aggregate(morning_df, date, Period.MORNING)
-        afternoon = self._aggregate(afternoon_df, date, Period.AFTERNOON)
+        morning = self._aggregate(morning_df, target_date, Period.MORNING)
+        afternoon = self._aggregate(afternoon_df, target_date, Period.AFTERNOON)
 
         return morning, afternoon
 
     @staticmethod
     def _aggregate(
             hourly_df: Series[CandleSchema],
-            date: dt.date,
+            target_date: dt.date,
             period: Period
     ) -> HalfDayCandle:
         """
@@ -189,14 +191,14 @@ class DataCollector:
 
         Args:
             hourly_df: 12개의 시간봉 Series[CandleSchema]
-            date: 날짜
+            target_date: 날짜
             period: 기간 ("morning" 또는 "afternoon")
 
         Returns:
             집계된 반일봉
         """
         return HalfDayCandle(
-            date=date,
+            date=target_date,
             period=period,
             open=hourly_df[constants.FIELD_OPEN].iloc[0],
             high=hourly_df[constants.FIELD_HIGH].max(),

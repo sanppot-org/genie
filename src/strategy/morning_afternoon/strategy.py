@@ -210,11 +210,10 @@ class MorningAfternoonStrategy(BaseStrategy):
             return False
 
         # 2. 보유 중인지 체크
-        coin_symbol = self.config.ticker.split("-")[1]
-        volume = self.upbit.get_available_amount(coin_symbol)
+        volume = self.upbit.get_available_amount(self.config.ticker)
 
         if volume <= 0:
-            logger.debug(f"[오전오후] 보유 수량 없음: {coin_symbol}")
+            logger.debug(f"[오전오후] 보유 수량 없음: {self.config.ticker}")
             return False
 
         return True
@@ -226,18 +225,15 @@ class MorningAfternoonStrategy(BaseStrategy):
         보유 수량을 조회하여 전량 매도합니다.
         """
         try:
-            # 티커에서 코인 심볼 추출
-            coin_symbol = self.config.ticker.split("-")[1]
-
             # 보유 수량 조회
-            volume = self.upbit.get_available_amount(coin_symbol)
+            volume = self.upbit.get_available_amount(self.config.ticker)
 
             if volume <= 0:
-                logger.debug(f"[오전오후] 보유 수량 없음: {coin_symbol}")
+                logger.debug(f"[오전오후] 보유 수량 없음: {self.config.ticker}")
                 return
 
             # 매도 주문
-            logger.info(f"[오전오후] 전량 매도 시작: {volume} {coin_symbol}")
+            logger.info(f"[오전오후] 전량 매도 시작: {volume} {self.config.ticker}")
             result = self.upbit.sell_market_order(self.config.ticker, volume)
 
             logger.info(f"[오전오후] 매도 완료: {result}")
