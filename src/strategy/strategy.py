@@ -7,6 +7,7 @@ from src.strategy.clock import Clock
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.data.models import Recent20DaysHalfDayCandles
+from src.strategy.order_executor import OrderExecutor
 from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
@@ -26,8 +27,10 @@ class Cache(BaseModel):
 
 # 1분마다 스케줄러로 실행
 class TradingService:
-    def __init__(self, upbit_api: UpbitAPI, config: BaseStrategyConfig, clock: Clock, collector: DataCollector) -> None:
-        self._upbit_api = upbit_api
+    def __init__(
+            self, order_executor: OrderExecutor, config: BaseStrategyConfig, clock: Clock, collector: DataCollector
+    ) -> None:
+        self._order_executor = order_executor
         self._config = config
         self._clock = clock
         self._collector = collector
@@ -54,13 +57,13 @@ class TradingService:
         if self._ma_should_buy():
             position_size = self._config.target_vol / max(self._cache.history.yesterday_morning.volatility, 0.01)
             amount = min(self._config.total_balance * position_size, self._config.allocated_balance)
-            execution_volume = self.buy(amount)
-            self._cache.morning_afternoon_execution_volume = execution_volume
+            result = self._order_executor.buy(self._config.ticker, amount)
+            self._cache.morning_afternoon_execution_volume = result.executed_volume  # 체결수량 캐시
 
         # 오후
         else:
             if self._cache.morning_afternoon_execution_volume:
-                self.sell(self._cache.morning_afternoon_execution_volume)
+                self._order_executor.sell(self._config.ticker, self._cache.morning_afternoon_execution_volume)
                 self._cache.morning_afternoon_execution_volume = 0
 
     def _ma_should_buy(self) -> bool:
@@ -89,12 +92,12 @@ class TradingService:
             amount = min(
                 self._config.total_balance * self._cache.volatility_position_size, self._config.allocated_balance
             )
-            execution_volume = self.buy(amount)
-            self._cache.volatility_execution_volume = execution_volume  # 체결수량 캐시
+            result = self._order_executor.buy(self._config.ticker, amount)
+            self._cache.volatility_execution_volume = result.executed_volume  # 체결수량 캐시
 
         else:
             if self._cache.volatility_execution_volume:
-                self.sell(self._cache.volatility_execution_volume)
+                self._order_executor.sell(self._config.ticker, self._cache.volatility_execution_volume)
                 self._cache.volatility_execution_volume = 0
 
     def _vol_should_buy(self) -> bool:
@@ -120,24 +123,6 @@ class TradingService:
             logger.debug(f"조건 4: 현재가: {current_price} > 돌파 가격: {threshold} = {current_price > threshold}")
 
         return is_morning and execution_volume and position_size_ and current_price > threshold
-
-    def buy(self, amount: float) -> float:
-        order_result = self._upbit_api.buy_market_order_and_wait(self._config.ticker, amount)
-        execution_price = order_result.trades[0].price
-        execution_volume = order_result.trades[0].volume
-        logger.debug(
-            f"{self._config.ticker} 매수 완료. 수량: {execution_volume}, 가격: {execution_price}, 금액: {amount}"
-        )
-        return execution_volume
-
-    def sell(self, volume: float) -> None:
-        order_result = self._upbit_api.sell_market_order_and_wait(self._config.ticker, volume)
-        execution_price = order_result.trades[0].price
-        execution_volume = order_result.trades[0].volume
-        amount = execution_price * execution_volume
-        logger.debug(
-            f"{self._config.ticker} 매도 완료. 수량: {execution_volume}, 가격: {execution_price}, 금액: {amount}"
-        )
 
     def _update_cache(self) -> Cache:
         history = self._collector.collect_data(self._config.ticker)

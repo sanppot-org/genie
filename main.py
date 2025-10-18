@@ -1,20 +1,19 @@
 import logging
 from datetime import datetime
 
+from strategy.strategy import TradingService
+
 from src.config import HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
 from src.strategy.clock import SystemClock
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
+from src.strategy.order_executor import OrderExecutor
 from src.upbit.upbit_api import UpbitAPI
-from strategy import TradingService
 
 # 로깅 설정
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
 
@@ -69,7 +68,7 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 
 ###### storage #########
 ticker = "KRW-BTC"
-filename = f'{ticker}-{datetime.now().date()}.json'
+filename = f"{ticker}-{datetime.now().date()}.json"
 # data = collector.collect_initial_data(ticker=ticker)
 # storage.save(data, filename)
 
@@ -88,7 +87,8 @@ filename = f'{ticker}-{datetime.now().date()}.json'
 strategy_config = BaseStrategyConfig(total_balance=100_000_000, allocated_balance=10_000_000)
 clock = SystemClock(strategy_config.timezone)
 
-trading_service = TradingService(upbit_api, strategy_config, clock, DataCollector(clock))
+order_executor = OrderExecutor(upbit_api)
+trading_service = TradingService(order_executor, strategy_config, clock, DataCollector(clock))
 
 trading_service.run()
 
