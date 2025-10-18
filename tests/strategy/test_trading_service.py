@@ -127,9 +127,7 @@ class TestTradingServiceInitialization:
 class TestTradingServiceVolatilityStrategy:
     """TradingService 변동성 돌파 전략 테스트"""
 
-    def test_volatility_strategy_should_use_order_executor_buy(
-            self, trading_service, mock_order_executor, mock_clock
-    ):
+    def test_volatility_strategy_should_use_order_executor_buy(self, trading_service, mock_order_executor, mock_clock):
         """변동성 돌파 전략에서 매수 시 OrderExecutor.buy()를 사용해야 한다"""
         # Given
         mock_clock.is_morning.return_value = True
@@ -146,9 +144,7 @@ class TestTradingServiceVolatilityStrategy:
         assert call_args[0][0] == "KRW-BTC"  # ticker
         assert call_args[0][1] > 0  # amount
 
-    def test_volatility_strategy_should_use_order_executor_sell(
-            self, trading_service, mock_order_executor, mock_clock
-    ):
+    def test_volatility_strategy_should_use_order_executor_sell(self, trading_service, mock_order_executor, mock_clock):
         """변동성 돌파 전략에서 매도 시 OrderExecutor.sell()을 사용해야 한다"""
         # Given
         mock_clock.is_morning.return_value = False  # 오후

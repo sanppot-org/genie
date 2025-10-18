@@ -15,7 +15,7 @@ from src.strategy.clock import Clock
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.upbit import upbit_api
 from src.upbit.model.candle import CandleSchema
-from upbit.upbit_api import UpbitAPI
+from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
 

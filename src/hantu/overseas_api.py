@@ -388,7 +388,11 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
     def buy_limit_order(
-            self, ticker: str, quantity: int, price: str, exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
     ) -> overseas_order.ResponseBody:
         """지정가 매수 주문
 
@@ -440,7 +444,11 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
     def sell_limit_order(
-            self, ticker: str, quantity: int, price: str, exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
     ) -> overseas_order.ResponseBody:
         """지정가 매도 주문
 

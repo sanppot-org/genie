@@ -1,27 +1,28 @@
 from src.strategy.clock import SystemClock
-
 from src.strategy.data.collector import DataCollector
 from src.upbit.upbit_api import UpbitAPI
 
 clock = SystemClock()
 collector = DataCollector(clock)
-ticker = 'KRW-BTC'
-target_vol = 0.001 # [0.5%, 1%, 2%]
+ticker = "KRW-BTC"
+target_vol = 0.001  # [0.5%, 1%, 2%]
 upbit_api = UpbitAPI()
 krw_balance = upbit_api.get_available_amount() / 2 - 1000
 history = collector.collect_data(ticker, days=20)
 total_krw_balance = 1
 
+
 # 1분마다 스케줄러로 실행. 각 전략 실행 여부를 저장해둔다.
 # 날짜를 저장해두고 날이 바뀐 경우 캐시를 업데이트 한다.
 
+
 # TODO: 멱등하게 동작하도록.
-def volatility():
+def volatility() -> None:
     # 오전
     if clock.is_morning():
         # TODO: 이미 매수한 경우 멈추기
-        position_size = calculate_volatility_position_size() # TODO: 캐시
-        threshold = calculate_threshold() # TODO: 캐시
+        position_size = calculate_volatility_position_size()  # TODO: 캐시
+        threshold = calculate_threshold()  # TODO: 캐시
 
         if position_size > 0 and UpbitAPI.get_current_price(ticker) > threshold:
             # 매수
@@ -46,12 +47,14 @@ def calculate_volatility_position_size() -> float:
 
 
 # TODO: 멱등하게 동작하도록
-def morning_afternoon():
+def morning_afternoon() -> None:
     # 오전
     if clock.is_morning():
         # 조건 1: 전일 오후 수익률 > 0
         # 조건 2: 전일 오전 거래량 < 전일 오후 거래량
-        if history.yesterday_afternoon.return_rate > 0 and history.yesterday_morning.volume < history.yesterday_afternoon.volume:
+        afternoon_profitable = history.yesterday_afternoon.return_rate > 0
+        morning_volume_lower = history.yesterday_morning.volume < history.yesterday_afternoon.volume
+        if afternoon_profitable and morning_volume_lower:
             position_size = target_vol / max(history.yesterday_morning.volatility, 0.01)
             amount = min(total_krw_balance * position_size, krw_balance)
             upbit_api.buy_market_order(ticker, amount)

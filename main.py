@@ -1,8 +1,6 @@
 import logging
 from datetime import datetime
 
-from strategy.strategy import TradingService
-
 from src.config import HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
@@ -11,6 +9,7 @@ from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.order_executor import OrderExecutor
 from src.upbit.upbit_api import UpbitAPI
+from src.strategy.strategy import TradingService
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
