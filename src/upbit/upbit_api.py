@@ -53,9 +53,7 @@ class UpbitAPI:
         return pyupbit.get_current_price(ticker) or 0.0
 
     @staticmethod
-    def get_candles(
-            ticker: str = constants.KRW_BTC, interval: CandleInterval = CandleInterval.MINUTE_60, count: int = 24
-    ) -> DataFrame[CandleSchema]:
+    def get_candles(ticker: str = constants.KRW_BTC, interval: CandleInterval = CandleInterval.MINUTE_60, count: int = 24) -> DataFrame[CandleSchema]:
         """
         캔들 데이터 조회
 

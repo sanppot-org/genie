@@ -1,4 +1,5 @@
 """거래 기록 모델"""
+
 from datetime import datetime
 
 from pydantic import BaseModel, Field

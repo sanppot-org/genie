@@ -60,7 +60,7 @@ class TestSendOrderNotification:
         )
         result = ExecutionResult.buy(strategy_name="test", order_result=order_result)
 
-        with patch.object(slack_client, 'send_message') as mock_send:
+        with patch.object(slack_client, "send_message") as mock_send:
             # When
             slack_client.send_order_notification(result)
 
@@ -106,7 +106,7 @@ class TestSendOrderNotification:
         )
         result = ExecutionResult.sell(strategy_name="test", order_result=order_result)
 
-        with patch.object(slack_client, 'send_message') as mock_send:
+        with patch.object(slack_client, "send_message") as mock_send:
             # When
             slack_client.send_order_notification(result)
 
@@ -152,17 +152,12 @@ class TestSendOrderNotification:
         )
         result = ExecutionResult.buy(strategy_name="test", order_result=order_result)
 
-        with patch.object(slack_client, 'send_message') as mock_send:
+        with patch.object(slack_client, "send_message") as mock_send:
             # When
             slack_client.send_order_notification(result)
 
             # Then
-            expected_message = (
-                "✅ 매수 완료: KRW-XRP\n"
-                "수량: 100.50000000\n"
-                "가격: 1,500.0000원\n"
-                "금액: 150,750.0000원"
-            )
+            expected_message = "✅ 매수 완료: KRW-XRP\n수량: 100.50000000\n가격: 1,500.0000원\n금액: 150,750.0000원"
             mock_send.assert_called_once_with(expected_message)
 
 

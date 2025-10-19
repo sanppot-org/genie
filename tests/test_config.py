@@ -15,11 +15,11 @@ class TestConfig:
     def test_필수_필드_모두_있으면_생성_성공(self):
         """필수 필드가 모두 제공되면 Config 인스턴스가 생성된다"""
         with patch.dict(
-                os.environ,
-                {
-                    "UPBIT_ACCESS_KEY": "test_access_key",
-                    "UPBIT_SECRET_KEY": "test_secret_key",
-                },
+            os.environ,
+            {
+                "UPBIT_ACCESS_KEY": "test_access_key",
+                "UPBIT_SECRET_KEY": "test_secret_key",
+            },
         ):
             config = UpbitConfig(_env_file="nonexistent.env")
 
@@ -41,11 +41,11 @@ class TestConfig:
     def test_upbit_access_key만_누락시_ValidationError_발생(self):
         """upbit_access_key만 누락되면 ValidationError가 발생한다"""
         with patch.dict(
-                os.environ,
-                {
-                    "UPBIT_SECRET_KEY": "test_secret_key",
-                },
-                clear=True,
+            os.environ,
+            {
+                "UPBIT_SECRET_KEY": "test_secret_key",
+            },
+            clear=True,
         ):
             with pytest.raises(ValidationError) as exc_info:
                 UpbitConfig(_env_file="nonexistent.env")
@@ -59,11 +59,11 @@ class TestConfig:
     def test_upbit_secret_key만_누락시_ValidationError_발생(self):
         """upbit_secret_key만 누락되면 ValidationError가 발생한다"""
         with patch.dict(
-                os.environ,
-                {
-                    "UPBIT_ACCESS_KEY": "test_access_key",
-                },
-                clear=True,
+            os.environ,
+            {
+                "UPBIT_ACCESS_KEY": "test_access_key",
+            },
+            clear=True,
         ):
             with pytest.raises(ValidationError) as exc_info:
                 UpbitConfig(_env_file="nonexistent.env")
@@ -77,12 +77,12 @@ class TestConfig:
     def test_빈_문자열은_필수_필드로_인정되지_않음(self):
         """빈 문자열은 필수 필드의 유효한 값으로 인정되지 않는다"""
         with patch.dict(
-                os.environ,
-                {
-                    "UPBIT_ACCESS_KEY": "",
-                    "UPBIT_SECRET_KEY": "test_secret_key",
-                },
-                clear=True,
+            os.environ,
+            {
+                "UPBIT_ACCESS_KEY": "",
+                "UPBIT_SECRET_KEY": "test_secret_key",
+            },
+            clear=True,
         ):
             with pytest.raises(ValidationError) as exc_info:
                 UpbitConfig(_env_file="nonexistent.env")
@@ -95,11 +95,11 @@ class TestConfig:
     def test_환경변수가_env_파일보다_우선순위_높음(self):
         """환경변수의 값이 .env 파일보다 우선한다"""
         with patch.dict(
-                os.environ,
-                {
-                    "UPBIT_ACCESS_KEY": "env_access_key",
-                    "UPBIT_SECRET_KEY": "env_secret_key",
-                },
+            os.environ,
+            {
+                "UPBIT_ACCESS_KEY": "env_access_key",
+                "UPBIT_SECRET_KEY": "env_secret_key",
+            },
         ):
             config = UpbitConfig()
 

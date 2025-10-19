@@ -38,12 +38,12 @@ class HantuDomesticAPI(HantuBaseAPI):
         return balance.BalanceResponse(output1=output1, output2=output2)
 
     def get_psbl_order(
-            self,
-            ticker: str,
-            price: str,
-            order_division: OrderDivision = OrderDivision.MARKET,
-            cma_evaluation_amount_included: str = "N",
-            overseas_included: str = "N",
+        self,
+        ticker: str,
+        price: str,
+        order_division: OrderDivision = OrderDivision.MARKET,
+        cma_evaluation_amount_included: str = "N",
+        overseas_included: str = "N",
     ) -> psbl_order.ResponseBody:
         """매수가능 조회
 
@@ -192,9 +192,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             price=price,
         )
 
-    def _order(
-            self, order_direction: OrderDirection, order_division: OrderDivision, ticker: str, quantity: int, price: int
-    ) -> order.ResponseBody:
+    def _order(self, order_direction: OrderDirection, order_division: OrderDivision, ticker: str, quantity: int, price: int) -> order.ResponseBody:
         """주식 주문 (내부 메서드)
 
         Args:
@@ -236,11 +234,11 @@ class HantuDomesticAPI(HantuBaseAPI):
         return order.ResponseBody.model_validate(res.json())
 
     def _get_balance_recursive(
-            self,
-            ctx_area_fk100: str = "",
-            ctx_area_nk100: str = "",
-            continuation_flag: str = "",
-            accumulated_output1: list[balance.ResponseBodyoutput1] | None = None,
+        self,
+        ctx_area_fk100: str = "",
+        ctx_area_nk100: str = "",
+        continuation_flag: str = "",
+        accumulated_output1: list[balance.ResponseBodyoutput1] | None = None,
     ) -> tuple[list[balance.ResponseBodyoutput1], list[balance.ResponseBodyoutput2]]:
         """주식 잔고 조회 (연속 조회 지원) - 내부 메서드
 
@@ -303,13 +301,13 @@ class HantuDomesticAPI(HantuBaseAPI):
             return accumulated_output1, accumulated_output2
 
     def get_daily_chart(
-            self,
-            ticker: str,
-            start_date: date,
-            end_date: date,
-            interval: ChartInterval = ChartInterval.DAY,
-            price_type: PriceType = PriceType.ADJUSTED,
-            market_code: MarketCode = MarketCode.KRX,
+        self,
+        ticker: str,
+        start_date: date,
+        end_date: date,
+        interval: ChartInterval = ChartInterval.DAY,
+        price_type: PriceType = PriceType.ADJUSTED,
+        market_code: MarketCode = MarketCode.KRX,
     ) -> chart.DailyChartResponseBody:
         """일/주/월/년봉 차트 조회
 
@@ -348,9 +346,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         return chart.DailyChartResponseBody.model_validate(res.json())
 
-    def get_minute_chart(
-            self, ticker: str, target_date: date, target_time: time_obj, market_code: MarketCode = MarketCode.KRX
-    ) -> chart.MinuteChartResponseBody:
+    def get_minute_chart(self, ticker: str, target_date: date, target_time: time_obj, market_code: MarketCode = MarketCode.KRX) -> chart.MinuteChartResponseBody:
         """분봉 차트 조회
 
         - 한 번 호출에 최대 120건

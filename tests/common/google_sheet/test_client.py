@@ -102,9 +102,7 @@ class TestGoogleSheetClientAppendRow:
         # Assert (상태 검증)
         assert result is True
 
-    def test_append_row_calls_sheet_append_with_correct_data(
-            self, mock_config, mock_sheet, sample_trade_record
-    ):
+    def test_append_row_calls_sheet_append_with_correct_data(self, mock_config, mock_sheet, sample_trade_record):
         """append_row가 올바른 데이터로 시트 메서드 호출"""
         # Arrange
         client = GoogleSheetClient(mock_config, sheet=mock_sheet)

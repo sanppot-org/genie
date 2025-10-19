@@ -147,10 +147,5 @@ class TestOrderNotification:
         message = notification.to_message()
 
         # Then
-        expected_message = (
-            "✅ 매수 완료: KRW-XRP\n"
-            "수량: 100.50000000\n"
-            "가격: 1,500.0000원\n"
-            "금액: 150,750.0000원"
-        )
+        expected_message = "✅ 매수 완료: KRW-XRP\n수량: 100.50000000\n가격: 1,500.0000원\n금액: 150,750.0000원"
         assert message == expected_message

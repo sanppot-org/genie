@@ -1,15 +1,9 @@
 import logging
-from datetime import datetime
 
 from src.config import HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
-from src.strategy.clock import SystemClock
-from src.strategy.config import BaseStrategyConfig
-from src.strategy.data.collector import DataCollector
-from src.strategy.order_executor import OrderExecutor
 from src.upbit.upbit_api import UpbitAPI
-from src.strategy.strategy import TradingService
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -61,13 +55,13 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 
 #################################### Candle ####################################
 
-# collector = DataCollector()  # 필요한 clock 인자 추가 필요
-# result = collector.collect_initial_data(ticker="KRW-BTC")
-
+# clock = SystemClock()
+# collector = DataCollector(clock)
+# result = collector.collect_data("KRW-BTC", days=20)
 
 ###### storage #########
-ticker = "KRW-BTC"
-filename = f"{ticker}-{datetime.now().date()}.json"
+# ticker = "KRW-BTC"
+# filename = f"{ticker}-{datetime.now().date()}.json"
 # data = collector.collect_initial_data(ticker=ticker)
 # storage.save(data, filename)
 
@@ -82,13 +76,14 @@ filename = f"{ticker}-{datetime.now().date()}.json"
 # result = breakout_strategy._check_buy_signal(history=history, current_price=get_current_price())
 
 
-#### Strategy ####
-strategy_config = BaseStrategyConfig(total_balance=100_000_000, allocated_balance=10_000_000)
-clock = SystemClock(strategy_config.timezone)
+# executor = OrderExecutor(upbit_api=upbit_api, google_sheet_client=GoogleSheetClient(GoogleSheetConfig()), slack_client=SlackClient(SlackConfig()))
 
-order_executor = OrderExecutor(upbit_api)
-trading_service = TradingService(order_executor, strategy_config, clock, DataCollector(clock))
+# executor.buy(ticker="KRW-ETH", amount=5100, strategy_name="테스트")
+# executor.sell(ticker="KRW-ETH", volume=0.00086352, strategy_name="테스트")
 
-trading_service.run()
+### SLACK ###
+
+# slack_client = SlackClient(SlackConfig())
+# slack_client.send_message("hi")
 
 # print(result)

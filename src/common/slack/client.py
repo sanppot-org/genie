@@ -20,7 +20,7 @@ class SlackClient:
     )
     def send_message(self, msg: str) -> None:
         now = datetime.now(KST)
-        message = {"text": f"""[{now.strftime('%Y-%m-%d %H:%M:%S')}]\n{str(msg)}"""}
+        message = {"text": f"""[{now.strftime("%Y-%m-%d %H:%M:%S")}]\n{str(msg)}"""}
         requests.post(self.config.url, json=message, headers={"Content-Type": "application/json"})
 
     def send_order_notification(self, result: ExecutionResult) -> None:

@@ -204,9 +204,7 @@ class TestUpbitAPIGetBalances:
         """에러 응답 시 UpbitAPIError 예외를 발생시킨다"""
         # Mock 설정 - 에러 응답
         mock_upbit_instance = MagicMock()
-        mock_upbit_instance.get_balances.return_value = {
-            "error": {"message": "This is not a verified IP.", "name": "no_authorization_ip"}
-        }
+        mock_upbit_instance.get_balances.return_value = {"error": {"message": "This is not a verified IP.", "name": "no_authorization_ip"}}
         mock_upbit_class.return_value = mock_upbit_instance
 
         with patch("src.upbit.upbit_api.UpbitConfig") as mock_config_class:
@@ -305,9 +303,7 @@ class TestUpbitAPIBuyMarketOrder:
     def test_buy_market_order_에러_응답시_예외_발생(self, mock_upbit_class):
         """에러 응답 시 UpbitAPIError 예외를 발생시킨다"""
         mock_upbit_instance = MagicMock()
-        mock_upbit_instance.buy_market_order.return_value = {
-            "error": {"message": "Insufficient funds.", "name": "insufficient_funds"}
-        }
+        mock_upbit_instance.buy_market_order.return_value = {"error": {"message": "Insufficient funds.", "name": "insufficient_funds"}}
         mock_upbit_class.return_value = mock_upbit_instance
 
         with patch("src.upbit.upbit_api.UpbitConfig") as mock_config_class:
@@ -406,9 +402,7 @@ class TestUpbitAPISellMarketOrder:
     def test_sell_market_order_에러_응답시_예외_발생(self, mock_upbit_class):
         """에러 응답 시 UpbitAPIError 예외를 발생시킨다"""
         mock_upbit_instance = MagicMock()
-        mock_upbit_instance.sell_market_order.return_value = {
-            "error": {"message": "Insufficient volume.", "name": "insufficient_volume"}
-        }
+        mock_upbit_instance.sell_market_order.return_value = {"error": {"message": "Insufficient volume.", "name": "insufficient_volume"}}
         mock_upbit_class.return_value = mock_upbit_instance
 
         with patch("src.upbit.upbit_api.UpbitConfig") as mock_config_class:

@@ -16,6 +16,7 @@ class ExecutionResult:
         executed_amount: 체결된 금액 (가격 * 수량)
         order: 원본 주문 정보
     """
+
     strategy_name: str
     order_type: OrderDirection
     ticker: str

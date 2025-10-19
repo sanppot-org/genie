@@ -57,9 +57,7 @@ class GoogleSheetClient:
     doc: Spreadsheet
     trades_sheet: Worksheet
 
-    def __init__(
-            self, google_sheet_config: GoogleSheetConfig, sheet: Worksheet | None = None
-    ) -> None:
+    def __init__(self, google_sheet_config: GoogleSheetConfig, sheet: Worksheet | None = None) -> None:
         """
         Google Sheet 클라이언트를 초기화합니다.
 

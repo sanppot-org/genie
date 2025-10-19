@@ -9,9 +9,7 @@ class TestRequestHeader:
     def test_request_header_creation(self):
         """요청 헤더 생성 테스트"""
         # Given & When
-        header = RequestHeader(
-            authorization="Bearer test_token", appkey="test_app_key", appsecret="test_app_secret", tr_id="VTTC0011U"
-        )
+        header = RequestHeader(authorization="Bearer test_token", appkey="test_app_key", appsecret="test_app_secret", tr_id="VTTC0011U")
 
         # Then
         assert header.authorization == "Bearer test_token"
@@ -23,9 +21,7 @@ class TestRequestHeader:
     def test_request_header_with_alias(self):
         """alias를 통한 헤더 생성 테스트"""
         # Given & When
-        header = RequestHeader(
-            authorization="Bearer test_token", appkey="test_app_key", appsecret="test_app_secret", tr_id="VTTC0011U"
-        )
+        header = RequestHeader(authorization="Bearer test_token", appkey="test_app_key", appsecret="test_app_secret", tr_id="VTTC0011U")
 
         # Then
         header_dict = header.model_dump(by_alias=True)

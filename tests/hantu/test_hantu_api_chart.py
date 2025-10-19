@@ -177,9 +177,7 @@ class TestGetDailyChart:
         mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_daily_chart(
-            ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9), interval=ChartInterval.WEEK
-        )
+        response = api.get_daily_chart(ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9), interval=ChartInterval.WEEK)
 
         # Then
         assert response is not None
@@ -257,9 +255,7 @@ class TestGetDailyChart:
         mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_daily_chart(
-            ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9), price_type=PriceType.ORIGINAL
-        )
+        response = api.get_daily_chart(ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9), price_type=PriceType.ORIGINAL)
 
         # Then
         assert response is not None
@@ -395,9 +391,7 @@ class TestGetMinuteChart:
         mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_minute_chart(
-            ticker="005930", target_date=date(2024, 10, 23), target_time=time(13, 0, 0), market_code=MarketCode.KRX
-        )
+        response = api.get_minute_chart(ticker="005930", target_date=date(2024, 10, 23), target_time=time(13, 0, 0), market_code=MarketCode.KRX)
 
         # Then
         assert response is not None

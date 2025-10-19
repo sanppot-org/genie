@@ -31,12 +31,7 @@ class OrderNotification(BaseModel):
         Returns:
             str: 포맷팅된 주문 알림 메시지
         """
-        return (
-            f"✅ {self.order_type.value} 완료: {self.ticker}\n"
-            f"수량: {self.execution_volume:.8f}\n"
-            f"가격: {self.execution_price:,.4f}원\n"
-            f"금액: {self.funds:,.4f}원"
-        )
+        return f"✅ {self.order_type.value} 완료: {self.ticker}\n수량: {self.execution_volume:.8f}\n가격: {self.execution_price:,.4f}원\n금액: {self.funds:,.4f}원"
 
     @staticmethod
     def from_result(result: ExecutionResult) -> "OrderNotification":

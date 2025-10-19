@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
+from src.constants import KST
+
 
 class Clock(ABC):
     """시간 제공 인터페이스"""
@@ -16,7 +18,7 @@ class Clock(ABC):
         Args:
             timezone: 사용할 타임존 (기본값: KST)
         """
-        self.timezone = timezone if timezone is not None else ZoneInfo("Asia/Seoul")
+        self.timezone = timezone or KST
 
     @abstractmethod
     def now(self) -> datetime:

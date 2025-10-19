@@ -3,6 +3,7 @@
 
 모든 문자열 상수와 매직 넘버를 중앙에서 관리합니다.
 """
+
 from zoneinfo import ZoneInfo
 
 KST = ZoneInfo("Asia/Seoul")
