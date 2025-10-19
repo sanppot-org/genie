@@ -57,13 +57,13 @@ class TradingService:
         if self._ma_should_buy():
             position_size = self._config.target_vol / max(self._cache.history.yesterday_morning.volatility, 0.01)
             amount = min(self._config.total_balance * position_size, self._config.allocated_balance)
-            result = self._order_executor.buy(self._config.ticker, amount)
+            result = self._order_executor.buy(self._config.ticker, amount, strategy_name="오전오후")
             self._cache.morning_afternoon_execution_volume = result.executed_volume  # 체결수량 캐시
 
         # 오후
         else:
             if self._cache.morning_afternoon_execution_volume:
-                self._order_executor.sell(self._config.ticker, self._cache.morning_afternoon_execution_volume)
+                self._order_executor.sell(self._config.ticker, self._cache.morning_afternoon_execution_volume, strategy_name="오전오후")
                 self._cache.morning_afternoon_execution_volume = 0
 
     def _ma_should_buy(self) -> bool:
@@ -92,12 +92,12 @@ class TradingService:
             amount = min(
                 self._config.total_balance * self._cache.volatility_position_size, self._config.allocated_balance
             )
-            result = self._order_executor.buy(self._config.ticker, amount)
+            result = self._order_executor.buy(self._config.ticker, amount, strategy_name="변동성돌파")
             self._cache.volatility_execution_volume = result.executed_volume  # 체결수량 캐시
 
         else:
             if self._cache.volatility_execution_volume:
-                self._order_executor.sell(self._config.ticker, self._cache.volatility_execution_volume)
+                self._order_executor.sell(self._config.ticker, self._cache.volatility_execution_volume, strategy_name="변동성돌파")
                 self._cache.volatility_execution_volume = 0
 
     def _vol_should_buy(self) -> bool:

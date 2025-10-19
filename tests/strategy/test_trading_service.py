@@ -154,7 +154,7 @@ class TestTradingServiceVolatilityStrategy:
         trading_service._volatility()
 
         # Then
-        mock_order_executor.sell.assert_called_once_with("KRW-BTC", 0.0002)
+        mock_order_executor.sell.assert_called_once_with("KRW-BTC", 0.0002, strategy_name="변동성돌파")
         assert trading_service._cache.volatility_execution_volume == 0
 
 
@@ -195,7 +195,7 @@ class TestTradingServiceMorningAfternoonStrategy:
         trading_service._morning_afternoon()
 
         # Then
-        mock_order_executor.sell.assert_called_once_with("KRW-BTC", 0.0003)
+        mock_order_executor.sell.assert_called_once_with("KRW-BTC", 0.0003, strategy_name="오전오후")
         assert trading_service._cache.morning_afternoon_execution_volume == 0
 
 
