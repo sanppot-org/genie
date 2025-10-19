@@ -94,3 +94,9 @@ class GoogleSheetConfig(BaseSettings):
             raise ValueError(f"Credentials 파일을 찾을 수 없습니다: {path}")
 
         return str(path)
+
+
+class SlackConfig(BaseSettings):
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+
+    url: str = Field(..., min_length=1, description="Slack URL", alias="SLACK_WEBHOOK_URL")
