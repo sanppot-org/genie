@@ -6,8 +6,8 @@ import pytest
 from gspread.exceptions import APIError
 
 from src.common.google_sheet.client import GoogleSheetClient
+from src.common.google_sheet.trade_record import TradeRecord
 from src.config import GoogleSheetConfig
-from src.models.trade_record import TradeRecord
 
 
 @pytest.fixture

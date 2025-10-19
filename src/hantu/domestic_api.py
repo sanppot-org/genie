@@ -5,12 +5,13 @@ from datetime import time as time_obj
 
 import requests
 
+from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic import balance, chart, order, psbl_order, stock_price
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.chart import ChartInterval, PriceType
 from src.hantu.model.domestic.market_code import MarketCode
-from src.hantu.model.domestic.order import OrderDirection, OrderDivision
+from src.hantu.model.domestic.order import OrderDivision
 
 logger = logging.getLogger(__name__)
 

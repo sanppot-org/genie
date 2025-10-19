@@ -1,6 +1,11 @@
 """거래 기록 모델"""
+from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from src.common.order_direction import OrderDirection
+from src.constants import KST
+from src.strategy.order.execution_result import ExecutionResult
 
 
 class TradeRecord(BaseModel):
@@ -17,9 +22,9 @@ class TradeRecord(BaseModel):
         executed_amount: 체결된 금액
     """
 
-    timestamp: str
+    timestamp: datetime = Field(default=datetime.now(KST))
     strategy_name: str
-    order_type: str
+    order_type: OrderDirection
     ticker: str
     executed_volume: float
     executed_price: float
@@ -28,11 +33,22 @@ class TradeRecord(BaseModel):
     def to_list(self) -> list:
         """Google Sheet에 기록하기 위한 리스트 형태로 변환"""
         return [
-            self.timestamp,
+            self.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             self.strategy_name,
-            self.order_type,
+            self.order_type.value,
             self.ticker,
             self.executed_volume,
             self.executed_price,
             self.executed_amount,
         ]
+
+    @staticmethod
+    def from_result(result: ExecutionResult) -> "TradeRecord":
+        return TradeRecord(
+            strategy_name=result.strategy_name,
+            order_type=result.order_type,
+            ticker=result.ticker,
+            executed_volume=result.executed_volume,
+            executed_price=result.executed_price,
+            executed_amount=result.executed_amount,
+        )

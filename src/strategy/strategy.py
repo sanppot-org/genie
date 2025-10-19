@@ -7,7 +7,7 @@ from src.strategy.clock import Clock
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.data.models import Recent20DaysHalfDayCandles
-from src.strategy.order_executor import OrderExecutor
+from src.strategy.order.order_executor import OrderExecutor
 from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class TradingService:
         self._clock = clock
         self._collector = collector
 
-        self._cache = self._update_cache()  # 캐시는 파일을 만들어서 저장
+        self._cache = self._update_cache()  # TODO: 캐시는 파일을 만들어서 저장
 
     def run(self) -> None:
         logger.debug("전략 실행")

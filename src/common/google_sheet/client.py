@@ -7,8 +7,9 @@ from gspread import Spreadsheet, Worksheet
 from gspread.exceptions import APIError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from src.common.google_sheet.trade_record import TradeRecord
 from src.config import GoogleSheetConfig
-from src.models.trade_record import TradeRecord
+from src.strategy.order.execution_result import ExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -130,3 +131,7 @@ class GoogleSheetClient:
         """
         self.trades_sheet.append_row(trade_record.to_list())
         return True
+
+    def append_order_result(self, result: ExecutionResult) -> None:
+        record = TradeRecord.from_result(result)
+        self.append_row(record)

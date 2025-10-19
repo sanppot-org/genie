@@ -5,8 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.models.trade_record import TradeRecord
-from src.strategy.order_executor import ExecutionResult, OrderExecutor
+from src.common.google_sheet.trade_record import TradeRecord
+from src.common.order_direction import OrderDirection
+from src.strategy.order.order_executor import ExecutionResult, OrderExecutor
 from src.upbit.model.order import OrderResult, OrderSide, OrderState, OrderType, Trade
 
 
@@ -186,14 +187,14 @@ class TestOrderExecutorBuy:
         result = order_executor_with_sheet.buy(ticker, amount)
 
         # Then
-        mock_google_sheet_client.append_row.assert_called_once()
-        trade_record = mock_google_sheet_client.append_row.call_args[0][0]
-        assert trade_record.strategy_name == "Unknown"  # strategy_name (기본값)
-        assert trade_record.order_type == "매수"  # order_type
-        assert trade_record.ticker == ticker
-        assert trade_record.executed_volume == expected_volume
-        assert trade_record.executed_price == expected_price
-        assert trade_record.executed_amount == amount
+        mock_google_sheet_client.append_order_result.assert_called_once()
+        execution_result = mock_google_sheet_client.append_order_result.call_args[0][0]
+        assert execution_result.strategy_name == "Unknown"  # strategy_name (기본값)
+        assert execution_result.order_type == OrderDirection.BUY  # order_type
+        assert execution_result.ticker == ticker
+        assert execution_result.executed_volume == expected_volume
+        assert execution_result.executed_price == expected_price
+        assert execution_result.executed_amount == amount
 
     def test_buy_should_record_strategy_name_when_provided(
             self, order_executor_with_sheet, mock_upbit_api, mock_google_sheet_client
@@ -241,14 +242,14 @@ class TestOrderExecutorBuy:
         result = order_executor_with_sheet.buy(ticker, amount, strategy_name=strategy_name)
 
         # Then
-        mock_google_sheet_client.append_row.assert_called_once()
-        trade_record = mock_google_sheet_client.append_row.call_args[0][0]
-        assert trade_record.strategy_name == strategy_name
-        assert trade_record.order_type == "매수"
-        assert trade_record.ticker == ticker
-        assert trade_record.executed_volume == expected_volume
-        assert trade_record.executed_price == expected_price
-        assert trade_record.executed_amount == amount
+        mock_google_sheet_client.append_order_result.assert_called_once()
+        execution_result = mock_google_sheet_client.append_order_result.call_args[0][0]
+        assert execution_result.strategy_name == strategy_name
+        assert execution_result.order_type == OrderDirection.BUY
+        assert execution_result.ticker == ticker
+        assert execution_result.executed_volume == expected_volume
+        assert execution_result.executed_price == expected_price
+        assert execution_result.executed_amount == amount
 
     def test_buy_should_not_record_when_sheet_client_is_none(
             self, order_executor, mock_upbit_api
@@ -442,14 +443,14 @@ class TestOrderExecutorSell:
         result = order_executor_with_sheet.sell(ticker, volume)
 
         # Then
-        mock_google_sheet_client.append_row.assert_called_once()
-        trade_record = mock_google_sheet_client.append_row.call_args[0][0]
-        assert trade_record.strategy_name == "Unknown"  # strategy_name (기본값)
-        assert trade_record.order_type == "매도"  # order_type
-        assert trade_record.ticker == ticker
-        assert trade_record.executed_volume == volume
-        assert trade_record.executed_price == expected_price
-        assert trade_record.executed_amount == expected_amount
+        mock_google_sheet_client.append_order_result.assert_called_once()
+        execution_result = mock_google_sheet_client.append_order_result.call_args[0][0]
+        assert execution_result.strategy_name == "Unknown"  # strategy_name (기본값)
+        assert execution_result.order_type == OrderDirection.SELL  # order_type
+        assert execution_result.ticker == ticker
+        assert execution_result.executed_volume == volume
+        assert execution_result.executed_price == expected_price
+        assert execution_result.executed_amount == expected_amount
 
     def test_sell_should_record_strategy_name_when_provided(
             self, order_executor_with_sheet, mock_upbit_api, mock_google_sheet_client
@@ -497,14 +498,14 @@ class TestOrderExecutorSell:
         result = order_executor_with_sheet.sell(ticker, volume, strategy_name=strategy_name)
 
         # Then
-        mock_google_sheet_client.append_row.assert_called_once()
-        trade_record = mock_google_sheet_client.append_row.call_args[0][0]
-        assert trade_record.strategy_name == strategy_name
-        assert trade_record.order_type == "매도"
-        assert trade_record.ticker == ticker
-        assert trade_record.executed_volume == volume
-        assert trade_record.executed_price == expected_price
-        assert trade_record.executed_amount == expected_amount
+        mock_google_sheet_client.append_order_result.assert_called_once()
+        execution_result = mock_google_sheet_client.append_order_result.call_args[0][0]
+        assert execution_result.strategy_name == strategy_name
+        assert execution_result.order_type == OrderDirection.SELL
+        assert execution_result.ticker == ticker
+        assert execution_result.executed_volume == volume
+        assert execution_result.executed_price == expected_price
+        assert execution_result.executed_amount == expected_amount
 
     def test_sell_should_not_record_when_sheet_client_is_none(
             self, order_executor, mock_upbit_api
@@ -559,9 +560,8 @@ class TestTradeRecord:
     def test_trade_record_should_create_with_all_fields(self):
         """모든 필드로 TradeRecord를 생성할 수 있어야 한다"""
         # Given
-        timestamp = "2025-01-15 10:30:00"
         strategy_name = "변동성돌파"
-        order_type = "매수"
+        order_type = OrderDirection.BUY.value
         ticker = "KRW-BTC"
         executed_volume = 0.0002
         executed_price = 50000000.0
@@ -569,7 +569,6 @@ class TestTradeRecord:
 
         # When
         record = TradeRecord(
-            timestamp=timestamp,
             strategy_name=strategy_name,
             order_type=order_type,
             ticker=ticker,
@@ -579,7 +578,7 @@ class TestTradeRecord:
         )
 
         # Then
-        assert record.timestamp == timestamp
+        assert record.timestamp is not None  # timestamp는 자동 생성
         assert record.strategy_name == strategy_name
         assert record.order_type == order_type
         assert record.ticker == ticker
@@ -591,7 +590,6 @@ class TestTradeRecord:
         """to_list()는 정렬된 리스트를 반환해야 한다"""
         # Given
         record = TradeRecord(
-            timestamp="2025-01-15 10:30:00",
             strategy_name="변동성돌파",
             order_type="매수",
             ticker="KRW-BTC",
@@ -604,22 +602,19 @@ class TestTradeRecord:
         result = record.to_list()
 
         # Then
-        expected = [
-            "2025-01-15 10:30:00",
-            "변동성돌파",
-            "매수",
-            "KRW-BTC",
-            0.0002,
-            50000000.0,
-            10000.0,
-        ]
-        assert result == expected
+        assert len(result) == 7
+        assert isinstance(result[0], str)  # timestamp (자동 생성)
+        assert result[1] == "변동성돌파"
+        assert result[2] == "매수"
+        assert result[3] == "KRW-BTC"
+        assert result[4] == 0.0002
+        assert result[5] == 50000000.0
+        assert result[6] == 10000.0
 
     def test_trade_record_to_list_should_maintain_field_order(self):
         """to_list()는 필드 순서를 유지해야 한다"""
         # Given
         record = TradeRecord(
-            timestamp="2025-01-15 14:45:00",
             strategy_name="오전오후",
             order_type="매도",
             ticker="KRW-ETH",
@@ -633,7 +628,7 @@ class TestTradeRecord:
 
         # Then
         assert len(result) == 7
-        assert result[0] == "2025-01-15 14:45:00"  # timestamp
+        assert isinstance(result[0], str)  # timestamp (자동 생성)
         assert result[1] == "오전오후"  # strategy_name
         assert result[2] == "매도"  # order_type
         assert result[3] == "KRW-ETH"  # ticker

@@ -5,13 +5,6 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
-class OrderDirection(str, Enum):
-    """주문 방향"""
-
-    BUY = "buy"
-    SELL = "sell"
-
-
 class OrderDivision(str, Enum):
     """주문 구분"""
 

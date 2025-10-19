@@ -5,9 +5,10 @@ from unittest.mock import Mock
 
 import pytest
 
+from src.common.order_direction import OrderDirection
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.models import HalfDayCandle, Recent20DaysHalfDayCandles
-from src.strategy.order_executor import ExecutionResult, OrderExecutor
+from src.strategy.order.order_executor import ExecutionResult, OrderExecutor
 from src.strategy.strategy import TradingService
 
 
@@ -17,6 +18,8 @@ def mock_order_executor():
     executor = Mock(spec=OrderExecutor)
     # 기본 반환값 설정
     executor.buy.return_value = ExecutionResult(
+        strategy_name="test",
+        order_type=OrderDirection.BUY,
         ticker="KRW-BTC",
         executed_volume=0.0002,
         executed_price=50000000.0,
@@ -24,6 +27,8 @@ def mock_order_executor():
         order=Mock(),
     )
     executor.sell.return_value = ExecutionResult(
+        strategy_name="test",
+        order_type=OrderDirection.SELL,
         ticker="KRW-BTC",
         executed_volume=0.0002,
         executed_price=50000000.0,

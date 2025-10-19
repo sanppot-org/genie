@@ -3,9 +3,9 @@ import time
 
 import requests
 
+from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic.account_type import AccountType
-from src.hantu.model.domestic.order import OrderDirection
 from src.hantu.model.domestic.trading_currency_code import TradingCurrencyCode
 from src.hantu.model.overseas import balance as overseas_balance
 from src.hantu.model.overseas import order as overseas_order
