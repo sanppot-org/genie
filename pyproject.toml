@@ -17,6 +17,9 @@ dependencies = [
     "mypy>=1.18.2",
     "types-requests>=2.32.4.20250913",
     "apscheduler>=3.10.0",
+    "gspread>=6.0.0",
+    "gspread-dataframe>=4.0.0",
+    "tenacity>=9.0.0",
 ]
 
 [tool.pytest.ini_options]

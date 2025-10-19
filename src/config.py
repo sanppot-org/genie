@@ -64,3 +64,33 @@ class HantuConfig(BaseSettings):
         if not path.is_absolute():
             path = PROJECT_ROOT / path
         return str(path)
+
+
+class GoogleSheetConfig(BaseSettings):
+    """구글 시트 API 설정"""
+
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+
+    google_sheet_url: str = Field(..., min_length=1, description="Google Sheet URL", alias="GOOGLE_SHEET_URL")
+
+    credentials_path: str = Field(
+        default="config/auto-trade-google-key.json",
+        description="Google Service Account Credentials 파일 경로",
+        alias="GOOGLE_CREDENTIALS_PATH",
+    )
+
+    sheet_name: str = Field(..., min_length=1, description="시트 이름", alias="SHEET_NAME")
+
+    @field_validator("credentials_path")
+    @classmethod
+    def resolve_credentials_path(cls, v: str) -> str:
+        """상대 경로를 프로젝트 루트 기준 절대 경로로 변환"""
+        path = Path(v)
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+
+        # 파일 존재 확인
+        if not path.exists():
+            raise ValueError(f"Credentials 파일을 찾을 수 없습니다: {path}")
+
+        return str(path)
