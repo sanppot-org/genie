@@ -17,9 +17,12 @@ class TestDataCollector:
     """DataCollector 클래스 테스트"""
 
     @pytest.fixture
-    def collector(self):
+    def collector(self, tmp_path):
         """DataCollector 인스턴스 생성"""
-        return DataCollector(SystemClock())
+        from src.strategy.cache_manager import CacheManager
+
+        cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
+        return DataCollector(SystemClock(), cache_manager=cache_manager)
 
     @pytest.fixture
     def mock_hourly_df(self):
@@ -248,7 +251,7 @@ class TestDataCollector:
         assert mock_get_candles.call_count == 2
 
     @patch("src.strategy.data.collector.UpbitAPI.get_candles")
-    def test_cache_cleanup_on_date_change(self, mock_get_candles):
+    def test_cache_cleanup_on_date_change(self, mock_get_candles, tmp_path):
         """날짜가 바뀌면 이전 캐시가 정리됨"""
         # Mock 데이터 준비
         data = []
@@ -264,7 +267,10 @@ class TestDataCollector:
 
         # 10월 15일에 첫 호출
         clock = FixedClock(datetime.datetime(2025, 10, 15, 10, 0, 0))
-        collector = DataCollector(clock=clock)
+        from src.strategy.cache_manager import CacheManager
+
+        cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
+        collector = DataCollector(clock=clock, cache_manager=cache_manager)
         collector.collect_data("KRW-BTC", days=20)
         assert mock_get_candles.call_count == 1
 
@@ -276,11 +282,5 @@ class TestDataCollector:
         clock.set_time(datetime.datetime(2025, 10, 16, 10, 0, 0))
         collector.collect_data("KRW-BTC", days=20)
 
-        # 날짜가 바뀌어서 캐시가 정리되고 다시 API 호출
+        # 날짜가 바뀌어서 파일 캐시가 무시되고 다시 API 호출
         assert mock_get_candles.call_count == 2
-
-        # 캐시가 정리되었는지 확인 (내부 캐시 딕셔너리 확인)
-        # 10월 15일 캐시는 없고 10월 16일 캐시만 있어야 함
-        cache_dates = [key[1] for key in collector._cache.keys()]
-        assert datetime.date(2025, 10, 15) not in cache_dates
-        assert datetime.date(2025, 10, 16) in cache_dates

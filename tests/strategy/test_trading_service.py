@@ -99,16 +99,24 @@ def mock_collector():
 
 
 @pytest.fixture
-def trading_service(mock_order_executor, mock_config, mock_clock, mock_collector):
+def trading_service(mock_order_executor, mock_config, mock_clock, mock_collector, mocker):
     """TradingService 인스턴스 생성"""
+    # CacheManager mock 설정
+    mock_cache_manager = mocker.patch("src.strategy.strategy.CacheManager")
+    mock_cache_manager.return_value.load_cache.return_value = None  # 캐시 파일 없음
+
     return TradingService(mock_order_executor, mock_config, mock_clock, mock_collector)
 
 
 class TestTradingServiceInitialization:
     """TradingService 초기화 테스트"""
 
-    def test_should_initialize_with_order_executor(self, mock_order_executor, mock_config, mock_clock, mock_collector):
+    def test_should_initialize_with_order_executor(self, mock_order_executor, mock_config, mock_clock, mock_collector, mocker):
         """OrderExecutor를 받아서 초기화해야 한다"""
+        # Given - CacheManager mock 설정
+        mock_cache_manager = mocker.patch("src.strategy.strategy.CacheManager")
+        mock_cache_manager.return_value.load_cache.return_value = None
+
         # When
         service = TradingService(mock_order_executor, mock_config, mock_clock, mock_collector)
 
@@ -118,8 +126,12 @@ class TestTradingServiceInitialization:
         assert service._clock == mock_clock
         assert service._collector == mock_collector
 
-    def test_should_initialize_cache_on_creation(self, mock_order_executor, mock_config, mock_clock, mock_collector):
+    def test_should_initialize_cache_on_creation(self, mock_order_executor, mock_config, mock_clock, mock_collector, mocker):
         """생성 시 캐시를 초기화해야 한다"""
+        # Given - CacheManager가 캐시를 로드하지 못하도록 mock
+        mock_cache_manager = mocker.patch("src.strategy.strategy.CacheManager")
+        mock_cache_manager.return_value.load_cache.return_value = None  # 캐시 파일 없음
+
         # When
         service = TradingService(mock_order_executor, mock_config, mock_clock, mock_collector)
 
@@ -166,18 +178,19 @@ class TestTradingServiceVolatilityStrategy:
 class TestTradingServiceMorningAfternoonStrategy:
     """TradingService 오전/오후 전략 테스트"""
 
-    def test_morning_afternoon_strategy_should_use_order_executor_buy(
-            self, trading_service, mock_order_executor, mock_clock
-    ):
+    def test_morning_afternoon_strategy_should_use_order_executor_buy(self, trading_service, mock_order_executor, mock_clock, mock_collector):
         """오전/오후 전략에서 매수 시 OrderExecutor.buy()를 사용해야 한다"""
         # Given
         mock_clock.is_morning.return_value = True
         trading_service._cache.morning_afternoon_execution_volume = 0  # 아직 매수 전
+
         # 매수 조건 충족: 전일 오후 수익률 > 0, 전일 오전 거래량 < 전일 오후 거래량
-        trading_service._cache.history.yesterday_afternoon.close = 51000000.0
-        trading_service._cache.history.yesterday_afternoon.open = 50000000.0
-        trading_service._cache.history.yesterday_morning.volume = 100.0
-        trading_service._cache.history.yesterday_afternoon.volume = 120.0
+        # mock_collector가 반환하는 history를 수정
+        history = mock_collector.collect_data.return_value
+        history.yesterday_afternoon.close = 51000000.0
+        history.yesterday_afternoon.open = 50000000.0
+        history.yesterday_morning.volume = 100.0
+        history.yesterday_afternoon.volume = 120.0
 
         # When
         trading_service._morning_afternoon()
@@ -188,9 +201,7 @@ class TestTradingServiceMorningAfternoonStrategy:
         assert call_args[0][0] == "KRW-BTC"  # ticker
         assert call_args[0][1] > 0  # amount
 
-    def test_morning_afternoon_strategy_should_use_order_executor_sell(
-            self, trading_service, mock_order_executor, mock_clock
-    ):
+    def test_morning_afternoon_strategy_should_use_order_executor_sell(self, trading_service, mock_order_executor, mock_clock):
         """오전/오후 전략에서 매도 시 OrderExecutor.sell()을 사용해야 한다"""
         # Given
         mock_clock.is_morning.return_value = False  # 오후
@@ -207,9 +218,7 @@ class TestTradingServiceMorningAfternoonStrategy:
 class TestTradingServiceIntegration:
     """TradingService 통합 테스트"""
 
-    def test_should_not_call_buy_or_sell_when_conditions_not_met(
-            self, trading_service, mock_order_executor, mock_clock
-    ):
+    def test_should_not_call_buy_or_sell_when_conditions_not_met(self, trading_service, mock_order_executor, mock_clock):
         """매수/매도 조건이 충족되지 않으면 주문을 실행하지 않아야 한다"""
         # Given
         mock_clock.is_morning.return_value = False  # 오후

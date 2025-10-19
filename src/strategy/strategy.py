@@ -1,25 +1,14 @@
-import datetime as dt
 import logging
 
-from pydantic import BaseModel, Field
-
+from src.strategy.cache_manager import CacheManager
+from src.strategy.cache_models import StrategyCache
 from src.strategy.clock import Clock
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
-from src.strategy.data.models import Recent20DaysHalfDayCandles
 from src.strategy.order.order_executor import OrderExecutor
 from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
-
-
-class Cache(BaseModel):
-    last_run_date: dt.date
-    volatility_position_size: float
-    history: Recent20DaysHalfDayCandles
-    volatility_threshold: float = Field(default=float("inf"))
-    volatility_execution_volume: float = Field(default=0.0, description="변동성 돌파 매수 수량")
-    morning_afternoon_execution_volume: float = Field(default=0.0, description="오전오후 매수 수량")
 
 
 # TODO: 할당 금액은 어떤 식으로 관리?
@@ -27,15 +16,21 @@ class Cache(BaseModel):
 
 # 1분마다 스케줄러로 실행
 class TradingService:
-    def __init__(
-            self, order_executor: OrderExecutor, config: BaseStrategyConfig, clock: Clock, collector: DataCollector
-    ) -> None:
+    def __init__(self, order_executor: OrderExecutor, config: BaseStrategyConfig, clock: Clock, collector: DataCollector) -> None:
         self._order_executor = order_executor
         self._config = config
         self._clock = clock
         self._collector = collector
+        self._cache_manager = CacheManager(file_suffix="strategy")
 
-        self._cache = self._update_cache()  # TODO: 캐시는 파일을 만들어서 저장
+        # 캐시 로드 시도
+        loaded_cache = self._cache_manager.load_strategy_cache(config.ticker)
+        today = self._clock.today()
+
+        if not loaded_cache or loaded_cache.last_run_date != today:
+            self._cache = self._update_cache()
+        else:
+            self._cache = loaded_cache
 
     def run(self) -> None:
         logger.debug("전략 실행")
@@ -55,7 +50,8 @@ class TradingService:
         logger.debug("============= 오전 오후 전략 =============")
 
         if self._ma_should_buy():
-            position_size = self._config.target_vol / max(self._cache.history.yesterday_morning.volatility, 0.01)
+            history = self._collector.collect_data(self._config.ticker)
+            position_size = self._config.target_vol / max(history.yesterday_morning.volatility, 0.01)
             amount = min(self._config.total_balance * position_size, self._config.allocated_balance)
             result = self._order_executor.buy(self._config.ticker, amount, strategy_name="오전오후")
             self._cache.morning_afternoon_execution_volume = result.executed_volume  # 체결수량 캐시
@@ -73,8 +69,10 @@ class TradingService:
         # 조건 4: 전일 오전 거래량 < 전일 오후 거래량
         is_morning = self._clock.is_morning()
         execution_volume = not self._cache.morning_afternoon_execution_volume
-        afternoon_return_rate_ = self._cache.history.yesterday_afternoon.return_rate > 0
-        afternoon_volume = self._cache.history.yesterday_morning.volume < self._cache.history.yesterday_afternoon.volume
+
+        history = self._collector.collect_data(self._config.ticker)
+        afternoon_return_rate_ = history.yesterday_afternoon.return_rate > 0
+        afternoon_volume = history.yesterday_morning.volume < history.yesterday_afternoon.volume
 
         logger.debug(f"""
         오전/오후 전략 매수 시그널:
@@ -89,9 +87,7 @@ class TradingService:
     def _volatility(self) -> None:
         logger.debug("============= 변동성 돌파 전략 =============")
         if self._vol_should_buy():
-            amount = min(
-                self._config.total_balance * self._cache.volatility_position_size, self._config.allocated_balance
-            )
+            amount = min(self._config.total_balance * self._cache.volatility_position_size, self._config.allocated_balance)
             result = self._order_executor.buy(self._config.ticker, amount, strategy_name="변동성돌파")
             self._cache.volatility_execution_volume = result.executed_volume  # 체결수량 캐시
 
@@ -124,12 +120,10 @@ class TradingService:
 
         return is_morning and execution_volume and position_size_ and current_price > threshold
 
-    def _update_cache(self) -> Cache:
+    def _update_cache(self) -> StrategyCache:
         history = self._collector.collect_data(self._config.ticker)
 
-        volatility_position_size = self._calculate_volatility_position_size(
-            self._config.target_vol, history.yesterday_morning.volatility, history.calculate_ma_score()
-        )
+        volatility_position_size = self._calculate_volatility_position_size(self._config.target_vol, history.yesterday_morning.volatility, history.calculate_ma_score())
 
         volatility_threshold = self._calculate_threshold(
             yesterday_afternoon_close=history.yesterday_afternoon.close,
@@ -137,13 +131,17 @@ class TradingService:
             k=history.calculate_morning_noise_average(),
         )
 
-        cache = Cache(
+        cache = StrategyCache(
+            ticker=self._config.ticker,
             last_run_date=self._clock.today(),
-            history=history,
             volatility_position_size=volatility_position_size,
             volatility_threshold=volatility_threshold,
         )
         logger.debug(f"캐시 업데이트: {cache}")
+
+        # 캐시를 파일로 저장
+        self._cache_manager.save_strategy_cache(self._config.ticker, cache)
+
         return cache
 
     @staticmethod
@@ -151,9 +149,7 @@ class TradingService:
         return yesterday_afternoon_close + (yesterday_morning_range * k)
 
     @staticmethod
-    def _calculate_volatility_position_size(
-            target_vol: float, yesterday_morning_volatility: float, ma_score: float
-    ) -> float:
+    def _calculate_volatility_position_size(target_vol: float, yesterday_morning_volatility: float, ma_score: float) -> float:
         # 최소: 0
         # 최대: 1
         return (target_vol / max(yesterday_morning_volatility, 0.01)) * ma_score

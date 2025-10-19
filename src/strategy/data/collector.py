@@ -5,12 +5,13 @@
 
 import datetime as dt
 import logging
-from datetime import date
 
 import pandas as pd
 from pandera.typing import DataFrame, Series
 
 from src import constants
+from src.strategy.cache_manager import CacheManager
+from src.strategy.cache_models import DataCache
 from src.strategy.clock import Clock
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
 from src.upbit import upbit_api
@@ -28,20 +29,19 @@ class DataCollector:
     반일봉으로 집계합니다.
 
     캐싱 전략:
-    - 캐시 키: (ticker, date, days)
-    - 날짜가 바뀌면 이전 캐시 자동 정리
+    - 파일 캐시: 영구 보존, 프로세스 재시작 후에도 유지
+    - 날짜별로 캐시 파일 관리 (last_update_date로 구분)
     """
 
-    def __init__(self, clock: Clock) -> None:
+    def __init__(self, clock: Clock, cache_manager: CacheManager | None = None) -> None:
         """DataCollector 초기화
 
         Args:
             clock: 시간 제공자
+            cache_manager: 파일 캐시 관리자 (None이면 기본 생성)
         """
-        # 캐시: (ticker, date, days) -> Recent20DaysHalfDayCandles
-        self._cache: dict[tuple[str, date, int], Recent20DaysHalfDayCandles] = {}
-        self._last_cleanup_date: date | None = None
         self._clock = clock
+        self._cache_manager = cache_manager or CacheManager(file_suffix="data")
 
     def collect_data(self, ticker: str, days: int = 20) -> Recent20DaysHalfDayCandles:
         """
@@ -50,9 +50,11 @@ class DataCollector:
         21일치 시간봉을 가져와서 타임스탬프 기준으로 정확히 지정된 일수만 필터링합니다.
         여유분은 스케줄러 지연, API 응답 시간, 봉 누락에 대응하기 위함입니다.
 
-        캐싱:
-        - 같은 날짜, 같은 티커, 같은 일수로 요청하면 캐시된 데이터 반환
-        - 날짜가 바뀌면 이전 날짜 캐시 자동 정리
+        캐싱 전략:
+        1. 파일 캐시 확인
+        2. API 호출 → 파일 캐시에 저장
+        - 같은 날짜, 같은 티커로 요청하면 캐시된 데이터 반환
+        - 날짜가 바뀌면 자동으로 새 캐시 파일 생성
 
         Args:
             ticker: 티커 코드
@@ -62,51 +64,26 @@ class DataCollector:
             Recent20DaysHalfDayCandles 객체 (20일 * 2 = 40개 캔들)
         """
         today = self._clock.today()
-        cache_key = (ticker, today, days)
 
-        # 날짜가 바뀌면 캐시 정리
-        self._cleanup_cache_if_needed(today)
+        # 파일 캐시 확인
+        file_cache = self._cache_manager.load_data_cache(ticker)
+        if file_cache and file_cache.last_update_date == today:
+            logger.debug(f"파일 캐시 히트: {ticker}, {today}")
+            return file_cache.history
 
-        # 캐시 확인
-        if cache_key in self._cache:
-            logger.debug(f"캐시 히트: {cache_key}")
-            return self._cache[cache_key]
+        logger.debug(f"파일 캐시 미스: {ticker}, {today}")
 
-        logger.debug(f"캐시 미스: {cache_key}")
-
-        # 여유분 포함하여 데이터 수집
+        # API 호출
         df = UpbitAPI.get_candles(ticker=ticker, interval=upbit_api.CandleInterval.MINUTE_60, count=(days + 1) * 24)
 
         candles = self._aggregate_all(df, days)
         result = Recent20DaysHalfDayCandles(candles=candles)
 
-        # 캐시 저장
-        self._cache[cache_key] = result
+        # 파일 캐시 저장
+        data_cache = DataCache(ticker=ticker, last_update_date=today, history=result)
+        self._cache_manager.save_data_cache(ticker, data_cache)
 
         return result
-
-    def _cleanup_cache_if_needed(self, today: date) -> None:
-        """
-        날짜가 바뀌면 이전 날짜 캐시 삭제
-
-        Args:
-            today: 오늘 날짜
-        """
-        if self._last_cleanup_date is None or self._last_cleanup_date < today:
-            # 이전 날짜 캐시 모두 삭제
-            old_keys = [k for k in self._cache.keys() if k[1] < today]
-            for key in old_keys:
-                del self._cache[key]
-
-            self._last_cleanup_date = today
-
-            if old_keys:
-                logger.debug(f"캐시 정리 완료: {len(old_keys)}개 삭제")
-
-    def clear_cache(self) -> None:
-        """캐시 초기화 (테스트용)"""
-        self._cache.clear()
-        self._last_cleanup_date = None
 
     def _aggregate_all(self, df: DataFrame[CandleSchema], days: int) -> list[HalfDayCandle]:
         """
