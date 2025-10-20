@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.strategy.cache_manager import CacheManager
-from src.strategy.cache_models import DataCache, StrategyCache
+from src.strategy.cache_models import DataCache, StrategyCacheData, VolatilityStrategyCacheData
 from src.strategy.data.models import HalfDayCandle, Recent20DaysHalfDayCandles
 
 
@@ -69,50 +69,59 @@ def sample_data_cache(sample_history):
 
 @pytest.fixture
 def sample_strategy_cache():
-    """테스트용 StrategyCache"""
+    """테스트용 StrategyCacheData"""
     today = dt.date(2024, 1, 2)
 
-    return StrategyCache(
-        ticker="KRW-BTC",
+    return StrategyCacheData(
+        execution_volume=0.0,
         last_run_date=today,
-        volatility_position_size=0.5,
-        volatility_threshold=105.0,
-        volatility_execution_volume=0.0,
-        morning_afternoon_execution_volume=0.0,
+    )
+
+
+@pytest.fixture
+def sample_volatility_cache():
+    """테스트용 VolatilityStrategyCacheData"""
+    today = dt.date(2024, 1, 2)
+
+    return VolatilityStrategyCacheData(
+        execution_volume=0.001,
+        last_run_date=today,
+        position_size=1.0,
+        threshold=50500000,
     )
 
 
 class TestCacheManager:
-    def test_cache_file_path_with_suffix(self, temp_cache_dir):
-        """file_suffix가 있을 때 캐시 파일 경로가 올바르게 생성되는지 검증"""
-        manager = CacheManager(cache_dir=temp_cache_dir, file_suffix="strategy")
-
-        expected_path = Path(temp_cache_dir) / "KRW-BTC_strategy_cache.json"
-        assert manager.get_cache_path("KRW-BTC") == expected_path
-
-    def test_cache_file_path_without_suffix(self, temp_cache_dir):
-        """file_suffix가 없을 때 캐시 파일 경로가 올바르게 생성되는지 검증"""
+    def test_cache_file_path_with_strategy_name(self, temp_cache_dir):
+        """strategy_name이 있을 때 캐시 파일 경로가 올바르게 생성되는지 검증"""
         manager = CacheManager(cache_dir=temp_cache_dir)
 
-        expected_path = Path(temp_cache_dir) / "KRW-BTC_cache.json"
+        expected_path = Path(temp_cache_dir) / "KRW-BTC_volatility_cache.json"
+        assert manager.get_cache_path("KRW-BTC", strategy_name="volatility") == expected_path
+
+    def test_cache_file_path_with_suffix(self, temp_cache_dir):
+        """file_suffix가 있을 때 캐시 파일 경로가 올바르게 생성되는지 검증 (DataCache용)"""
+        manager = CacheManager(cache_dir=temp_cache_dir, file_suffix="data")
+
+        expected_path = Path(temp_cache_dir) / "KRW-BTC_data_cache.json"
         assert manager.get_cache_path("KRW-BTC") == expected_path
 
     def test_save_and_load_strategy_cache(self, temp_cache_dir, sample_strategy_cache):
-        """StrategyCache 저장 후 로드가 정상 동작하는지 검증"""
-        manager = CacheManager(cache_dir=temp_cache_dir, file_suffix="strategy")
+        """StrategyCacheData 저장 후 로드가 정상 동작하는지 검증"""
+        manager = CacheManager(cache_dir=temp_cache_dir)
         ticker = "KRW-BTC"
+        strategy_name = "volatility"
 
         # 저장
-        manager.save_strategy_cache(ticker, sample_strategy_cache)
+        manager.save_strategy_cache(ticker, strategy_name, sample_strategy_cache)
 
         # 로드
-        loaded_cache = manager.load_strategy_cache(ticker)
+        loaded_cache = manager.load_strategy_cache(ticker, strategy_name)
 
         # 검증
         assert loaded_cache is not None
         assert loaded_cache.last_run_date == sample_strategy_cache.last_run_date
-        assert loaded_cache.volatility_position_size == sample_strategy_cache.volatility_position_size
-        assert loaded_cache.volatility_threshold == sample_strategy_cache.volatility_threshold
+        assert loaded_cache.execution_volume == sample_strategy_cache.execution_volume
 
     def test_save_and_load_data_cache(self, temp_cache_dir, sample_data_cache):
         """DataCache 저장 후 로드가 정상 동작하는지 검증"""
@@ -133,9 +142,9 @@ class TestCacheManager:
 
     def test_load_nonexistent_cache(self, temp_cache_dir):
         """존재하지 않는 캐시 로드 시 None 반환"""
-        manager = CacheManager(cache_dir=temp_cache_dir, file_suffix="strategy")
+        manager = CacheManager(cache_dir=temp_cache_dir)
 
-        loaded_cache = manager.load_strategy_cache("NONEXISTENT")
+        loaded_cache = manager.load_strategy_cache("NONEXISTENT", "volatility")
 
         assert loaded_cache is None
 
@@ -143,10 +152,10 @@ class TestCacheManager:
         """캐시 디렉토리가 자동으로 생성되는지 검증"""
         # 존재하지 않는 하위 디렉토리 경로
         cache_path = Path(temp_cache_dir) / "subdir" / "cache"
-        manager = CacheManager(cache_dir=str(cache_path), file_suffix="strategy")
+        manager = CacheManager(cache_dir=str(cache_path))
 
         # 저장 시 디렉토리가 자동 생성되어야 함
-        manager.save_strategy_cache("KRW-BTC", sample_strategy_cache)
+        manager.save_strategy_cache("KRW-BTC", "volatility", sample_strategy_cache)
 
         # 디렉토리 생성 확인
         assert cache_path.exists()
@@ -154,19 +163,104 @@ class TestCacheManager:
 
     def test_overwrite_existing_cache(self, temp_cache_dir, sample_strategy_cache):
         """기존 캐시를 덮어쓰는지 검증"""
-        manager = CacheManager(cache_dir=temp_cache_dir, file_suffix="strategy")
+        manager = CacheManager(cache_dir=temp_cache_dir)
         ticker = "KRW-BTC"
+        strategy_name = "volatility"
 
         # 첫 번째 저장
-        manager.save_strategy_cache(ticker, sample_strategy_cache)
+        manager.save_strategy_cache(ticker, strategy_name, sample_strategy_cache)
 
         # 캐시 수정
         modified_cache = sample_strategy_cache.model_copy()
-        modified_cache.volatility_position_size = 0.8
+        modified_cache.execution_volume = 0.001
 
         # 덮어쓰기
-        manager.save_strategy_cache(ticker, modified_cache)
+        manager.save_strategy_cache(ticker, strategy_name, modified_cache)
 
         # 로드 후 검증
-        loaded_cache = manager.load_strategy_cache(ticker)
-        assert loaded_cache.volatility_position_size == 0.8
+        loaded_cache = manager.load_strategy_cache(ticker, strategy_name)
+        assert loaded_cache.execution_volume == 0.001
+
+    def test_save_and_load_volatility_cache(self, temp_cache_dir, sample_volatility_cache):
+        """VolatilityStrategyCacheData 저장 후 로드가 정상 동작하는지 검증"""
+        manager = CacheManager(cache_dir=temp_cache_dir)
+        ticker = "KRW-BTC"
+        strategy_name = "volatility"
+
+        # 저장
+        manager.save_strategy_cache(ticker, strategy_name, sample_volatility_cache)
+
+        # 로드 (제네릭 타입 지정)
+        loaded_cache = manager.load_strategy_cache(ticker, strategy_name, VolatilityStrategyCacheData)
+
+        # 검증
+        assert loaded_cache is not None
+        assert isinstance(loaded_cache, VolatilityStrategyCacheData)
+        assert loaded_cache.last_run_date == sample_volatility_cache.last_run_date
+        assert loaded_cache.execution_volume == sample_volatility_cache.execution_volume
+        assert loaded_cache.position_size == sample_volatility_cache.position_size
+        assert loaded_cache.threshold == sample_volatility_cache.threshold
+
+    def test_load_volatility_cache_with_base_type(self, temp_cache_dir, sample_volatility_cache):
+        """VolatilityStrategyCacheData를 StrategyCacheData로 로드해도 동작하는지 검증"""
+        manager = CacheManager(cache_dir=temp_cache_dir)
+        ticker = "KRW-BTC"
+        strategy_name = "volatility"
+
+        # VolatilityStrategyCacheData로 저장
+        manager.save_strategy_cache(ticker, strategy_name, sample_volatility_cache)
+
+        # 기본 타입으로 로드 (model_class 생략)
+        loaded_cache = manager.load_strategy_cache(ticker, strategy_name)
+
+        # 검증: StrategyCacheData로 로드되지만 기본 필드는 접근 가능
+        assert loaded_cache is not None
+        assert loaded_cache.last_run_date == sample_volatility_cache.last_run_date
+        assert loaded_cache.execution_volume == sample_volatility_cache.execution_volume
+
+    def test_delete_strategy_cache(self, temp_cache_dir, sample_strategy_cache):
+        """전략 캐시 삭제가 정상 동작하는지 검증"""
+        manager = CacheManager(cache_dir=temp_cache_dir)
+        ticker = "KRW-BTC"
+        strategy_name = "volatility"
+
+        # 캐시 저장
+        manager.save_strategy_cache(ticker, strategy_name, sample_strategy_cache)
+
+        # 저장된 캐시 확인
+        cache_path = manager.get_cache_path(ticker, strategy_name)
+        assert cache_path.exists()
+
+        # 캐시 삭제
+        manager.delete_strategy_cache(ticker, strategy_name)
+
+        # 파일이 삭제되었는지 확인
+        assert not cache_path.exists()
+
+    def test_delete_nonexistent_cache(self, temp_cache_dir):
+        """존재하지 않는 캐시 삭제 시 에러 없이 처리"""
+        manager = CacheManager(cache_dir=temp_cache_dir)
+        ticker = "KRW-BTC"
+        strategy_name = "volatility"
+
+        # 존재하지 않는 캐시 삭제 - 에러 없이 처리되어야 함
+        manager.delete_strategy_cache(ticker, strategy_name)
+
+
+class TestStrategyCacheData:
+    """StrategyCacheData 모델 테스트"""
+
+    def test_has_position_returns_true_when_today(self):
+        """오늘 날짜와 같으면 True를 반환"""
+        today = dt.date(2024, 1, 2)
+        cache = StrategyCacheData(execution_volume=0.001, last_run_date=today)
+
+        assert cache.has_position(today) is True
+
+    def test_has_position_returns_false_when_not_today(self):
+        """오늘 날짜와 다르면 False를 반환"""
+        yesterday = dt.date(2024, 1, 1)
+        today = dt.date(2024, 1, 2)
+        cache = StrategyCacheData(execution_volume=0.001, last_run_date=yesterday)
+
+        assert cache.has_position(today) is False

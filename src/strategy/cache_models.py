@@ -26,23 +26,40 @@ class DataCache(BaseModel):
     history: Recent20DaysHalfDayCandles = Field(..., description="최근 20일의 반일봉 데이터")
 
 
-class StrategyCache(BaseModel):
-    """Strategy가 관리하는 영구 캐시
+class StrategyCacheData(BaseModel):
+    """각 전략이 독립적으로 관리하는 캐시
 
-    전략 실행 상태와 계산 결과를 파일로 저장합니다.
+    전략별 실행 상태를 개별 파일로 저장합니다.
 
     Attributes:
-        ticker: 종목 코드 (예: KRW-BTC)
+        execution_volume: 체결 수량
         last_run_date: 마지막 실행 날짜
-        volatility_position_size: 변동성 돌파 전략 매수 비중
-        volatility_threshold: 변동성 돌파 가격
-        volatility_execution_volume: 변동성 돌파 매수 체결 수량
-        morning_afternoon_execution_volume: 오전오후 전략 매수 체결 수량
     """
 
-    ticker: str = Field(..., description="종목 코드")
+    execution_volume: float = Field(default=0.0, description="체결 수량")
     last_run_date: dt.date = Field(..., description="마지막 실행 날짜")
-    volatility_position_size: float = Field(..., description="변동성 돌파 전략 매수 비중")
-    volatility_threshold: float = Field(default=float("inf"), description="변동성 돌파 가격")
-    volatility_execution_volume: float = Field(default=0.0, description="변동성 돌파 매수 체결 수량")
-    morning_afternoon_execution_volume: float = Field(default=0.0, description="오전오후 전략 매수 체결 수량")
+
+    def has_position(self, today: dt.date) -> bool:
+        """오늘 포지션이 있는지 확인
+
+        Args:
+            today: 오늘 날짜
+
+        Returns:
+            오늘 날짜이고 체결 수량이 있으면 True, 아니면 False
+        """
+        return self.last_run_date == today and self.execution_volume > 0
+
+
+class VolatilityStrategyCacheData(StrategyCacheData):
+    """변동성 전략 전용 캐시
+
+    변동성 전략에서 계산한 매수 비중과 돌파 가격을 저장합니다.
+
+    Attributes:
+        position_size: 매수 비중 (0~1)
+        threshold: 돌파 가격
+    """
+
+    position_size: float = Field(..., description="매수 비중 (0~1)")
+    threshold: float = Field(..., description="돌파 가격")
