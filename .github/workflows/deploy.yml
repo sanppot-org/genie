@@ -46,6 +46,10 @@ jobs:
             echo "📌 태그 체크아웃: $VERSION"
             git checkout "tags/$VERSION"
 
+            # 파일 소유권 확인 및 수정
+            echo "🔐 파일 소유권 확인 중..."
+            sudo chown -R ubuntu:ubuntu "$REPO_DIR"
+            
             # 서브모듈 업데이트
             echo "📦 서브모듈 업데이트 중..."
             git submodule update --init --recursive
