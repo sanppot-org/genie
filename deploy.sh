@@ -4,7 +4,16 @@
 set -e
 
 # PATH 설정 (uv 명령어 찾기 위함)
-export PATH="/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:$PATH"
+export PATH="/root/.local/bin:/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:$PATH"
+
+# uv 명령어 확인
+if ! command -v uv &> /dev/null; then
+    echo "❌ uv를 찾을 수 없습니다. 설치 중..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="/root/.local/bin:$PATH"
+fi
+
+echo "✅ uv 위치: $(which uv)"
 
 echo "🚀 배포 시작..."
 
