@@ -1,0 +1,16 @@
+[Unit]
+Description=Genie Cryptocurrency Auto Trading
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/genie
+ExecStart=/usr/bin/env bash -c 'cd /home/ubuntu/genie && uv run python main.py'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
