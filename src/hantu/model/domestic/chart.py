@@ -1,6 +1,6 @@
 """차트 조회 모델"""
+
 from enum import Enum
-from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -9,6 +9,7 @@ from src.hantu.model.domestic.market_code import MarketCode
 
 class ChartInterval(str, Enum):
     """차트 주기"""
+
     DAY = "D"  # 일봉
     WEEK = "W"  # 주봉
     MONTH = "M"  # 월봉
@@ -17,24 +18,28 @@ class ChartInterval(str, Enum):
 
 class PriceType(str, Enum):
     """가격 타입"""
+
     ADJUSTED = "0"  # 수정주가
     ORIGINAL = "1"  # 원주가
 
 
 # ===== 일/주/월/년봉 조회 =====
 
+
 class DailyChartRequestHeader(BaseModel):
     """일/주/월/년봉 요청 헤더"""
+
     content_type: str = Field(default="application/json; charset=utf-8", alias="Content-Type")
     authorization: str
     appkey: str
     appsecret: str
     tr_id: str = "FHKST03010100"  # 실전/모의 동일
-    custtype: Optional[str] = None
+    custtype: str | None = None
 
 
 class DailyChartRequestQueryParam(BaseModel):
     """일/주/월/년봉 요청 쿼리 파라미터"""
+
     FID_COND_MRKT_DIV_CODE: MarketCode  # 조건 시장 분류 코드
     FID_INPUT_ISCD: str  # 종목코드
     FID_INPUT_DATE_1: str  # 조회 시작일자 (YYYYMMDD)
@@ -45,6 +50,7 @@ class DailyChartRequestQueryParam(BaseModel):
 
 class DailyChartOutput1(BaseModel):
     """일/주/월/년봉 output1 (전체 정보)"""
+
     # 전일 대비
     prdy_vrss: str = Field(description="전일 대비")
     prdy_vrss_sign: str = Field(description="전일 대비 부호")
@@ -90,6 +96,7 @@ class DailyChartOutput1(BaseModel):
 
 class DailyChartOutput2(BaseModel):
     """일/주/월/년봉 output2 (개별 봉 데이터)"""
+
     stck_bsop_date: str = Field(description="영업 일자")
     stck_clpr: str = Field(description="종가")
     stck_oprc: str = Field(description="시가")
@@ -107,27 +114,31 @@ class DailyChartOutput2(BaseModel):
 
 class DailyChartResponseBody(BaseModel):
     """일/주/월/년봉 API 응답 바디"""
+
     rt_cd: str = Field(description="성공 실패 여부 (0:성공, 0 이외:실패)")
     msg_cd: str = Field(description="응답코드")
     msg1: str = Field(description="응답메시지")
     output1: DailyChartOutput1 = Field(description="전체 정보")
-    output2: List[DailyChartOutput2] = Field(description="개별 봉 데이터")
+    output2: list[DailyChartOutput2] = Field(description="개별 봉 데이터")
 
 
 # ===== 분봉 조회 =====
 
+
 class MinuteChartRequestHeader(BaseModel):
     """분봉 요청 헤더"""
+
     content_type: str = Field(default="application/json; charset=utf-8", alias="Content-Type")
     authorization: str
     appkey: str
     appsecret: str
     tr_id: str = "FHKST03010230"
-    custtype: Optional[str] = None
+    custtype: str | None = None
 
 
 class MinuteChartRequestQueryParam(BaseModel):
     """분봉 요청 쿼리 파라미터"""
+
     FID_COND_MRKT_DIV_CODE: MarketCode  # 시장 분류 코드
     FID_INPUT_ISCD: str  # 종목코드
     FID_INPUT_HOUR_1: str  # 입력 시간1 (HHMMSS)
@@ -138,6 +149,7 @@ class MinuteChartRequestQueryParam(BaseModel):
 
 class MinuteChartOutput1(BaseModel):
     """분봉 output1 (전체 정보)"""
+
     prdy_vrss: str = Field(description="전일 대비")
     prdy_vrss_sign: str = Field(description="전일 대비 부호")
     prdy_ctrt: str = Field(description="전일 대비율")
@@ -150,6 +162,7 @@ class MinuteChartOutput1(BaseModel):
 
 class MinuteChartOutput2(BaseModel):
     """분봉 output2 (개별 분봉 데이터)"""
+
     stck_bsop_date: str = Field(description="영업 일자")
     stck_cntg_hour: str = Field(description="체결 시간")
     stck_prpr: str = Field(description="현재가")
@@ -162,8 +175,9 @@ class MinuteChartOutput2(BaseModel):
 
 class MinuteChartResponseBody(BaseModel):
     """분봉 API 응답 바디"""
+
     rt_cd: str = Field(description="성공 실패 여부 (0:성공, 0 이외:실패)")
     msg_cd: str = Field(description="응답코드")
     msg1: str = Field(description="응답메시지")
     output1: MinuteChartOutput1 = Field(description="전체 정보")
-    output2: List[MinuteChartOutput2] = Field(description="개별 분봉 데이터")
+    output2: list[MinuteChartOutput2] = Field(description="개별 분봉 데이터")

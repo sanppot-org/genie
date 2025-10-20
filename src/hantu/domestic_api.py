@@ -1,16 +1,17 @@
 import logging
 import time
-from datetime import date, time as time_obj
-from typing import List, Tuple
+from datetime import date
+from datetime import time as time_obj
 
 import requests
 
+from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic import balance, chart, order, psbl_order, stock_price
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.chart import ChartInterval, PriceType
 from src.hantu.model.domestic.market_code import MarketCode
-from src.hantu.model.domestic.order import OrderDirection, OrderDivision
+from src.hantu.model.domestic.order import OrderDivision
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +38,12 @@ class HantuDomesticAPI(HantuBaseAPI):
         return balance.BalanceResponse(output1=output1, output2=output2)
 
     def get_psbl_order(
-            self,
-            ticker: str,
-            price: str,
-            order_division: OrderDivision = OrderDivision.MARKET,
-            cma_evaluation_amount_included: str = "N",
-            overseas_included: str = "N"
+        self,
+        ticker: str,
+        price: str,
+        order_division: OrderDivision = OrderDivision.MARKET,
+        cma_evaluation_amount_included: str = "N",
+        overseas_included: str = "N",
     ) -> psbl_order.ResponseBody:
         """매수가능 조회
 
@@ -58,7 +59,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             psbl_order.ResponseBody: 매수가능 조회 결과
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-psbl-order"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-psbl-order"
 
         # TR_ID 설정 (계좌 타입에 따라 다름)
         tr_id = "TTTC8908R" if self.account_type == AccountType.REAL else "VTTC8908R"
@@ -81,11 +82,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            URL,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -101,7 +98,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             stock_price.ResponseBody: 주식 현재가 시세 정보
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-price"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-price"
 
         header = stock_price.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -115,11 +112,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            URL,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -140,7 +133,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
-            price=0
+            price=0,
         )
 
     def sell_limit_order(self, ticker: str, quantity: int, price: int) -> order.ResponseBody:
@@ -159,7 +152,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.LIMIT,
             ticker=ticker,
             quantity=quantity,
-            price=price
+            price=price,
         )
 
     def buy_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
@@ -177,7 +170,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.MARKET,
             ticker=ticker,
             quantity=quantity,
-            price=0
+            price=0,
         )
 
     def buy_limit_order(self, ticker: str, quantity: int, price: int) -> order.ResponseBody:
@@ -196,17 +189,10 @@ class HantuDomesticAPI(HantuBaseAPI):
             order_division=OrderDivision.LIMIT,
             ticker=ticker,
             quantity=quantity,
-            price=price
+            price=price,
         )
 
-    def _order(
-            self,
-            order_direction: OrderDirection,
-            order_division: OrderDivision,
-            ticker: str,
-            quantity: int,
-            price: int
-    ) -> order.ResponseBody:
+    def _order(self, order_direction: OrderDirection, order_division: OrderDivision, ticker: str, quantity: int, price: int) -> order.ResponseBody:
         """주식 주문 (내부 메서드)
 
         Args:
@@ -219,7 +205,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             order.ResponseBody: 주문 응답
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/order-cash"
 
         # TR_ID 설정 (계좌 타입과 매수/매도 구분에 따라 다름)
         tr_id = self.ORDER_TR_ID_MAP[self.account_type, order_direction]  # type: ignore[index]
@@ -241,23 +227,19 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.post(
-            URL,
-            headers=header.model_dump(by_alias=True),
-            data=body.model_dump_json()
-        )
+        res = requests.post(url, headers=header.model_dump(by_alias=True), data=body.model_dump_json())
 
         self._validate_response(res)
 
         return order.ResponseBody.model_validate(res.json())
 
     def _get_balance_recursive(
-            self,
-            ctx_area_fk100: str = "",
-            ctx_area_nk100: str = "",
-            continuation_flag: str = "",
-            accumulated_output1=None,
-    ) -> Tuple[List[balance.ResponseBodyoutput1], List[balance.ResponseBodyoutput2]]:
+        self,
+        ctx_area_fk100: str = "",
+        ctx_area_nk100: str = "",
+        continuation_flag: str = "",
+        accumulated_output1: list[balance.ResponseBodyoutput1] | None = None,
+    ) -> tuple[list[balance.ResponseBodyoutput1], list[balance.ResponseBodyoutput2]]:
         """주식 잔고 조회 (연속 조회 지원) - 내부 메서드
 
         Args:
@@ -272,7 +254,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         if accumulated_output1 is None:
             accumulated_output1 = []
 
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/trading/inquire-balance"
 
         header = balance.RequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -290,11 +272,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            URL,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -306,9 +284,9 @@ class HantuDomesticAPI(HantuBaseAPI):
         accumulated_output2 = response_body.output2
 
         # 연속 조회 필요 여부 확인
-        response_tr_cont = res.headers.get('tr_cont', '')
+        response_tr_cont = res.headers.get("tr_cont", "")
 
-        if response_tr_cont in ['M', 'F']:  # 다음 페이지 존재
+        if response_tr_cont in ["M", "F"]:  # 다음 페이지 존재
             # API 호출 간격 (과부하 방지)
             time.sleep(0.1)
             # 재귀 호출로 다음 페이지 가져오기
@@ -323,13 +301,13 @@ class HantuDomesticAPI(HantuBaseAPI):
             return accumulated_output1, accumulated_output2
 
     def get_daily_chart(
-            self,
-            ticker: str,
-            start_date: date,
-            end_date: date,
-            interval: ChartInterval = ChartInterval.DAY,
-            price_type: PriceType = PriceType.ADJUSTED,
-            market_code: MarketCode = MarketCode.KRX
+        self,
+        ticker: str,
+        start_date: date,
+        end_date: date,
+        interval: ChartInterval = ChartInterval.DAY,
+        price_type: PriceType = PriceType.ADJUSTED,
+        market_code: MarketCode = MarketCode.KRX,
     ) -> chart.DailyChartResponseBody:
         """일/주/월/년봉 차트 조회
 
@@ -344,7 +322,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             chart.DailyChartResponseBody: 일/주/월/년봉 차트 데이터
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice"
 
         header = chart.DailyChartRequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -362,23 +340,13 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            URL,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
         return chart.DailyChartResponseBody.model_validate(res.json())
 
-    def get_minute_chart(
-            self,
-            ticker: str,
-            target_date: date,
-            target_time: time_obj,
-            market_code: MarketCode = MarketCode.KRX
-    ) -> chart.MinuteChartResponseBody:
+    def get_minute_chart(self, ticker: str, target_date: date, target_time: time_obj, market_code: MarketCode = MarketCode.KRX) -> chart.MinuteChartResponseBody:
         """분봉 차트 조회
 
         - 한 번 호출에 최대 120건
@@ -392,7 +360,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         Returns:
             chart.MinuteChartResponseBody: 분봉 차트 데이터
         """
-        URL = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice"
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice"
 
         header = chart.MinuteChartRequestHeader(
             authorization=f"Bearer {self._get_token()}",
@@ -408,11 +376,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(
-            URL,
-            headers=header.model_dump(by_alias=True),
-            params=param.model_dump()
-        )
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 

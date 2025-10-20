@@ -1,4 +1,5 @@
 """한투 API 차트 조회 테스트"""
+
 from datetime import date, time
 
 import pytest
@@ -20,7 +21,7 @@ class TestGetDailyChart:
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
         # _get_token mock
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -58,7 +59,7 @@ class TestGetDailyChart:
                 "per": "18.5",
                 "eps": "3520",
                 "pbr": "1.2",
-                "itewhol_loan_rmnd_ratem name": "0.5"
+                "itewhol_loan_rmnd_ratem name": "0.5",
             },
             "output2": [
                 {
@@ -74,7 +75,7 @@ class TestGetDailyChart:
                     "mod_yn": "N",
                     "prdy_vrss_sign": "2",
                     "prdy_vrss": "100",
-                    "revl_issu_reas": "00"
+                    "revl_issu_reas": "00",
                 },
                 {
                     "stck_bsop_date": "20220808",
@@ -89,19 +90,15 @@ class TestGetDailyChart:
                     "mod_yn": "N",
                     "prdy_vrss_sign": "2",
                     "prdy_vrss": "50",
-                    "revl_issu_reas": "00"
-                }
-            ]
+                    "revl_issu_reas": "00",
+                },
+            ],
         }
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_daily_chart(
-            ticker="005930",
-            start_date=date(2022, 1, 1),
-            end_date=date(2022, 8, 9)
-        )
+        response = api.get_daily_chart(ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9))
 
         # Then
         assert response is not None
@@ -118,7 +115,7 @@ class TestGetDailyChart:
         config = HantuConfig()
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -156,7 +153,7 @@ class TestGetDailyChart:
                 "per": "18.5",
                 "eps": "3520",
                 "pbr": "1.2",
-                "itewhol_loan_rmnd_ratem name": "0.5"
+                "itewhol_loan_rmnd_ratem name": "0.5",
             },
             "output2": [
                 {
@@ -172,28 +169,23 @@ class TestGetDailyChart:
                     "mod_yn": "N",
                     "prdy_vrss_sign": "2",
                     "prdy_vrss": "100",
-                    "revl_issu_reas": "00"
+                    "revl_issu_reas": "00",
                 }
-            ]
+            ],
         }
 
-        mock_get = mocker.patch('requests.get', return_value=mock_response)
+        mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_daily_chart(
-            ticker="005930",
-            start_date=date(2022, 1, 1),
-            end_date=date(2022, 8, 9),
-            interval=ChartInterval.WEEK
-        )
+        response = api.get_daily_chart(ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9), interval=ChartInterval.WEEK)
 
         # Then
         assert response is not None
         assert len(response.output2) == 1
 
         # ChartInterval enum 값이 올바르게 전달되었는지 확인
-        call_params = mock_get.call_args[1]['params']
-        assert call_params['FID_PERIOD_DIV_CODE'] == ChartInterval.WEEK
+        call_params = mock_get.call_args[1]["params"]
+        assert call_params["FID_PERIOD_DIV_CODE"] == ChartInterval.WEEK
 
     def test_get_daily_chart_with_original_price(self, mocker):
         """원주가 차트 조회"""
@@ -201,7 +193,7 @@ class TestGetDailyChart:
         config = HantuConfig()
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -239,7 +231,7 @@ class TestGetDailyChart:
                 "per": "18.5",
                 "eps": "3520",
                 "pbr": "1.2",
-                "itewhol_loan_rmnd_ratem name": "0.5"
+                "itewhol_loan_rmnd_ratem name": "0.5",
             },
             "output2": [
                 {
@@ -255,27 +247,22 @@ class TestGetDailyChart:
                     "mod_yn": "N",
                     "prdy_vrss_sign": "2",
                     "prdy_vrss": "100",
-                    "revl_issu_reas": "00"
+                    "revl_issu_reas": "00",
                 }
-            ]
+            ],
         }
 
-        mock_get = mocker.patch('requests.get', return_value=mock_response)
+        mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_daily_chart(
-            ticker="005930",
-            start_date=date(2022, 1, 1),
-            end_date=date(2022, 8, 9),
-            price_type=PriceType.ORIGINAL
-        )
+        response = api.get_daily_chart(ticker="005930", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9), price_type=PriceType.ORIGINAL)
 
         # Then
         assert response is not None
 
         # PriceType enum 값이 올바르게 전달되었는지 확인
-        call_params = mock_get.call_args[1]['params']
-        assert call_params['FID_ORG_ADJ_PRC'] == PriceType.ORIGINAL
+        call_params = mock_get.call_args[1]["params"]
+        assert call_params["FID_ORG_ADJ_PRC"] == PriceType.ORIGINAL
 
     def test_get_daily_chart_error(self, mocker):
         """API 에러 응답"""
@@ -283,26 +270,18 @@ class TestGetDailyChart:
         config = HantuConfig()
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
-        mock_response.json.return_value = {
-            "rt_cd": "1",
-            "msg_cd": "EGW00123",
-            "msg1": "종목코드 오류"
-        }
+        mock_response.json.return_value = {"rt_cd": "1", "msg_cd": "EGW00123", "msg1": "종목코드 오류"}
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When & Then
         with pytest.raises(Exception, match="Error:"):
-            api.get_daily_chart(
-                ticker="000000",
-                start_date=date(2022, 1, 1),
-                end_date=date(2022, 8, 9)
-            )
+            api.get_daily_chart(ticker="000000", start_date=date(2022, 1, 1), end_date=date(2022, 8, 9))
 
 
 class TestGetMinuteChart:
@@ -314,7 +293,7 @@ class TestGetMinuteChart:
         config = HantuConfig()
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -330,7 +309,7 @@ class TestGetMinuteChart:
                 "acml_vol": "10000000",
                 "acml_tr_pbmn": "650000000000",
                 "hts_kor_isnm": "삼성전자",
-                "stck_prpr": "65100"
+                "stck_prpr": "65100",
             },
             "output2": [
                 {
@@ -341,7 +320,7 @@ class TestGetMinuteChart:
                     "stck_hgpr": "65200",
                     "stck_lwpr": "64900",
                     "cntg_vol": "100000",
-                    "acml_tr_pbmn": "650000000000"
+                    "acml_tr_pbmn": "650000000000",
                 },
                 {
                     "stck_bsop_date": "20241023",
@@ -351,19 +330,15 @@ class TestGetMinuteChart:
                     "stck_hgpr": "65050",
                     "stck_lwpr": "64900",
                     "cntg_vol": "95000",
-                    "acml_tr_pbmn": "617500000000"
-                }
-            ]
+                    "acml_tr_pbmn": "617500000000",
+                },
+            ],
         }
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_minute_chart(
-            ticker="005930",
-            target_date=date(2024, 10, 23),
-            target_time=time(13, 0, 0)
-        )
+        response = api.get_minute_chart(ticker="005930", target_date=date(2024, 10, 23), target_time=time(13, 0, 0))
 
         # Then
         assert response is not None
@@ -381,7 +356,7 @@ class TestGetMinuteChart:
         config = HantuConfig()
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 200
@@ -397,7 +372,7 @@ class TestGetMinuteChart:
                 "acml_vol": "10000000",
                 "acml_tr_pbmn": "650000000000",
                 "hts_kor_isnm": "삼성전자",
-                "stck_prpr": "65100"
+                "stck_prpr": "65100",
             },
             "output2": [
                 {
@@ -408,27 +383,22 @@ class TestGetMinuteChart:
                     "stck_hgpr": "65200",
                     "stck_lwpr": "64900",
                     "cntg_vol": "100000",
-                    "acml_tr_pbmn": "650000000000"
+                    "acml_tr_pbmn": "650000000000",
                 }
-            ]
+            ],
         }
 
-        mock_get = mocker.patch('requests.get', return_value=mock_response)
+        mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        response = api.get_minute_chart(
-            ticker="005930",
-            target_date=date(2024, 10, 23),
-            target_time=time(13, 0, 0),
-            market_code=MarketCode.KRX
-        )
+        response = api.get_minute_chart(ticker="005930", target_date=date(2024, 10, 23), target_time=time(13, 0, 0), market_code=MarketCode.KRX)
 
         # Then
         assert response is not None
 
         # MarketCode enum 값이 올바르게 전달되었는지 확인
-        call_params = mock_get.call_args[1]['params']
-        assert call_params['FID_COND_MRKT_DIV_CODE'] == MarketCode.KRX
+        call_params = mock_get.call_args[1]["params"]
+        assert call_params["FID_COND_MRKT_DIV_CODE"] == MarketCode.KRX
 
     def test_get_minute_chart_error(self, mocker):
         """API 에러 응답"""
@@ -436,23 +406,15 @@ class TestGetMinuteChart:
         config = HantuConfig()
         api = HantuDomesticAPI(config, AccountType.VIRTUAL)
 
-        mocker.patch.object(api, '_get_token', return_value='mock_token')
+        mocker.patch.object(api, "_get_token", return_value="mock_token")
 
         mock_response = mocker.Mock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
-        mock_response.json.return_value = {
-            "rt_cd": "1",
-            "msg_cd": "EGW00123",
-            "msg1": "종목코드 오류"
-        }
+        mock_response.json.return_value = {"rt_cd": "1", "msg_cd": "EGW00123", "msg1": "종목코드 오류"}
 
-        mocker.patch('requests.get', return_value=mock_response)
+        mocker.patch("requests.get", return_value=mock_response)
 
         # When & Then
         with pytest.raises(Exception, match="Error:"):
-            api.get_minute_chart(
-                ticker="000000",
-                target_date=date(2024, 10, 23),
-                target_time=time(13, 0, 0)
-            )
+            api.get_minute_chart(ticker="000000", target_date=date(2024, 10, 23), target_time=time(13, 0, 0))

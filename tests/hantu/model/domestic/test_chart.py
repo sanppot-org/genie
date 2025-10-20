@@ -38,7 +38,7 @@ class TestDailyChartRequestQueryParam:
             FID_INPUT_DATE_1="20220101",
             FID_INPUT_DATE_2="20220809",
             FID_PERIOD_DIV_CODE=chart.ChartInterval.DAY,
-            FID_ORG_ADJ_PRC=chart.PriceType.ADJUSTED
+            FID_ORG_ADJ_PRC=chart.PriceType.ADJUSTED,
         )
 
         # When
@@ -67,7 +67,7 @@ class TestDailyChartRequestQueryParam:
                 FID_INPUT_DATE_1="20220101",
                 FID_INPUT_DATE_2="20220809",
                 FID_PERIOD_DIV_CODE=interval,
-                FID_ORG_ADJ_PRC=chart.PriceType.ADJUSTED
+                FID_ORG_ADJ_PRC=chart.PriceType.ADJUSTED,
             )
             assert param.model_dump()["FID_PERIOD_DIV_CODE"] == expected
 
@@ -84,7 +84,7 @@ class TestDailyChartRequestQueryParam:
                 FID_INPUT_DATE_1="20220101",
                 FID_INPUT_DATE_2="20220809",
                 FID_PERIOD_DIV_CODE=chart.ChartInterval.DAY,
-                FID_ORG_ADJ_PRC=price_type
+                FID_ORG_ADJ_PRC=price_type,
             )
             assert param.model_dump()["FID_ORG_ADJ_PRC"] == expected
 
@@ -101,7 +101,7 @@ class TestMinuteChartRequestQueryParam:
             FID_INPUT_HOUR_1="130000",
             FID_INPUT_DATE_1="20241023",
             FID_PW_DATA_INCU_YN="N",
-            FID_FAKE_TICK_INCU_YN=""
+            FID_FAKE_TICK_INCU_YN="",
         )
 
         # When
@@ -122,7 +122,7 @@ class TestMinuteChartRequestQueryParam:
             FID_COND_MRKT_DIV_CODE=MarketCode.KRX,
             FID_INPUT_ISCD="005930",
             FID_INPUT_HOUR_1="130000",
-            FID_INPUT_DATE_1="20241023"
+            FID_INPUT_DATE_1="20241023",
         )
 
         # When
@@ -173,7 +173,7 @@ class TestDailyChartResponseBody:
                 "per": "18.5",
                 "eps": "3520",
                 "pbr": "1.2",
-                "itewhol_loan_rmnd_ratem name": "0.5"
+                "itewhol_loan_rmnd_ratem name": "0.5",
             },
             "output2": [
                 {
@@ -189,9 +189,9 @@ class TestDailyChartResponseBody:
                     "mod_yn": "N",
                     "prdy_vrss_sign": "2",
                     "prdy_vrss": "100",
-                    "revl_issu_reas": "00"
+                    "revl_issu_reas": "00",
                 }
-            ]
+            ],
         }
 
         # When
@@ -225,7 +225,7 @@ class TestMinuteChartResponseBody:
                 "acml_vol": "10000000",
                 "acml_tr_pbmn": "650000000000",
                 "hts_kor_isnm": "삼성전자",
-                "stck_prpr": "65100"
+                "stck_prpr": "65100",
             },
             "output2": [
                 {
@@ -236,9 +236,9 @@ class TestMinuteChartResponseBody:
                     "stck_hgpr": "65200",
                     "stck_lwpr": "64900",
                     "cntg_vol": "100000",
-                    "acml_tr_pbmn": "650000000000"
+                    "acml_tr_pbmn": "650000000000",
                 }
-            ]
+            ],
         }
 
         # When

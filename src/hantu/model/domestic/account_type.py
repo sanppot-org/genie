@@ -10,5 +10,6 @@ class AccountType(str, Enum):
         REAL: 실제 계좌
         VIRTUAL: 가상 계좌 (모의투자)
     """
+
     REAL = "real"
     VIRTUAL = "virtual"

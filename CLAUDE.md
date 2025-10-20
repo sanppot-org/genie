@@ -57,12 +57,6 @@ tests/
 ### 환경 설정
 
 ```bash
-# 가상 환경 활성화
-source .venv/bin/activate
-
-# 의존성 설치
-uv pip install -e .
-
 # 테스트 실행 (항상 uv 사용)
 uv run pytest tests/
 
@@ -112,10 +106,10 @@ api = UpbitAPI(config)
 
 # 잔고 조회
 balances = api.get_balances()
-eth_balance = api.get_balance(ticker='ETH')
+eth_balance = api.get_available_amount(ticker='ETH')
 
 # 주문
-buy_order = api.buy_market_order(ticker='KRW-ETH', price=10000)
+buy_order = api.buy_market_order(ticker='KRW-ETH', amount=10000)
 sell_order = api.sell_market_order(ticker='KRW-ETH', volume=0.001)
 ```
 
@@ -153,3 +147,4 @@ UPBIT_SECRET_KEY=your_secret_key_here
 
 - 이 프로젝트는 `invest-app`, `sudoku` 등 다른 개인 프로젝트에서 사용됩니다
 - 설정 파일은 `config/` submodule을 통해 중앙 관리됩니다
+- 테스트 실행 시 uv run pytest를 사용해.

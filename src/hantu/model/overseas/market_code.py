@@ -1,13 +1,14 @@
 """해외 시세 조회용 거래소 코드 정의"""
+
 from enum import Enum
 
 
 class OverseasMarketCode(str, Enum):
     """해외주식 시세 조회 API용 거래소 코드
-    
+
     price, price_detail, inquire_asking_price 등 시세 조회 API에서 사용
     잔고 조회나 주문 API에서 사용하는 OverseasExchangeCode와는 다른 코드 체계
-    
+
     Attributes:
         HKS: 홍콩증권거래소
         NYS: 뉴욕증권거래소 (NYSE)
@@ -24,6 +25,7 @@ class OverseasMarketCode(str, Enum):
         BAQ: 베트남
         BAA: 베트남
     """
+
     HKS = "HKS"  # 홍콩증권거래소
     NYS = "NYS"  # 뉴욕증권거래소 (NYSE)
     NAS = "NAS"  # 나스닥

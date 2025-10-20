@@ -16,7 +16,8 @@ class HantuAPI:
     Examples:
         >>> from src.config import HantuConfig
         >>> from src.hantu import HantuAPI, AccountType
-        >>> from src.hantu.model import OverseasExchangeCode, TradingCurrencyCode
+        >>> from hantu.model.overseas import OverseasExchangeCode
+        >>> from hantu.model.domestic import TradingCurrencyCode
         >>>
         >>> config = HantuConfig()
         >>> api = HantuAPI(config, AccountType.REAL)
@@ -32,7 +33,7 @@ class HantuAPI:
         >>> )
     """
 
-    def __init__(self, config: HantuConfig, account_type: AccountType = AccountType.REAL):
+    def __init__(self, config: HantuConfig, account_type: AccountType = AccountType.REAL) -> None:
         """
         Args:
             config: 한투 API 설정

@@ -1,18 +1,12 @@
 import logging
-from datetime import datetime
 
-from src.config import UpbitConfig, HantuConfig
+from src.config import HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
-from src.strategy.data.collector import DataCollector
-from src.upbit.upbit_api import UpbitAPI, get_candles
-from strategy.data import storage
+from src.upbit.upbit_api import UpbitAPI
 
 # 로깅 설정
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
 
@@ -21,16 +15,18 @@ hantu_overseas_api = HantuOverseasAPI(HantuConfig())  # type: ignore
 
 v_hantu_domestic_api = HantuDomesticAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
-# result = get_current_price()
-
 
 # Upbit
 
-# result = get_candles()
-# result = upbit_api.get_balance()
+# result = upbit_api.get_current_price()
+# result = upbit_api.get_candles()
+# result = upbit_api.get_available_amount()
 # result = upbit_api.get_balances()
-# result = upbit_api.buy_market_order(ticker='KRW-ETH', price=11000)
+# result = upbit_api.buy_market_order(ticker='KRW-ETH', amount=11000)
 # result = upbit_api.sell_market_order(ticker='KRW-ETH', volume=0.0009) # 6000원 정도
+# result = upbit_api.buy_market_order_and_wait(ticker='KRW-ETH', amount=5000)
+# result = upbit_api.sell_market_order_and_wait(ticker='KRW-ETH', volume=0.0009)
+# result = upbit_api.upbit.get_order('e9e04adc-b0dc-47a4-bd98-ff544e2846da')
 
 #################################### KIS ####################################
 ### Domastic ###
@@ -59,16 +55,35 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 
 #################################### Candle ####################################
 
-collector = DataCollector()
-# result = collector.collect_initial_data(ticker="KRW-BTC")
-
+# clock = SystemClock()
+# collector = DataCollector(clock)
+# result = collector.collect_data("KRW-BTC", days=20)
 
 ###### storage #########
-ticker = "KRW-BTC"
-filename = f'{ticker}-{datetime.now().date()}.json'
+# ticker = "KRW-BTC"
+# filename = f"{ticker}-{datetime.now().date()}.json"
 # data = collector.collect_initial_data(ticker=ticker)
 # storage.save(data, filename)
 
-result = storage.load(filename)
+# result = storage.load(filename)
 
-print(result)
+### Strategy ###
+# history = storage.load(filename)
+# result = morning_afternoon.check_buy_signal(history=history)
+
+# breakout_strategy = VolatilityBreakoutStrategy()  # 필요한 인자 추가 필요
+
+# result = breakout_strategy._check_buy_signal(history=history, current_price=get_current_price())
+
+
+# executor = OrderExecutor(upbit_api=upbit_api, google_sheet_client=GoogleSheetClient(GoogleSheetConfig()), slack_client=SlackClient(SlackConfig()))
+
+# executor.buy(ticker="KRW-ETH", amount=5100, strategy_name="테스트")
+# executor.sell(ticker="KRW-ETH", volume=0.00086352, strategy_name="테스트")
+
+### SLACK ###
+
+# slack_client = SlackClient(SlackConfig())
+# slack_client.send_message("hi")
+
+# print(result)

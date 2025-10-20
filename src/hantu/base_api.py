@@ -21,7 +21,7 @@ class HantuBaseAPI:
         account_type: 계좌 타입 (REAL: 실제 계좌, VIRTUAL: 가상 계좌)
     """
 
-    def __init__(self, config: HantuConfig, account_type: AccountType = AccountType.REAL):
+    def __init__(self, config: HantuConfig, account_type: AccountType = AccountType.REAL) -> None:
         self.config = config
         self.account_type = account_type
 
@@ -41,7 +41,7 @@ class HantuBaseAPI:
             self.url_base = config.v_url_base
             self.token_path = config.v_token_path
 
-    def _make_token(self):
+    def _make_token(self) -> str:
         """OAuth2 액세스 토큰 생성"""
         request_body = access_token.RequestBody(appkey=self.app_key, appsecret=self.app_secret)
 
@@ -82,7 +82,7 @@ class HantuBaseAPI:
         return data.access_token
 
     @staticmethod
-    def _validate_response(res: Response):
+    def _validate_response(res: Response) -> None:
         if not res or res.status_code != 200 or res.json()["rt_cd"] != "0":
             logger.error(f"Error Code : {res.status_code} | {res.text}")
             raise Exception(f"Error: {res.text}")

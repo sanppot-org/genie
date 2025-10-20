@@ -1,7 +1,5 @@
 """해외주식 시세 조회 관련 모델"""
 
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -45,8 +43,8 @@ class OverseasDailyCandleData(BaseModel):
 class OverseasDailyCandleResponse(BaseModel):
     """해외주식 일/주/월/년 캔들 응답"""
 
-    output1: List[OverseasDailyCandleData] = Field(default_factory=list, description="캔들 데이터 목록")
-    output2: Optional[dict] = Field(None, description="추가 정보")
+    output1: list[OverseasDailyCandleData] = Field(default_factory=list, description="캔들 데이터 목록")
+    output2: dict | None = Field(None, description="추가 정보")
 
 
 class OverseasOrderbookItem(BaseModel):
@@ -70,7 +68,7 @@ class OverseasOrderbookResponse(BaseModel):
     """호가 정보 응답"""
 
     output1: OverseasOrderbookData = Field(..., description="호가 기본 정보")
-    output2: List[OverseasOrderbookItem] = Field(default_factory=list, description="호가 목록")
+    output2: list[OverseasOrderbookItem] = Field(default_factory=list, description="호가 목록")
 
 
 class OverseasMinuteCandleMetadata(BaseModel):
@@ -107,4 +105,4 @@ class OverseasMinuteCandleResponse(BaseModel):
     """해외주식 분봉 응답"""
 
     output1: OverseasMinuteCandleMetadata = Field(..., description="메타데이터")
-    output2: List[OverseasMinuteCandleData] = Field(default_factory=list, description="분봉 데이터 목록")
+    output2: list[OverseasMinuteCandleData] = Field(default_factory=list, description="분봉 데이터 목록")

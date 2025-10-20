@@ -105,9 +105,7 @@ class TestGetDailyCandles:
             mock_get.return_value.json.return_value = mock_response
             mock_get.return_value.headers = {"tr_cont": ""}
 
-            result = api.get_daily_candles(
-                asset_type=OverseasAssetType.INDEX, symbol="AAPL", start_date="20240101", end_date="20240131"
-            )
+            result = api.get_daily_candles(asset_type=OverseasAssetType.INDEX, symbol="AAPL", start_date="20240101", end_date="20240131")
 
             assert isinstance(result, OverseasDailyCandleResponse)
             assert len(result.output1) > 0

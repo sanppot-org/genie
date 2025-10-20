@@ -1,4 +1,5 @@
 """거래 통화 코드 정의"""
+
 from enum import Enum
 
 
@@ -14,6 +15,7 @@ class TradingCurrencyCode(str, Enum):
         JPY: 일본 엔화
         VND: 베트남 동
     """
+
     USD = "USD"  # 미국 달러
     HKD = "HKD"  # 홍콩 달러
     CNY = "CNY"  # 중국 위안화

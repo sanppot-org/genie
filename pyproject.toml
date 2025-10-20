@@ -16,6 +16,10 @@ dependencies = [
     "ruff>=0.14.0",
     "mypy>=1.18.2",
     "types-requests>=2.32.4.20250913",
+    "apscheduler>=3.10.0",
+    "gspread>=6.0.0",
+    "gspread-dataframe>=4.0.0",
+    "tenacity>=9.0.0",
 ]
 
 [tool.pytest.ini_options]
@@ -23,5 +27,41 @@ pythonpath = "."
 
 [dependency-groups]
 dev = [
+    "pytest>=8.4.2",
     "pytest-mock>=3.15.1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 180
+
+[tool.ruff.lint]
+select = [
+    "E", # pycodestyle errors
+    "F", # pyflakes
+    "W", # pycodestyle warnings
+    "I", # isort
+    "N", # pep8-naming
+    "UP", # pyupgrade
+    "ANN", # flake8-annotations (타입 힌트 강제)
+    "B", # flake8-bugbear
+    "A", # flake8-builtins
+    "C4", # flake8-comprehensions
+]
+ignore = [
+    "ANN101", # missing-type-self (self 타입 힌트 불필요)
+    "ANN102", # missing-type-cls (cls 타입 힌트 불필요)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "ANN001", # 테스트에서는 타입 힌트 덜 엄격하게
+    "ANN201",
+    "ANN202",
+    "N802", # 한글 테스트 메서드명 허용
+    "F841", # 사용되지 않는 변수 허용 (mock 등)
+    "B017", # blind exception 허용 (테스트에서 Exception 사용)
+]
+"main.py" = [
+    "E501", # 주석 처리된 코드의 줄 길이 무시
 ]
