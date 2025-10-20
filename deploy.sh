@@ -3,6 +3,9 @@
 # 에러 발생 시 스크립트 중단
 set -e
 
+# PATH 설정 (uv 명령어 찾기 위함)
+export PATH="/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:$PATH"
+
 echo "🚀 배포 시작..."
 
 # 작업 디렉토리로 이동
