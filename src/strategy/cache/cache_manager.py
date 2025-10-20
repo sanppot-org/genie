@@ -5,7 +5,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from src import constants
-from src.strategy.cache_models import DataCache, StrategyCacheData
+from src.strategy.cache.cache_models import DataCache, StrategyCacheData
 
 T = TypeVar("T", bound=StrategyCacheData)
 

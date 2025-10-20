@@ -1,12 +1,13 @@
 import logging
 
 from src.strategy.base_strategy import BaseStrategy
-from src.strategy.cache_models import VolatilityStrategyCacheData
+from src.strategy.cache.cache_models import VolatilityStrategyCacheData
 from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
 
 
+# TODO: 탬플릿 메서드 패턴 적용
 class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
     """변동성 돌파 전략"""
 

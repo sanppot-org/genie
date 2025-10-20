@@ -2,8 +2,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.strategy.cache_manager import CacheManager
-from src.strategy.clock import Clock
+from src.common.clock import Clock
+from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.morning_afternoon_strategy import MorningAfternoonStrategy
@@ -96,7 +96,7 @@ class TestMorningAfternoonStrategyExecute:
         # 캐시에 보유 수량 있음
         import datetime as dt
 
-        from src.strategy.cache_models import StrategyCacheData
+        from src.strategy.cache.cache_models import StrategyCacheData
 
         mock_cache = StrategyCacheData(execution_volume=0.001, last_run_date=dt.date(2024, 1, 1))
         mock_cache_manager.load_strategy_cache.return_value = mock_cache

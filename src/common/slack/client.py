@@ -29,6 +29,9 @@ class SlackClient:
     def send_debug(self, msg: str) -> None:
         self._send_message(self.config.debug_url, msg)
 
+    def send_error(self, msg: str) -> None:
+        self._send_message(self.config.error_url, msg)
+
     def send_order_notification(self, result: ExecutionResult) -> None:
         """
         주문 완료 시 Slack 알림 발송

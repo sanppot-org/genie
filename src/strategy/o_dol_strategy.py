@@ -1,24 +1,17 @@
-import logging
 from zoneinfo import ZoneInfo
 
-from common.google_sheet.client import GoogleSheetClient
-from common.slack.client import SlackClient
-from config import GoogleSheetConfig, SlackConfig
-from src.config import UpbitConfig
+from src.common.clock import SystemClock
+from src.common.google_sheet.client import GoogleSheetClient
+from src.common.slack.client import SlackClient
+from src.config import GoogleSheetConfig, SlackConfig, UpbitConfig
 from src.constants import KST
-from src.strategy.cache_manager import CacheManager
-from src.strategy.clock import SystemClock
+from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.morning_afternoon_strategy import MorningAfternoonStrategy
 from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.volatility_strategy import VolatilityStrategy
 from src.upbit.upbit_api import UpbitAPI
-
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
-total_balance = 100_000_000
-allocated_balance = 2_000_000
 
 
 def run(ticker: str, total_balance: float, allocated_balance: float, target_vol: float = 0.01, timezone: ZoneInfo = KST) -> None:
@@ -34,16 +27,22 @@ def run(ticker: str, total_balance: float, allocated_balance: float, target_vol:
     allocated_balance_per_strategy = (allocated_balance - 100) / 2  # 티커에 할당된 금액을 전략별로 5:5로 나눈다.
     strategy_config = BaseStrategyConfig(timezone=timezone, ticker=ticker, target_vol=target_vol, total_balance=total_balance, allocated_balance=allocated_balance_per_strategy)
 
-    # 로그 남기기
-    slack_client.send_debug("암호화폐 자동 매매 실행")
-
     volatility_strategy = VolatilityStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)
     morning_afternoon_strategy = MorningAfternoonStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)
 
-    volatility_strategy.execute()
-    morning_afternoon_strategy.execute()
+    try:
+        volatility_strategy.execute()
+    except Exception as e:
+        slack_client.send_error(f"변동성 돌파 전략 에러 발생. log: {e}")
+
+    try:
+        morning_afternoon_strategy.execute()
+    except Exception as e:
+        slack_client.send_error(f"오전 오후 전략 에러 발생. log: {e}")
 
 
-if __name__ == "__main__":
-    run(ticker="KRW-BTC", total_balance=total_balance, allocated_balance=allocated_balance)
-    run(ticker="KRW-ETH", total_balance=total_balance, allocated_balance=allocated_balance)
+"""
+결국 티커만 다르게 설정하면 N개의 코인으로 해당 전략을 돌릴 수 있다.
+
+각 코인 별로 영향이 없으면 좋겠다. 공유하는 것들이 있지만 독립적으로 실행되어야 한다.
+"""

@@ -3,7 +3,7 @@
 import datetime
 from zoneinfo import ZoneInfo
 
-from src.strategy.clock import FixedClock, SystemClock
+from src.common.clock import FixedClock, SystemClock
 
 
 class TestSystemClock:

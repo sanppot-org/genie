@@ -1,7 +1,7 @@
 import logging
 
 from src.strategy.base_strategy import BaseStrategy
-from src.strategy.cache_models import StrategyCacheData
+from src.strategy.cache.cache_models import StrategyCacheData
 
 logger = logging.getLogger(__name__)
 

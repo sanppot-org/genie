@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from src.strategy.cache_manager import CacheManager
-from src.strategy.cache_models import DataCache, StrategyCacheData, VolatilityStrategyCacheData
+from src.strategy.cache.cache_manager import CacheManager
+from src.strategy.cache.cache_models import DataCache, StrategyCacheData, VolatilityStrategyCacheData
 from src.strategy.data.models import HalfDayCandle, Recent20DaysHalfDayCandles
 
 

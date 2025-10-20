@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from src.strategy.clock import FixedClock, SystemClock
+from src.common.clock import FixedClock, SystemClock
 from src.strategy.data.collector import DataCollector
 from src.strategy.data.models import Period
 from src.upbit.upbit_api import CandleInterval
@@ -19,7 +19,7 @@ class TestDataCollector:
     @pytest.fixture
     def collector(self, tmp_path):
         """DataCollector 인스턴스 생성"""
-        from src.strategy.cache_manager import CacheManager
+        from src.strategy.cache.cache_manager import CacheManager
 
         cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
         return DataCollector(SystemClock(), cache_manager=cache_manager)
@@ -267,7 +267,7 @@ class TestDataCollector:
 
         # 10월 15일에 첫 호출
         clock = FixedClock(datetime.datetime(2025, 10, 15, 10, 0, 0))
-        from src.strategy.cache_manager import CacheManager
+        from src.strategy.cache.cache_manager import CacheManager
 
         cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
         collector = DataCollector(clock=clock, cache_manager=cache_manager)

@@ -2,8 +2,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from src.strategy.cache_manager import CacheManager
-from src.strategy.clock import Clock
+from src.common.clock import Clock
+from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.execution_result import ExecutionResult
@@ -102,7 +102,7 @@ class TestVolatilityStrategyExecute:
         # 캐시에 보유 수량 있음
         import datetime as dt
 
-        from src.strategy.cache_models import VolatilityStrategyCacheData
+        from src.strategy.cache.cache_models import VolatilityStrategyCacheData
 
         mock_cache = VolatilityStrategyCacheData(
             execution_volume=0.001,
@@ -167,7 +167,7 @@ class TestVolatilityStrategyExecute:
         mock_clock.today.return_value = dt.date(2024, 1, 1)
 
         # 오늘 날짜의 캐시 (execution_volume=0이므로 매수 가능)
-        from src.strategy.cache_models import VolatilityStrategyCacheData
+        from src.strategy.cache.cache_models import VolatilityStrategyCacheData
 
         cached_position_size = 1.0
         cached_threshold = 50500000
@@ -241,7 +241,7 @@ class TestVolatilityStrategyExecute:
             save_call_args = mock_cache_manager.save_strategy_cache.call_args
             saved_cache = save_call_args[0][2]
 
-            from src.strategy.cache_models import VolatilityStrategyCacheData
+            from src.strategy.cache.cache_models import VolatilityStrategyCacheData
 
             assert isinstance(saved_cache, VolatilityStrategyCacheData)
             assert saved_cache.execution_volume == 0.001
