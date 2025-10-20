@@ -33,12 +33,12 @@ def run(ticker: str, total_balance: float, allocated_balance: float, target_vol:
     try:
         volatility_strategy.execute()
     except Exception as e:
-        slack_client.send_error(f"변동성 돌파 전략 에러 발생. log: {e}")
+        slack_client.send_error(f"{ticker} 변동성 돌파 전략 에러 발생. log: {e}")
 
     try:
         morning_afternoon_strategy.execute()
     except Exception as e:
-        slack_client.send_error(f"오전 오후 전략 에러 발생. log: {e}")
+        slack_client.send_error(f"{ticker} 오전 오후 전략 에러 발생. log: {e}")
 
 
 """
