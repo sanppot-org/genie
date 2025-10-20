@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/genie
+Environment="PATH=/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=/usr/bin/env bash -c 'cd /home/ubuntu/genie && uv run python main.py'
 Restart=always
 RestartSec=10
