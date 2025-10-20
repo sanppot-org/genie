@@ -1,0 +1,58 @@
+name: Deploy to Server
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.OCI_APPLICATION_HOST }}
+          username: ${{ secrets.OCI_APPLICATION_USERNAME }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            set -e
+
+            REPO_DIR="/home/ubuntu/genie"
+            REPO_URL="https://github.com/${{ github.repository }}.git"
+            VERSION="${{ steps.version.outputs.VERSION }}"
+
+            echo "🚀 배포 시작: $VERSION"
+
+            # 저장소 클론 또는 업데이트
+            if [ ! -d "$REPO_DIR" ]; then
+              echo "📥 저장소 클론 중..."
+              git clone "$REPO_URL" "$REPO_DIR"
+            else
+              echo "🔄 저장소 업데이트 중..."
+              cd "$REPO_DIR"
+              git fetch --all --tags
+            fi
+
+            # 작업 디렉토리로 이동
+            cd "$REPO_DIR"
+
+            # 특정 태그로 체크아웃
+            echo "📌 태그 체크아웃: $VERSION"
+            git checkout "tags/$VERSION"
+
+            # 서브모듈 업데이트
+            echo "📦 서브모듈 업데이트 중..."
+            git submodule update --init --recursive
+
+            # 배포 스크립트 실행
+            echo "⚙️  배포 스크립트 실행 중..."
+            chmod +x deploy.sh
+            ./deploy.sh
+
+            echo "✅ 배포 완료: $VERSION"
