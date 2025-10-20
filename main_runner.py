@@ -1,6 +1,9 @@
 import logging
 from zoneinfo import ZoneInfo
 
+from common.google_sheet.client import GoogleSheetClient
+from common.slack.client import SlackClient
+from config import GoogleSheetConfig, SlackConfig
 from src.config import UpbitConfig
 from src.constants import KST
 from src.strategy.cache_manager import CacheManager
@@ -22,12 +25,17 @@ def run(ticker: str, total_balance: float, allocated_balance: float, target_vol:
     # 공유 컴포넌트
     clock = SystemClock(timezone)
     data_collector = DataCollector(clock)
+    google_sheet_client = GoogleSheetClient(GoogleSheetConfig())
+    slack_client = SlackClient(SlackConfig())
     upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
-    order_executor = OrderExecutor(upbit_api)
+    order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
     cache_manager = CacheManager()
 
     allocated_balance_per_strategy = (allocated_balance - 100) / 2  # 티커에 할당된 금액을 전략별로 5:5로 나눈다.
     strategy_config = BaseStrategyConfig(timezone=timezone, ticker=ticker, target_vol=target_vol, total_balance=total_balance, allocated_balance=allocated_balance_per_strategy)
+
+    # 로그 남기기
+    slack_client.send_debug("암호화폐 자동 매매 실행")
 
     volatility_strategy = VolatilityStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)
     morning_afternoon_strategy = MorningAfternoonStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)

@@ -23,7 +23,7 @@ class MorningAfternoonStrategy(BaseStrategy[StrategyCacheData]):
         else:
             self._sell()
 
-    def _buy(self):
+    def _buy(self) -> None:
         if self._should_buy():
             history = self._collector.collect_data(self._config.ticker)
             position_size = self._config.target_vol / max(history.yesterday_morning.volatility, 0.01)
@@ -32,7 +32,7 @@ class MorningAfternoonStrategy(BaseStrategy[StrategyCacheData]):
             result = self._order_executor.buy(self._config.ticker, amount, strategy_name=self._strategy_name)
             self._save_cache(execution_volume=result.executed_volume)
 
-    def _sell(self):
+    def _sell(self) -> None:
         # TODO: 공통 메서드로 리팩터링?
         cache = self._load_cache()
         if cache and cache.has_position(self._clock.today()):

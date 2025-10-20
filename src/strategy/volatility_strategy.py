@@ -24,7 +24,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
         else:
             self._sell()
 
-    def _buy(self):
+    def _buy(self) -> None:
         position_size, threshold, has_position = self._get_strategy_params()
 
         if self._should_buy(position_size, threshold, has_position):
@@ -39,7 +39,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
                 execution_volume=result.executed_volume, position_size=position_size, threshold=threshold
             )
 
-    def _sell(self):
+    def _sell(self) -> None:
         # TODO: 공통 메서드로 리팩터링?
         cache = self._load_cache()
         if cache and cache.has_position(self._clock.today()):

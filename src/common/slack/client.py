@@ -18,10 +18,16 @@ class SlackClient:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         retry=retry_if_exception_type(requests.exceptions.RequestException),
     )
-    def send_message(self, msg: str) -> None:
+    def _send_message(self, url: str, msg: str) -> None:
         now = datetime.now(KST)
         message = {"text": f"""[{now.strftime("%Y-%m-%d %H:%M:%S")}]\n{str(msg)}"""}
-        requests.post(self.config.url, json=message, headers={"Content-Type": "application/json"})
+        requests.post(url, json=message, headers={"Content-Type": "application/json"})
+
+    def send_log(self, msg: str) -> None:
+        self._send_message(self.config.log_url, msg)
+
+    def send_debug(self, msg: str) -> None:
+        self._send_message(self.config.debug_url, msg)
 
     def send_order_notification(self, result: ExecutionResult) -> None:
         """
@@ -31,4 +37,4 @@ class SlackClient:
             result: 주문 결과
         """
         notification = OrderNotification.from_result(result)
-        self.send_message(notification.to_message())
+        self.send_log(notification.to_message())

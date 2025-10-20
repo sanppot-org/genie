@@ -60,7 +60,7 @@ class TestSendOrderNotification:
         )
         result = ExecutionResult.buy(strategy_name="test", order_result=order_result)
 
-        with patch.object(slack_client, "send_message") as mock_send:
+        with patch.object(slack_client, "send_log") as mock_send:
             # When
             slack_client.send_order_notification(result)
 
@@ -106,7 +106,7 @@ class TestSendOrderNotification:
         )
         result = ExecutionResult.sell(strategy_name="test", order_result=order_result)
 
-        with patch.object(slack_client, "send_message") as mock_send:
+        with patch.object(slack_client, "send_log") as mock_send:
             # When
             slack_client.send_order_notification(result)
 
@@ -152,7 +152,7 @@ class TestSendOrderNotification:
         )
         result = ExecutionResult.buy(strategy_name="test", order_result=order_result)
 
-        with patch.object(slack_client, "send_message") as mock_send:
+        with patch.object(slack_client, "send_log") as mock_send:
             # When
             slack_client.send_order_notification(result)
 
@@ -174,7 +174,7 @@ class TestSendMessage:
             mock_post.return_value = Mock(status_code=200)
 
             # When
-            slack_client.send_message(message)
+            slack_client._send_message(slack_config.url, message)
 
             # Then
             assert mock_post.call_count == 1
@@ -196,7 +196,7 @@ class TestSendMessage:
             ]
 
             # When
-            slack_client.send_message(message)
+            slack_client._send_message(slack_config.url, message)
 
             # Then
             assert mock_post.call_count == 3
@@ -216,7 +216,7 @@ class TestSendMessage:
 
             # When & Then
             with pytest.raises(RetryError):
-                slack_client.send_message(message)
+                slack_client._send_message(slack_config.url, message)
 
             # 최대 3회 재시도
             assert mock_post.call_count == 3
@@ -237,7 +237,7 @@ class TestSendMessage:
             ]
 
             # When
-            slack_client.send_message(message)
+            slack_client._send_message(slack_config.url, message)
 
             # Then
             assert mock_post.call_count == 2

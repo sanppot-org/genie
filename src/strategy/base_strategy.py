@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import get_args, get_origin
+from typing import Any, get_args, get_origin
 
 from src.strategy.cache_manager import CacheManager
 from src.strategy.cache_models import StrategyCacheData
@@ -14,7 +14,7 @@ class BaseStrategy[T: StrategyCacheData](ABC):
 
     _cache_model_class: type[StrategyCacheData]
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, **kwargs: Any) -> None:  # noqa: ANN401
         """서브클래스 정의 시 제네릭 타입 파라미터에서 캐시 모델 클래스를 추출합니다."""
         super().__init_subclass__(**kwargs)
         base = next(
@@ -58,5 +58,5 @@ class BaseStrategy[T: StrategyCacheData](ABC):
             self._config.ticker, self._strategy_name, self._cache_model_class
         )  # type: ignore
 
-    def _delete_strategy_cache(self):
+    def _delete_strategy_cache(self) -> None:
         self._cache_manager.delete_strategy_cache(self._config.ticker, self._strategy_name)
