@@ -20,6 +20,12 @@ echo "🚀 배포 시작..."
 # 작업 디렉토리로 이동
 cd /home/ubuntu/genie
 
+# 기존 .venv 디렉토리 삭제 (권한 문제 방지)
+if [ -d ".venv" ]; then
+    echo "🧹 기존 가상환경 삭제 중..."
+    rm -rf .venv
+fi
+
 # Python 의존성 설치
 echo "📦 의존성 설치 중..."
 uv sync
