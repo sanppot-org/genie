@@ -17,9 +17,9 @@ jobs:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.OCI_APPLICATION_HOST }}
-          username: ${{ secrets.OCI_APPLICATION_USERNAME }}
-          key: ${{ secrets.OCI_SSH_KEY }}
+          host: ${{ secrets.OCI_APP_HOST }}
+          username: ${{ secrets.OCI_APP_USERNAME }}
+          key: ${{ secrets.OCI_APP_KEY }}
           script: |
             set -e
 
