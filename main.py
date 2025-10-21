@@ -5,12 +5,18 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.allocation_manager import AllocatedBalanceProvider
+from src.common.clock import SystemClock
+from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
-from src.config import HealthcheckConfig, SlackConfig, UpbitConfig
-from src.constants import RESERVED_BALANCE
+from src.config import GoogleSheetConfig, HealthcheckConfig, SlackConfig, UpbitConfig
+from src.constants import KST, RESERVED_BALANCE
 from src.logging_config import setup_logging
 from src.strategy import o_dol_strategy
+from src.strategy.cache.cache_manager import CacheManager
+from src.strategy.data.collector import DataCollector
+from src.strategy.order.order_executor import OrderExecutor
+from src.strategy.strategy_context import StrategyContext
 from src.upbit.upbit_api import UpbitAPI
 
 # Better Stack 로깅 설정 (가장 먼저 실행)
@@ -21,10 +27,29 @@ logger = logging.getLogger(__name__)
 total_balance = 100_000_000
 tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-USDT"]
 
+# 공유 클라이언트 및 헬스체크
 slack_client = SlackClient(SlackConfig())
 healthcheck_client = HealthcheckClient(HealthcheckConfig())
 allocation_manager = AllocatedBalanceProvider()
 upbit_api = UpbitAPI(UpbitConfig())
+
+# 전략 실행에 필요한 공유 컴포넌트들 (1분마다 재사용)
+clock = SystemClock(KST)
+data_collector = DataCollector(clock)
+google_sheet_client = GoogleSheetClient(GoogleSheetConfig())
+cache_manager = CacheManager()
+order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
+
+# 전략 컨텍스트 생성
+strategy_context = StrategyContext(
+    clock=clock,
+    data_collector=data_collector,
+    google_sheet_client=google_sheet_client,
+    slack_client=slack_client,
+    upbit_api=upbit_api,
+    order_executor=order_executor,
+    cache_manager=cache_manager,
+)
 
 
 def run_strategies() -> None:
@@ -37,7 +62,9 @@ def run_strategies() -> None:
 
         for ticker in tickers:
             try:
-                o_dol_strategy.run(ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance)
+                o_dol_strategy.run(
+                    ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance, context=strategy_context
+                )
                 sleep(0.5)
             except Exception as e:
                 logger.error(f"{ticker} 전략 실행 실패: {e}", exc_info=True)

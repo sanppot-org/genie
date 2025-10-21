@@ -1,41 +1,36 @@
 from zoneinfo import ZoneInfo
 
-from src.common.clock import SystemClock
-from src.common.google_sheet.client import GoogleSheetClient
-from src.common.slack.client import SlackClient
-from src.config import GoogleSheetConfig, SlackConfig, UpbitConfig
 from src.constants import KST, RESERVED_BALANCE
-from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.config import BaseStrategyConfig
-from src.strategy.data.collector import DataCollector
 from src.strategy.morning_afternoon_strategy import MorningAfternoonStrategy
-from src.strategy.order.order_executor import OrderExecutor
+from src.strategy.strategy_context import StrategyContext
 from src.strategy.volatility_strategy import VolatilityStrategy
-from src.upbit.upbit_api import UpbitAPI
 
 
-def run(ticker: str, total_balance: float, allocated_balance: float, target_vol: float = 0.01, timezone: ZoneInfo = KST) -> None:
-    # 공유 컴포넌트
-    clock = SystemClock(timezone)
-    data_collector = DataCollector(clock)
-    google_sheet_client = GoogleSheetClient(GoogleSheetConfig())
-    slack_client = SlackClient(SlackConfig())
-    upbit_api = UpbitAPI(UpbitConfig())
-    order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
-    cache_manager = CacheManager()
+def run(ticker: str, total_balance: float, allocated_balance: float, context: StrategyContext, target_vol: float = 0.01, timezone: ZoneInfo = KST) -> None:
+    """전략 실행 함수
 
+    Args:
+        ticker: 거래할 티커 (예: KRW-BTC)
+        total_balance: 전체 잔고
+        allocated_balance: 티커에 할당된 금액
+        context: 재사용 가능한 공유 컴포넌트들
+        target_vol: 목표 변동성 (기본값: 0.01)
+        timezone: 시간대 (기본값: KST)
+    """
     allocated_balance_per_strategy = (allocated_balance - RESERVED_BALANCE) / 2  # 티커에 할당된 금액을 전략별로 5:5로 나눈다.
     strategy_config = BaseStrategyConfig(timezone=timezone, ticker=ticker, target_vol=target_vol, total_balance=total_balance, allocated_balance=allocated_balance_per_strategy)
 
-    volatility_strategy = VolatilityStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)
-    morning_afternoon_strategy = MorningAfternoonStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)
+    # TODO: 한 번만 생성하기?
+    volatility_strategy = VolatilityStrategy(context.order_executor, strategy_config, context.clock, context.data_collector, context.cache_manager)
+    morning_afternoon_strategy = MorningAfternoonStrategy(context.order_executor, strategy_config, context.clock, context.data_collector, context.cache_manager)
 
     try:
         volatility_strategy.execute()
     except Exception as e:
-        slack_client.send_status(f"{ticker} 변동성 돌파 전략 에러 발생. log: {e}")
+        context.slack_client.send_status(f"{ticker} 변동성 돌파 전략 에러 발생. log: {e}")
 
     try:
         morning_afternoon_strategy.execute()
     except Exception as e:
-        slack_client.send_status(f"{ticker} 오전 오후 전략 에러 발생. log: {e}")
+        context.slack_client.send_status(f"{ticker} 오전 오후 전략 에러 발생. log: {e}")
