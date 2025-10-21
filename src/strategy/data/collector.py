@@ -7,7 +7,7 @@ import datetime as dt
 import logging
 
 import pandas as pd
-from pandera.typing import DataFrame, Series
+from pandera.typing import DataFrame
 
 from src import constants
 from src.common.clock import Clock
@@ -132,20 +132,20 @@ class DataCollector:
             (오전 반일봉, 오후 반일봉) 튜플
         """
         # 해당 날짜의 데이터만 필터링
-        date_df = df[df.index.normalize() == pd.Timestamp(target_date)]
+        date_df = df[df.index.normalize() == pd.Timestamp(target_date)]  # type: ignore
 
         # 오전(0-11시) / 오후(12-23시) 분리
-        morning_df = date_df[date_df.index.hour < 12]
-        afternoon_df = date_df[date_df.index.hour >= 12]
+        morning_df = date_df[date_df.index.hour < 12]  # type: ignore
+        afternoon_df = date_df[date_df.index.hour >= 12]  # type: ignore
 
         # 집계
-        morning = self._aggregate(morning_df, target_date, Period.MORNING)
-        afternoon = self._aggregate(afternoon_df, target_date, Period.AFTERNOON)
+        morning = self._aggregate(morning_df, target_date, Period.MORNING)  # type: ignore
+        afternoon = self._aggregate(afternoon_df, target_date, Period.AFTERNOON)  # type: ignore
 
         return morning, afternoon
 
     @staticmethod
-    def _aggregate(hourly_df: Series[CandleSchema], target_date: dt.date, period: Period) -> HalfDayCandle:
+    def _aggregate(hourly_df: pd.DataFrame, target_date: dt.date, period: Period) -> HalfDayCandle:
         """
         12개 시간봉을 하나의 반일봉으로 집계
 

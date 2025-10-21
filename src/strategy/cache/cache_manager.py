@@ -125,7 +125,8 @@ class CacheManager:
         Returns:
             DataCache 객체, 파일이 없으면 None
         """
-        return self._load_cache(ticker, DataCache)
+        result = self._load_cache(ticker, DataCache)
+        return result if isinstance(result, DataCache) else None
 
     def save_strategy_cache(self, ticker: str, strategy_name: str, cache: StrategyCacheData) -> None:
         """
@@ -138,7 +139,7 @@ class CacheManager:
         """
         self._save_cache(ticker, cache, strategy_name)
 
-    def load_strategy_cache(self, ticker: str, strategy_name: str, model_class: type[T] = StrategyCacheData) -> T | None:
+    def load_strategy_cache(self, ticker: str, strategy_name: str, model_class: type[T] = StrategyCacheData) -> T | None:  # type: ignore
         """
         JSON 파일에서 StrategyCacheData를 로드
 
@@ -150,7 +151,8 @@ class CacheManager:
         Returns:
             지정한 타입의 캐시 객체, 파일이 없으면 None
         """
-        return self._load_cache(ticker, model_class, strategy_name)
+        result = self._load_cache(ticker, model_class, strategy_name)
+        return result if isinstance(result, model_class) else None  # type: ignore
 
     def delete_strategy_cache(self, ticker: str, strategy_name: str) -> None:
         """

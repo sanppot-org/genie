@@ -62,3 +62,20 @@ ignore = []
 "main.py" = [
     "E501", # 주석 처리된 코드의 줄 길이 무시
 ]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]
+
+# pydantic-settings BaseSettings 초기화 시 필수 인자 체크 완화
+[[tool.mypy.overrides]]
+module = "pydantic_settings.*"
+warn_return_any = false
+
+# BaseSettings를 상속받은 Config 클래스들은 __init__ 체크 완화
+[[tool.mypy.overrides]]
+module = "src.config"
+disable_error_code = ["call-arg"]

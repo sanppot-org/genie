@@ -5,9 +5,9 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from config import UpbitConfig
-from constants import DEFAULT_CACHE_DIR, KST, UTF_8
-from upbit.upbit_api import UpbitAPI
+from src.config import UpbitConfig
+from src.constants import DEFAULT_CACHE_DIR, KST, UTF_8
+from src.upbit.upbit_api import UpbitAPI
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class AllocatedBalanceProvider:
         """
         self.state_file_path = state_file_path or Path(DEFAULT_CACHE_DIR) / "allocated_balance.json"
         self.allocation_hour = allocation_hour or 23  # 오후 11시에 자금 할당
-        self.upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
+        self.upbit_api = UpbitAPI(UpbitConfig())
 
     def get_allocated_amount(self) -> float:
         """

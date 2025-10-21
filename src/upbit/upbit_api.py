@@ -69,12 +69,12 @@ class UpbitAPI:
             df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count)
 
             if df is None or df.empty:
-                return pd.DataFrame()
+                return pd.DataFrame()  # type: ignore
 
             return CandleSchema.validate(df)
         except Exception:
             logger.exception(f"캔들 데이터 조회 실패: ticker={ticker}, interval={interval.value}, count={count}")
-            return pd.DataFrame()
+            return pd.DataFrame()  # type: ignore
 
     def __init__(self, config: UpbitConfig | None = None) -> None:
         if config is None:

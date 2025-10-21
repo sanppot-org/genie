@@ -20,7 +20,7 @@ def run(ticker: str, total_balance: float, allocated_balance: float, target_vol:
     data_collector = DataCollector(clock)
     google_sheet_client = GoogleSheetClient(GoogleSheetConfig())
     slack_client = SlackClient(SlackConfig())
-    upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
+    upbit_api = UpbitAPI(UpbitConfig())
     order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
     cache_manager = CacheManager()
 

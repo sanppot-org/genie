@@ -352,7 +352,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             )
         else:
             # 모든 페이지 수집 완료
-            return OverseasMinuteCandleResponse(output1=output1_metadata, output2=accumulated_output2)
+            return OverseasMinuteCandleResponse(output1=output1_metadata, output2=accumulated_output2)  # type: ignore
 
     def buy_market_order(self, ticker: str, quantity: int, exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD) -> overseas_order.ResponseBody:
         """시장가 매수 주문
