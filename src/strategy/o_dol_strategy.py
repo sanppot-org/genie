@@ -1,11 +1,10 @@
 from zoneinfo import ZoneInfo
 
-from constants import RESERVED_BALANCE
 from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.slack.client import SlackClient
 from src.config import GoogleSheetConfig, SlackConfig, UpbitConfig
-from src.constants import KST
+from src.constants import KST, RESERVED_BALANCE
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector

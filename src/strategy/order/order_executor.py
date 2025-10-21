@@ -28,10 +28,10 @@ class OrderExecutor:
     """주문 실행 책임만 담당하는 클래스"""
 
     def __init__(
-        self,
-        upbit_api: UpbitAPI,
-        google_sheet_client: GoogleSheetClient | None = None,
-        slack_client: SlackClient | None = None,
+            self,
+            upbit_api: UpbitAPI,
+            google_sheet_client: GoogleSheetClient | None = None,
+            slack_client: SlackClient | None = None,
     ) -> None:
         """
         OrderExecutor 초기화

@@ -35,9 +35,9 @@ class HantuOverseasAPI(HantuBaseAPI):
     """
 
     def get_balance(
-        self,
-        exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
-        trading_currency_code: TradingCurrencyCode = TradingCurrencyCode.USD,
+            self,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+            trading_currency_code: TradingCurrencyCode = TradingCurrencyCode.USD,
     ) -> overseas_balance.OverseasBalanceResponse:
         """해외 주식 잔고 조회
 
@@ -54,13 +54,13 @@ class HantuOverseasAPI(HantuBaseAPI):
         return overseas_balance.OverseasBalanceResponse(output1=output1, output2=output2)
 
     def _get_balance_recursive(
-        self,
-        exchange_code: OverseasExchangeCode,
-        trading_currency_code: TradingCurrencyCode,
-        ctx_area_fk200: str = "",
-        ctx_area_nk200: str = "",
-        continuation_flag: str = "",
-        accumulated_output1: list[overseas_balance.ResponseBodyoutput1] | None = None,
+            self,
+            exchange_code: OverseasExchangeCode,
+            trading_currency_code: TradingCurrencyCode,
+            ctx_area_fk200: str = "",
+            ctx_area_nk200: str = "",
+            continuation_flag: str = "",
+            accumulated_output1: list[overseas_balance.ResponseBodyoutput1] | None = None,
     ) -> tuple[list[overseas_balance.ResponseBodyoutput1], overseas_balance.ResponseBodyoutput2]:
         """해외 주식 잔고 조회 (연속 조회 지원) - 내부 메서드
 
@@ -167,12 +167,12 @@ class HantuOverseasAPI(HantuBaseAPI):
         return OverseasCurrentPriceResponse.model_validate(res.json())
 
     def get_daily_candles(
-        self,
-        symbol: str,
-        start_date: str,
-        end_date: str,
-        asset_type: OverseasAssetType = OverseasAssetType.INDEX,
-        period: OverseasCandlePeriod = OverseasCandlePeriod.DAILY,
+            self,
+            symbol: str,
+            start_date: str,
+            end_date: str,
+            asset_type: OverseasAssetType = OverseasAssetType.INDEX,
+            period: OverseasCandlePeriod = OverseasCandlePeriod.DAILY,
     ) -> OverseasDailyCandleResponse:
         """해외 주식 일/주/월/년 캔들 데이터 조회
 
@@ -222,12 +222,12 @@ class HantuOverseasAPI(HantuBaseAPI):
         return OverseasDailyCandleResponse.model_validate(res.json())
 
     def get_minute_candles(
-        self,
-        symbol: str,
-        exchange_code: OverseasMarketCode = OverseasMarketCode.NAS,
-        minute_interval: OverseasMinuteInterval = OverseasMinuteInterval.MIN_1,
-        include_previous: bool = False,
-        limit: int = 120,
+            self,
+            symbol: str,
+            exchange_code: OverseasMarketCode = OverseasMarketCode.NAS,
+            minute_interval: OverseasMinuteInterval = OverseasMinuteInterval.MIN_1,
+            include_previous: bool = False,
+            limit: int = 120,
     ) -> OverseasMinuteCandleResponse:
         """해외 주식 분봉 데이터 조회
 
@@ -262,17 +262,17 @@ class HantuOverseasAPI(HantuBaseAPI):
         return result
 
     def _get_minute_candles_recursive(
-        self,
-        symbol: str,
-        exchange_code: OverseasMarketCode,
-        minute_interval: OverseasMinuteInterval,
-        include_previous: bool,
-        limit: int,
-        next_key: str = "",
-        key_buffer: str = "",
-        continuation_flag: str = "",
-        accumulated_output2: list[OverseasMinuteCandleData] | None = None,
-        output1_metadata: dict[str, str] | None = None,
+            self,
+            symbol: str,
+            exchange_code: OverseasMarketCode,
+            minute_interval: OverseasMinuteInterval,
+            include_previous: bool,
+            limit: int,
+            next_key: str = "",
+            key_buffer: str = "",
+            continuation_flag: str = "",
+            accumulated_output2: list[OverseasMinuteCandleData] | None = None,
+            output1_metadata: dict[str, str] | None = None,
     ) -> OverseasMinuteCandleResponse:
         """해외 주식 분봉 조회 (연속 조회 지원) - 내부 메서드
 
@@ -382,11 +382,11 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
     def buy_limit_order(
-        self,
-        ticker: str,
-        quantity: int,
-        price: str,
-        exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
     ) -> overseas_order.ResponseBody:
         """지정가 매수 주문
 
@@ -436,11 +436,11 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
     def sell_limit_order(
-        self,
-        ticker: str,
-        quantity: int,
-        price: str,
-        exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
     ) -> overseas_order.ResponseBody:
         """지정가 매도 주문
 
@@ -463,13 +463,13 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
     def _order(
-        self,
-        order_direction: OrderDirection,
-        order_division: overseas_order.OverseasOrderDivision,
-        exchange_code: OverseasExchangeCode,
-        ticker: str,
-        quantity: int,
-        price: str,
+            self,
+            order_direction: OrderDirection,
+            order_division: overseas_order.OverseasOrderDivision,
+            exchange_code: OverseasExchangeCode,
+            ticker: str,
+            quantity: int,
+            price: str,
     ) -> overseas_order.ResponseBody:
         """해외주식 주문 (내부 메서드)
 

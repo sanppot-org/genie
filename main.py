@@ -4,14 +4,13 @@ from time import sleep
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from config import UpbitConfig
-from constants import RESERVED_BALANCE
 from src.allocation_manager import AllocatedBalanceProvider
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
-from src.config import HealthcheckConfig, SlackConfig
+from src.config import HealthcheckConfig, SlackConfig, UpbitConfig
+from src.constants import RESERVED_BALANCE
 from src.strategy import o_dol_strategy
-from upbit.upbit_api import UpbitAPI
+from src.upbit.upbit_api import UpbitAPI
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ def run_strategies() -> None:
 
 
 def check_upbit_status() -> None:
-    upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
+    upbit_api = UpbitAPI(UpbitConfig())
 
     if not upbit_api.get_available_amount():
         slack_client = SlackClient(SlackConfig())

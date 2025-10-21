@@ -4,8 +4,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
-from constants import DEFAULT_CACHE_DIR
 from src import constants
+from src.constants import DEFAULT_CACHE_DIR
 from src.strategy.cache.cache_models import DataCache, StrategyCacheData
 
 T = TypeVar("T", bound=StrategyCacheData)

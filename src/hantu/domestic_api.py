@@ -38,12 +38,12 @@ class HantuDomesticAPI(HantuBaseAPI):
         return balance.BalanceResponse(output1=output1, output2=output2)
 
     def get_psbl_order(
-        self,
-        ticker: str,
-        price: str,
-        order_division: OrderDivision = OrderDivision.MARKET,
-        cma_evaluation_amount_included: str = "N",
-        overseas_included: str = "N",
+            self,
+            ticker: str,
+            price: str,
+            order_division: OrderDivision = OrderDivision.MARKET,
+            cma_evaluation_amount_included: str = "N",
+            overseas_included: str = "N",
     ) -> psbl_order.ResponseBody:
         """매수가능 조회
 
@@ -234,11 +234,11 @@ class HantuDomesticAPI(HantuBaseAPI):
         return order.ResponseBody.model_validate(res.json())
 
     def _get_balance_recursive(
-        self,
-        ctx_area_fk100: str = "",
-        ctx_area_nk100: str = "",
-        continuation_flag: str = "",
-        accumulated_output1: list[balance.ResponseBodyoutput1] | None = None,
+            self,
+            ctx_area_fk100: str = "",
+            ctx_area_nk100: str = "",
+            continuation_flag: str = "",
+            accumulated_output1: list[balance.ResponseBodyoutput1] | None = None,
     ) -> tuple[list[balance.ResponseBodyoutput1], list[balance.ResponseBodyoutput2]]:
         """주식 잔고 조회 (연속 조회 지원) - 내부 메서드
 
@@ -301,13 +301,13 @@ class HantuDomesticAPI(HantuBaseAPI):
             return accumulated_output1, accumulated_output2
 
     def get_daily_chart(
-        self,
-        ticker: str,
-        start_date: date,
-        end_date: date,
-        interval: ChartInterval = ChartInterval.DAY,
-        price_type: PriceType = PriceType.ADJUSTED,
-        market_code: MarketCode = MarketCode.KRX,
+            self,
+            ticker: str,
+            start_date: date,
+            end_date: date,
+            interval: ChartInterval = ChartInterval.DAY,
+            price_type: PriceType = PriceType.ADJUSTED,
+            market_code: MarketCode = MarketCode.KRX,
     ) -> chart.DailyChartResponseBody:
         """일/주/월/년봉 차트 조회
 
