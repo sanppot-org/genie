@@ -1,5 +1,6 @@
 from zoneinfo import ZoneInfo
 
+from constants import RESERVED_BALANCE
 from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.slack.client import SlackClient
@@ -24,7 +25,7 @@ def run(ticker: str, total_balance: float, allocated_balance: float, target_vol:
     order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
     cache_manager = CacheManager()
 
-    allocated_balance_per_strategy = (allocated_balance - 50) / 2  # 티커에 할당된 금액을 전략별로 5:5로 나눈다.
+    allocated_balance_per_strategy = (allocated_balance - RESERVED_BALANCE) / 2  # 티커에 할당된 금액을 전략별로 5:5로 나눈다.
     strategy_config = BaseStrategyConfig(timezone=timezone, ticker=ticker, target_vol=target_vol, total_balance=total_balance, allocated_balance=allocated_balance_per_strategy)
 
     volatility_strategy = VolatilityStrategy(order_executor, strategy_config, clock, data_collector, cache_manager)

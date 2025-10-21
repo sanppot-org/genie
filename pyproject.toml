@@ -48,10 +48,7 @@ select = [
     "A", # flake8-builtins
     "C4", # flake8-comprehensions
 ]
-ignore = [
-    "ANN101", # missing-type-self (self 타입 힌트 불필요)
-    "ANN102", # missing-type-cls (cls 타입 힌트 불필요)
-]
+ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [

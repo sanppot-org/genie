@@ -4,6 +4,7 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 
+from constants import DEFAULT_CACHE_DIR
 from src import constants
 from src.strategy.cache.cache_models import DataCache, StrategyCacheData
 
@@ -11,7 +12,6 @@ T = TypeVar("T", bound=StrategyCacheData)
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CACHE_DIR = ".cache"
 DEFAULT_CACHE_FILE_NAME = "cache.json"
 
 

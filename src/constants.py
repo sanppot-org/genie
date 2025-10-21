@@ -6,7 +6,11 @@
 
 from zoneinfo import ZoneInfo
 
+DEFAULT_CACHE_DIR = ".cache"
+
 KST = ZoneInfo("Asia/Seoul")
+
+RESERVED_BALANCE = 50
 
 # 거래 관련 상수
 KRW_BTC = "KRW-BTC"
