@@ -36,7 +36,7 @@ jobs:
             else
               echo "🔄 저장소 업데이트 중..."
               cd "$REPO_DIR"
-              git fetch --all --tags
+              git fetch --all --tags --force
             fi
 
             # 작업 디렉토리로 이동
