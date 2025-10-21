@@ -138,9 +138,7 @@ class CacheManager:
         """
         self._save_cache(ticker, cache, strategy_name)
 
-    def load_strategy_cache(
-            self, ticker: str, strategy_name: str, model_class: type[T] = StrategyCacheData
-    ) -> T | None:
+    def load_strategy_cache(self, ticker: str, strategy_name: str, model_class: type[T] = StrategyCacheData) -> T | None:
         """
         JSON 파일에서 StrategyCacheData를 로드
 

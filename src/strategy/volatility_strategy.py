@@ -36,9 +36,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
 
             result = self._order_executor.buy(self._config.ticker, amount, strategy_name=self._strategy_name)
 
-            self._save_cache(
-                execution_volume=result.executed_volume, position_size=position_size, threshold=threshold
-            )
+            self._save_cache(execution_volume=result.executed_volume, position_size=position_size, threshold=threshold)
 
     def _sell(self) -> None:
         # TODO: 공통 메서드로 리팩터링?
@@ -62,9 +60,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
 
         # 계산
         history = self._collector.collect_data(self._config.ticker)
-        position_size = self._calculate_volatility_position_size(
-            self._config.target_vol, history.yesterday_morning.volatility, history.calculate_ma_score()
-        )
+        position_size = self._calculate_volatility_position_size(self._config.target_vol, history.yesterday_morning.volatility, history.calculate_ma_score())
         threshold = self._calculate_threshold(
             yesterday_afternoon_close=history.yesterday_afternoon.close,
             yesterday_morning_range=history.yesterday_morning.range,

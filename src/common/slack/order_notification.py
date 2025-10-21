@@ -17,6 +17,7 @@ class OrderNotification(BaseModel):
         execution_price: 체결된 가격
         funds: 체결된 금액
     """
+
     strategy_name: str
     order_type: OrderDirection
     ticker: str

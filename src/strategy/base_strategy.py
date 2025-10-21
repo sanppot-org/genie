@@ -21,7 +21,7 @@ class BaseStrategy[T: StrategyCacheData](ABC):
             (b for b in getattr(cls, "__orig_bases__", ()) if get_origin(b) is BaseStrategy),
             None,
         )
-        cls._cache_model_class = (get_args(base)[0] if base and get_args(base) else StrategyCacheData)
+        cls._cache_model_class = get_args(base)[0] if base and get_args(base) else StrategyCacheData
 
     def __init__(
             self,
@@ -54,9 +54,7 @@ class BaseStrategy[T: StrategyCacheData](ABC):
         Returns:
             캐시 객체, 파일이 없으면 None
         """
-        return self._cache_manager.load_strategy_cache(
-            self._config.ticker, self._strategy_name, self._cache_model_class
-        )  # type: ignore
+        return self._cache_manager.load_strategy_cache(self._config.ticker, self._strategy_name, self._cache_model_class)  # type: ignore
 
     def _delete_strategy_cache(self) -> None:
         self._cache_manager.delete_strategy_cache(self._config.ticker, self._strategy_name)

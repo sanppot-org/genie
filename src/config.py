@@ -100,5 +100,13 @@ class SlackConfig(BaseSettings):
     model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
 
     log_url: str = Field(..., min_length=1, description="Slack 로그 url", alias="SLACK_WEBHOOK_URL_GENIE_LOG")
-    debug_url: str = Field(..., min_length=1, description='Slack 디버그 url', alias="SLACK_WEBHOOK_URL_GENIE_DEBUG")
-    error_url: str = Field(..., min_length=1, description='Slack 에러 url', alias="SLACK_WEBHOOK_URL_GENIE_ERROR")
+    debug_url: str = Field(..., min_length=1, description="Slack 디버그 url", alias="SLACK_WEBHOOK_URL_GENIE_DEBUG")
+    error_url: str = Field(..., min_length=1, description="Slack 에러 url", alias="SLACK_WEBHOOK_URL_GENIE_ERROR")
+
+
+class HealthcheckConfig(BaseSettings):
+    """Healthchecks.io 설정"""
+
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+
+    healthcheck_url: str | None = Field(default=None, description="Healthchecks.io ping URL (optional)", alias="HEALTHCHECK_URL")
