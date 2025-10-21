@@ -34,7 +34,6 @@ class HealthcheckClient:
 
         try:
             requests.get(self.config.healthcheck_url, timeout=10)  # type: ignore
-            logger.debug("Healthcheck ping 전송 성공")
         except Exception as e:
             logger.error(f"Healthcheck ping 전송 실패: {e}")
             raise
@@ -56,7 +55,6 @@ class HealthcheckClient:
 
         try:
             requests.get(f"{self.config.healthcheck_url}/fail", timeout=10)  # type: ignore
-            logger.debug("Healthcheck fail 신호 전송 성공")
         except Exception as e:
             logger.error(f"Healthcheck fail 신호 전송 실패: {e}")
             raise

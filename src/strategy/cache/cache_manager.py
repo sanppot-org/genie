@@ -70,8 +70,6 @@ class CacheManager:
         json_data = cache.model_dump_json(indent=2)
         cache_path.write_text(json_data, encoding=constants.UTF_8)
 
-        logger.debug(f"캐시 저장 완료: {cache_path}")
-
     def _load_cache(self, ticker: str, model_class: type[BaseModel], strategy_name: str | None = None) -> BaseModel | None:
         """
         JSON 파일에서 캐시를 로드
@@ -88,7 +86,6 @@ class CacheManager:
 
         # 파일이 없으면 None 반환
         if not cache_path.exists():
-            logger.debug(f"캐시 파일 없음: {cache_path}")
             return None
 
         try:
@@ -96,10 +93,7 @@ class CacheManager:
             json_data = cache_path.read_text(encoding=constants.UTF_8)
 
             # Pydantic 모델로 역직렬화
-            cache = model_class.model_validate_json(json_data)
-
-            logger.debug(f"캐시 로드 완료: {cache_path}")
-            return cache
+            return model_class.model_validate_json(json_data)
 
         except Exception as e:
             logger.warning(f"캐시 로드 실패: {cache_path}, 에러: {e}")
@@ -166,6 +160,3 @@ class CacheManager:
 
         if cache_path.exists():
             cache_path.unlink()
-            logger.debug(f"캐시 삭제 완료: {cache_path}")
-        else:
-            logger.debug(f"삭제할 캐시 파일 없음: {cache_path}")

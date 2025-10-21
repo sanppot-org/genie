@@ -4,7 +4,6 @@
 """
 
 import datetime as dt
-import logging
 
 import pandas as pd
 from pandera.typing import DataFrame
@@ -17,8 +16,6 @@ from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayC
 from src.upbit import upbit_api
 from src.upbit.model.candle import CandleSchema
 from src.upbit.upbit_api import UpbitAPI
-
-logger = logging.getLogger(__name__)
 
 
 class DataCollector:
@@ -68,10 +65,7 @@ class DataCollector:
         # 파일 캐시 확인
         file_cache = self._cache_manager.load_data_cache(ticker)
         if file_cache and file_cache.last_update_date == today:
-            logger.debug(f"파일 캐시 히트: {ticker}, {today}")
             return file_cache.history
-
-        logger.debug(f"파일 캐시 미스: {ticker}, {today}")
 
         # API 호출
         df = UpbitAPI.get_candles(ticker=ticker, interval=upbit_api.CandleInterval.MINUTE_60, count=(days + 1) * 24)

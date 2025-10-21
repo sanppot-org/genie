@@ -57,7 +57,7 @@ class HantuBaseAPI:
             # ResponseBody 전체를 JSON으로 저장
             token_file.write_text(response_body.model_dump_json())
 
-            logger.debug(f"TOKEN : {response_body.access_token}")
+            logger.info(f"TOKEN : {response_body.access_token}")
             return response_body.access_token
         else:
             logger.error("Get Authentification token fail!")

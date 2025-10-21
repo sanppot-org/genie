@@ -230,7 +230,7 @@ class UpbitAPI:
 
             # 주문 완료 확인
             if order_result.state == OrderState.DONE or order_result.state == OrderState.CANCEL:
-                logger.debug(f"주문 체결 완료: {uuid}")
+                logger.info(f"주문 체결 완료: {uuid}")
                 return order_result
 
             # 타임아웃 확인
@@ -319,7 +319,7 @@ class UpbitAPI:
         if result is None:
             raise UpbitAPIError.empty_response()
 
-        logger.debug(f"api response: {result}")
+        logger.info(f"api response: {result}")
 
         if isinstance(result, dict) and "error" in result:
             raise UpbitAPIError(result["error"])

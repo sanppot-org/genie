@@ -1,6 +1,6 @@
 """바이낸스 캔들 데이터 모델."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -29,7 +29,7 @@ class BinanceCandleInterval(str, Enum):
 
 class BinanceCandleData(BaseModel):
     """바이낸스 캔들 데이터.
-    
+
     Attributes:
         open_time: 캔들 시작 시간
         open_price: 시가
@@ -58,7 +58,7 @@ class BinanceCandleData(BaseModel):
 
     @field_validator("open_price", "high_price", "low_price", "close_price", mode="before")
     @classmethod
-    def convert_price_to_float(cls, v: Any) -> float:
+    def convert_price_to_float(cls, v: Any) -> float:  # noqa: ANN401
         """문자열 가격을 float으로 변환."""
         if isinstance(v, str):
             return float(v)
@@ -66,7 +66,7 @@ class BinanceCandleData(BaseModel):
 
     @field_validator("volume", "quote_asset_volume", "taker_buy_base_volume", "taker_buy_quote_volume", mode="before")
     @classmethod
-    def convert_volume_to_float(cls, v: Any) -> float:
+    def convert_volume_to_float(cls, v: Any) -> float:  # noqa: ANN401
         """문자열 거래량을 float으로 변환."""
         if isinstance(v, str):
             return float(v)
@@ -74,16 +74,16 @@ class BinanceCandleData(BaseModel):
 
     @field_validator("open_time", "close_time", mode="before")
     @classmethod
-    def convert_timestamp_to_datetime(cls, v: Any) -> datetime:
+    def convert_timestamp_to_datetime(cls, v: Any) -> datetime:  # noqa: ANN401
         """밀리초 타임스탬프를 datetime으로 변환."""
         if isinstance(v, int):
-            return datetime.fromtimestamp(v / 1000, tz=timezone.utc)
+            return datetime.fromtimestamp(v / 1000, tz=UTC)
         return v
 
     @classmethod
     def from_api_response(cls, data: list[Any]) -> "BinanceCandleData":
         """바이낸스 API 응답을 BinanceCandleData로 변환.
-        
+
         Args:
             data: 바이낸스 API 응답 (리스트 형태)
                 [
@@ -100,7 +100,7 @@ class BinanceCandleData(BaseModel):
                     taker_buy_quote_volume,
                     ignore
                 ]
-        
+
         Returns:
             BinanceCandleData 객체
         """

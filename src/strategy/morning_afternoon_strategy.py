@@ -15,7 +15,7 @@ class MorningAfternoonStrategy(BaseStrategy[StrategyCacheData]):
 
     def execute(self) -> None:
         """오전/오후 전략을 실행합니다."""
-        logger.debug(f"============= {self._strategy_name} 전략 =============")
+        logger.info(f"============= {self._strategy_name} 전략 =============")
 
         if self._clock.is_morning():
             self._buy()
@@ -66,7 +66,7 @@ class MorningAfternoonStrategy(BaseStrategy[StrategyCacheData]):
         afternoon_return_rate_ = history.yesterday_afternoon.return_rate > 0
         afternoon_volume = history.yesterday_morning.volume < history.yesterday_afternoon.volume
 
-        logger.debug(
+        logger.info(
             f"""
         오전/오후 전략 매수 시그널:
         조건 1: 기 매수 여부 = {can_buy}

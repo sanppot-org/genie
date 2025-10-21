@@ -10,7 +10,7 @@ import pyupbit
 def fetch_and_save_candles(
         ticker: str = "KRW-BTC",
         interval: str = "minute60"
-):
+) -> None:
     """
     지정된 티커의 60분봉 데이터를 수집하여 CSV로 저장
 
@@ -20,7 +20,7 @@ def fetch_and_save_candles(
         output_file: 저장할 CSV 파일명
     """
     print(f"📊 {ticker} 60분봉 데이터 수집 시작...")
-    print(f"🕐 시작 시간: 2017-10-01 08:00")
+    print("🕐 시작 시간: 2017-10-01 08:00")
     print(f"🕐 종료 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # 2017-10-01부터 현재까지 약 8년 = 약 70,000시간
@@ -41,11 +41,11 @@ def fetch_and_save_candles(
     # CSV로 저장
     df.to_csv(output_file)
 
-    print(f"✅ 완료!")
+    print("✅ 완료!")
     print(f"📁 저장 위치: {output_file}")
     print(f"📊 수집된 데이터: {len(df)}개 캔들")
     print(f"📅 기간: {df.index[0]} ~ {df.index[-1]}")
-    print(f"\n데이터 미리보기:")
+    print("\n데이터 미리보기:")
     print(df.head())
     print(f"\n컬럼: {list(df.columns)}")
 

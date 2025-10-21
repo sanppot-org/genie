@@ -9,15 +9,22 @@ from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
 from src.config import HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import RESERVED_BALANCE
+from src.logging_config import setup_logging
 from src.strategy import o_dol_strategy
 from src.upbit.upbit_api import UpbitAPI
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# Better Stack 로깅 설정 (가장 먼저 실행)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # TODO: DB 설정
 total_balance = 100_000_000
 tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-USDT"]
+
+slack_client = SlackClient(SlackConfig())
+healthcheck_client = HealthcheckClient(HealthcheckConfig())
+allocation_manager = AllocatedBalanceProvider()
+upbit_api = UpbitAPI(UpbitConfig())
 
 
 def run_strategies() -> None:
@@ -25,17 +32,12 @@ def run_strategies() -> None:
     try:
         logger.info("암호화폐 자동 매매 시작")
 
-        slack_client = SlackClient(SlackConfig())
-        healthcheck_client = HealthcheckClient(HealthcheckConfig())
-
-        allocation_manager = AllocatedBalanceProvider()
         balance = allocation_manager.get_allocated_amount()
         allocated_balance = (balance - RESERVED_BALANCE) / len(tickers)
 
         for ticker in tickers:
             try:
                 o_dol_strategy.run(ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance)
-                logger.info(f"{ticker} 전략 실행 완료")
                 sleep(0.5)
             except Exception as e:
                 logger.error(f"{ticker} 전략 실행 실패: {e}", exc_info=True)
@@ -50,10 +52,7 @@ def run_strategies() -> None:
 
 
 def check_upbit_status() -> None:
-    upbit_api = UpbitAPI(UpbitConfig())
-
     if not upbit_api.get_available_amount():
-        slack_client = SlackClient(SlackConfig())
         slack_client.send_status("전략에 할당된 금액이 없거나, upbit에 접근할 수 없습니다.")
         raise SystemError
 

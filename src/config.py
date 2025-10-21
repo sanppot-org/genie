@@ -10,6 +10,8 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.constants import UTF_8
+
 # 프로젝트 루트 디렉토리 경로
 PROJECT_ROOT = Path(__file__).parent.parent
 ENV_FILE_PATH = PROJECT_ROOT / "config" / "genie" / ".env"
@@ -18,7 +20,7 @@ ENV_FILE_PATH = PROJECT_ROOT / "config" / "genie" / ".env"
 class UpbitConfig(BaseSettings):
     """업비트 API 설정"""
 
-    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
     upbit_access_key: str = Field(..., min_length=1, description="업비트 액세스 키", alias="UPBIT_ACCESS_KEY")
 
@@ -28,7 +30,7 @@ class UpbitConfig(BaseSettings):
 class HantuConfig(BaseSettings):
     """한국투자증권 API 설정"""
 
-    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
     # 한국투자증권 실계좌 설정
     cano: str = Field(..., min_length=1, description="한국투자증권 계좌번호", alias="CANO")
@@ -69,7 +71,7 @@ class HantuConfig(BaseSettings):
 class GoogleSheetConfig(BaseSettings):
     """구글 시트 API 설정"""
 
-    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
     google_sheet_url: str = Field(..., min_length=1, description="Google Sheet URL", alias="GOOGLE_SHEET_URL")
 
@@ -97,7 +99,7 @@ class GoogleSheetConfig(BaseSettings):
 
 
 class SlackConfig(BaseSettings):
-    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
     log_url: str = Field(..., min_length=1, description="Slack 로그 url", alias="SLACK_WEBHOOK_URL_GENIE_LOG")
     debug_url: str = Field(..., min_length=1, description="Slack 디버그 url", alias="SLACK_WEBHOOK_URL_GENIE_DEBUG")
@@ -107,6 +109,24 @@ class SlackConfig(BaseSettings):
 class HealthcheckConfig(BaseSettings):
     """Healthchecks.io 설정"""
 
-    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
     healthcheck_url: str | None = Field(default=None, description="Healthchecks.io ping URL (optional)", alias="HEALTHCHECK_URL")
+
+
+class LogtailConfig(BaseSettings):
+    """Better Stack (Logtail) 로깅 설정"""
+
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
+
+    logtail_source_token: str | None = Field(
+        default=None,
+        description="Better Stack (Logtail) Source Token (optional)",
+        alias="LOGTAIL_SOURCE_TOKEN"
+    )
+
+    logtail_source_host: str = Field(
+        ...,
+        description="Better Stack (Logtail) Source Host (optional)",
+        alias="LOGTAIL_SOURCE_HOST"
+    )

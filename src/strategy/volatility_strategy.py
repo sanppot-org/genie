@@ -17,7 +17,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
 
     def execute(self) -> None:
         """변동성 돌파 전략을 실행합니다."""
-        logger.debug(f"============= {self._strategy_name} 전략 =============")
+        logger.info(f"============= {self._strategy_name} 전략 =============")
 
         if self._clock.is_morning():
             self._buy()
@@ -81,7 +81,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
         """
         position_size_valid = position_size > 0
 
-        logger.debug(
+        logger.info(
             f"""
         변동성 돌파 전략 매수 시그널:
         조건 1: 기 매수 여부 = {has_position}
@@ -96,7 +96,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
         current_price = UpbitAPI.get_current_price(self._config.ticker)
         price_breakout = current_price > threshold
 
-        logger.debug(f"조건 3: 현재가: {current_price} > 돌파 가격: {threshold} = {price_breakout}")
+        logger.info(f"조건 3: 현재가: {current_price} > 돌파 가격: {threshold} = {price_breakout}")
 
         return price_breakout
 
