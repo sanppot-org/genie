@@ -101,7 +101,7 @@ class SlackConfig(BaseSettings):
 
     log_url: str = Field(..., min_length=1, description="Slack 로그 url", alias="SLACK_WEBHOOK_URL_GENIE_LOG")
     debug_url: str = Field(..., min_length=1, description="Slack 디버그 url", alias="SLACK_WEBHOOK_URL_GENIE_DEBUG")
-    error_url: str = Field(..., min_length=1, description="Slack 에러 url", alias="SLACK_WEBHOOK_URL_GENIE_ERROR")
+    status_url: str = Field(..., min_length=1, description="Slack 에러 url", alias="SLACK_WEBHOOK_URL_GENIE_STATUS")
 
 
 class HealthcheckConfig(BaseSettings):

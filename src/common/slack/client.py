@@ -29,8 +29,8 @@ class SlackClient:
     def send_debug(self, msg: str) -> None:
         self._send_message(self.config.debug_url, msg)
 
-    def send_error(self, msg: str) -> None:
-        self._send_message(self.config.error_url, msg)
+    def send_status(self, msg: str) -> None:
+        self._send_message(self.config.status_url, msg)
 
     def send_order_notification(self, result: ExecutionResult) -> None:
         """
