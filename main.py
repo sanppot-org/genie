@@ -1,4 +1,5 @@
 import logging
+from time import sleep
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -28,6 +29,7 @@ def run_strategies() -> None:
             try:
                 o_dol_strategy.run(ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance)
                 logger.info(f"{ticker} 전략 실행 완료")
+                sleep(.5)
             except Exception as e:
                 logger.error(f"{ticker} 전략 실행 실패: {e}", exc_info=True)
                 slack_client.send_error(f"{ticker} 전략 실행 실패: {e}")

@@ -67,7 +67,8 @@ class TestSendOrderNotification:
             # Then
             mock_send.assert_called_once()
             call_args = mock_send.call_args[0][0]
-            assert "✅ 매수 완료: KRW-BTC" in call_args
+            assert "✅ test 전략" in call_args
+            assert "매수 완료: KRW-BTC" in call_args
             assert "수량: 0.00020000" in call_args
             assert "가격: 50,000,000.0000원" in call_args
             assert "금액: 10,000.0000원" in call_args
@@ -113,7 +114,8 @@ class TestSendOrderNotification:
             # Then
             mock_send.assert_called_once()
             call_args = mock_send.call_args[0][0]
-            assert "✅ 매도 완료: KRW-ETH" in call_args
+            assert "✅ test 전략" in call_args
+            assert "매도 완료: KRW-ETH" in call_args
             assert "수량: 0.05000000" in call_args
             assert "가격: 3,000,000.0000원" in call_args
             assert "금액: 150,000.0000원" in call_args
@@ -157,7 +159,7 @@ class TestSendOrderNotification:
             slack_client.send_order_notification(result)
 
             # Then
-            expected_message = "✅ 매수 완료: KRW-XRP\n수량: 100.50000000\n가격: 1,500.0000원\n금액: 150,750.0000원"
+            expected_message = "✅ test 전략\n매수 완료: KRW-XRP\n수량: 100.50000000\n가격: 1,500.0000원\n금액: 150,750.0000원"
             mock_send.assert_called_once_with(expected_message)
 
 

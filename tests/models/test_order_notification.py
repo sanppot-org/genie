@@ -12,6 +12,7 @@ class TestOrderNotification:
     def test_should_create_with_all_fields(self):
         """모든 필드로 OrderNotification을 생성할 수 있어야 한다"""
         # Given
+        strategy_name = "test"
         order_type = "매수"
         ticker = "KRW-BTC"
         execution_volume = 0.0002
@@ -20,6 +21,7 @@ class TestOrderNotification:
 
         # When
         notification = OrderNotification(
+            strategy_name=strategy_name,
             order_type=order_type,
             ticker=ticker,
             execution_volume=execution_volume,
@@ -28,6 +30,7 @@ class TestOrderNotification:
         )
 
         # Then
+        assert notification.strategy_name == strategy_name
         assert notification.order_type == order_type
         assert notification.ticker == ticker
         assert notification.execution_volume == execution_volume
@@ -38,6 +41,7 @@ class TestOrderNotification:
         """매수 주문 알림을 생성할 수 있어야 한다"""
         # Given & When
         notification = OrderNotification(
+            strategy_name="test",
             order_type="매수",
             ticker="KRW-BTC",
             execution_volume=0.0002,
@@ -53,6 +57,7 @@ class TestOrderNotification:
         """매도 주문 알림을 생성할 수 있어야 한다"""
         # Given & When
         notification = OrderNotification(
+            strategy_name="test",
             order_type="매도",
             ticker="KRW-ETH",
             execution_volume=0.05,
@@ -69,6 +74,7 @@ class TestOrderNotification:
         # Given & When & Then
         with pytest.raises(ValidationError):
             OrderNotification(
+                strategy_name="test",
                 order_type="매수",
                 ticker="KRW-BTC",
                 execution_volume=0.0002,
@@ -80,6 +86,7 @@ class TestOrderNotification:
         """다양한 숫자 형식을 허용해야 한다"""
         # Given & When
         notification = OrderNotification(
+            strategy_name="test",
             order_type="매수",
             ticker="KRW-XRP",
             execution_volume=100.5,
@@ -96,6 +103,7 @@ class TestOrderNotification:
         """매수 알림 메시지를 올바른 포맷으로 반환해야 한다"""
         # Given
         notification = OrderNotification(
+            strategy_name="test",
             order_type="매수",
             ticker="KRW-BTC",
             execution_volume=0.0002,
@@ -107,7 +115,8 @@ class TestOrderNotification:
         message = notification.to_message()
 
         # Then
-        assert "✅ 매수 완료: KRW-BTC" in message
+        assert "✅ test 전략" in message
+        assert "매수 완료: KRW-BTC" in message
         assert "수량: 0.00020000" in message
         assert "가격: 50,000,000.0000원" in message
         assert "금액: 10,000.0000원" in message
@@ -116,6 +125,7 @@ class TestOrderNotification:
         """매도 알림 메시지를 올바른 포맷으로 반환해야 한다"""
         # Given
         notification = OrderNotification(
+            strategy_name="test",
             order_type="매도",
             ticker="KRW-ETH",
             execution_volume=0.05,
@@ -127,7 +137,8 @@ class TestOrderNotification:
         message = notification.to_message()
 
         # Then
-        assert "✅ 매도 완료: KRW-ETH" in message
+        assert "✅ test 전략" in message
+        assert "매도 완료: KRW-ETH" in message
         assert "수량: 0.05000000" in message
         assert "가격: 3,000,000.0000원" in message
         assert "금액: 150,000.0000원" in message
@@ -136,6 +147,7 @@ class TestOrderNotification:
         """숫자를 올바른 포맷으로 변환해야 한다"""
         # Given
         notification = OrderNotification(
+            strategy_name="test",
             order_type="매수",
             ticker="KRW-XRP",
             execution_volume=100.5,
@@ -147,5 +159,5 @@ class TestOrderNotification:
         message = notification.to_message()
 
         # Then
-        expected_message = "✅ 매수 완료: KRW-XRP\n수량: 100.50000000\n가격: 1,500.0000원\n금액: 150,750.0000원"
+        expected_message = "✅ test 전략\n매수 완료: KRW-XRP\n수량: 100.50000000\n가격: 1,500.0000원\n금액: 150,750.0000원"
         assert message == expected_message
