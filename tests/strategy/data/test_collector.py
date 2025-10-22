@@ -19,10 +19,12 @@ class TestDataCollector:
     @pytest.fixture
     def collector(self, tmp_path):
         """DataCollector 인스턴스 생성"""
+        from unittest.mock import Mock
         from src.strategy.cache.cache_manager import CacheManager
 
         cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
-        return DataCollector(SystemClock(), cache_manager=cache_manager)
+        mock_slack_client = Mock()
+        return DataCollector(SystemClock(), slack_client=mock_slack_client, cache_manager=cache_manager)
 
     @pytest.fixture
     def mock_hourly_df(self):
@@ -267,10 +269,12 @@ class TestDataCollector:
 
         # 10월 15일에 첫 호출
         clock = FixedClock(datetime.datetime(2025, 10, 15, 10, 0, 0))
+        from unittest.mock import Mock
         from src.strategy.cache.cache_manager import CacheManager
 
         cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
-        collector = DataCollector(clock=clock, cache_manager=cache_manager)
+        mock_slack_client = Mock()
+        collector = DataCollector(clock=clock, slack_client=mock_slack_client, cache_manager=cache_manager)
         collector.collect_data("KRW-BTC", days=20)
         assert mock_get_candles.call_count == 1
 

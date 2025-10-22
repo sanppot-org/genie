@@ -10,6 +10,7 @@ from pandera.typing import DataFrame
 
 from src import constants
 from src.common.clock import Clock
+from src.common.slack.client import SlackClient
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.cache.cache_models import DataCache
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
@@ -30,15 +31,22 @@ class DataCollector:
     - 날짜별로 캐시 파일 관리 (last_update_date로 구분)
     """
 
-    def __init__(self, clock: Clock, cache_manager: CacheManager | None = None) -> None:
+    def __init__(
+            self,
+            clock: Clock,
+            slack_client: SlackClient,
+            cache_manager: CacheManager | None = None,
+    ) -> None:
         """DataCollector 초기화
 
         Args:
             clock: 시간 제공자
+            slack_client: Slack 알림 클라이언트
             cache_manager: 파일 캐시 관리자 (None이면 기본 생성)
         """
         self._clock = clock
         self._cache_manager = cache_manager or CacheManager(file_suffix="data")
+        self._slack_client = slack_client
 
     def collect_data(self, ticker: str, days: int = 20) -> Recent20DaysHalfDayCandles:
         """
@@ -69,6 +77,8 @@ class DataCollector:
 
         # API 호출
         df = UpbitAPI.get_candles(ticker=ticker, interval=upbit_api.CandleInterval.MINUTE_60, count=(days + 1) * 24)
+
+        self._slack_client.send_log(f"{ticker} 데이터 업데이트 완료.")
 
         candles = self._aggregate_all(df, days)
         result = Recent20DaysHalfDayCandles(candles=candles)

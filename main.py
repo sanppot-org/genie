@@ -30,12 +30,12 @@ tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
 # 공유 클라이언트 및 헬스체크
 slack_client = SlackClient(SlackConfig())
 healthcheck_client = HealthcheckClient(HealthcheckConfig())
-allocation_manager = AllocatedBalanceProvider()
+allocation_manager = AllocatedBalanceProvider(slack_client)
 upbit_api = UpbitAPI(UpbitConfig())
 
 # 전략 실행에 필요한 공유 컴포넌트들 (1분마다 재사용)
 clock = SystemClock(KST)
-data_collector = DataCollector(clock)
+data_collector = DataCollector(clock, slack_client)
 google_sheet_client = GoogleSheetClient(GoogleSheetConfig())
 cache_manager = CacheManager()
 order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
