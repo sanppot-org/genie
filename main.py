@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # TODO: DB 설정
 total_balance = 100_000_000
-tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP", "KRW-USDT"]
+tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
 
 # 공유 클라이언트 및 헬스체크
 slack_client = SlackClient(SlackConfig())
