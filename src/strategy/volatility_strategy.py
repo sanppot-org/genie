@@ -17,8 +17,6 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
 
     def execute(self) -> None:
         """변동성 돌파 전략을 실행합니다."""
-        logger.info(f"============= {self._strategy_name} 전략 =============")
-
         if self._clock.is_morning():
             self._buy()
 
@@ -128,4 +126,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
         Returns:
             0 ~ 1 사이의 값
         """
-        return (target_vol / max(yesterday_morning_volatility, 0.01)) * ma_score
+        return min(
+            (target_vol / max(yesterday_morning_volatility, 0.01)) * ma_score,
+            1.0,
+        )

@@ -248,3 +248,74 @@ class TestVolatilityStrategyExecute:
             assert saved_cache.last_run_date == dt.date(2024, 1, 1)
             assert saved_cache.position_size == 1.0  # target_vol / volatility * ma_score
             assert saved_cache.threshold == 50500000  # close + range * k
+
+
+class TestVolatilityStrategyCalculatePositionSize:
+    """VolatilityStrategy의 _calculate_volatility_position_size 메서드 테스트"""
+
+    def test_position_size_with_normal_volatility(self):
+        """정상적인 변동성일 때 position_size가 올바르게 계산된다"""
+        # Given: target_vol=0.01, volatility=0.05, ma_score=0.8
+        target_vol = 0.01
+        volatility = 0.05
+        ma_score = 0.8
+
+        # When: position_size 계산
+        position_size = VolatilityStrategy._calculate_volatility_position_size(target_vol, volatility, ma_score)
+
+        # Then: position_size = (0.01 / 0.05) * 0.8 = 0.16
+        assert position_size == 0.16
+
+    def test_position_size_clamped_to_one_with_low_volatility(self):
+        """변동성이 낮을 때 position_size가 1.0으로 제한된다"""
+        # Given: target_vol=0.02, volatility=0.01, ma_score=1.0
+        # position_size = (0.02 / 0.01) * 1.0 = 2.0 → clamped to 1.0
+        target_vol = 0.02
+        volatility = 0.01
+        ma_score = 1.0
+
+        # When: position_size 계산
+        position_size = VolatilityStrategy._calculate_volatility_position_size(target_vol, volatility, ma_score)
+
+        # Then: position_size clamped to 1.0
+        assert position_size == 1.0
+
+    def test_position_size_with_low_volatility_and_low_ma_score(self):
+        """변동성이 낮고 ma_score도 낮을 때"""
+        # Given: target_vol=0.01, volatility=0.005, ma_score=0.5
+        # raw = (0.01 / 0.01) * 0.5 = 0.5 (max로 0.01 적용)
+        target_vol = 0.01
+        volatility = 0.005
+        ma_score = 0.5
+
+        # When: position_size 계산
+        position_size = VolatilityStrategy._calculate_volatility_position_size(target_vol, volatility, ma_score)
+
+        # Then: position_size = (0.01 / 0.01) * 0.5 = 0.5
+        assert position_size == 0.5
+
+    def test_position_size_with_high_volatility(self):
+        """변동성이 높을 때 position_size가 작아진다"""
+        # Given: target_vol=0.01, volatility=0.1, ma_score=1.0
+        target_vol = 0.01
+        volatility = 0.1
+        ma_score = 1.0
+
+        # When: position_size 계산
+        position_size = VolatilityStrategy._calculate_volatility_position_size(target_vol, volatility, ma_score)
+
+        # Then: position_size = (0.01 / 0.1) * 1.0 = 0.1
+        assert abs(position_size - 0.1) < 1e-10
+
+    def test_position_size_with_zero_ma_score(self):
+        """ma_score가 0이면 position_size도 0이다"""
+        # Given: ma_score = 0
+        target_vol = 0.01
+        volatility = 0.05
+        ma_score = 0
+
+        # When: position_size 계산
+        position_size = VolatilityStrategy._calculate_volatility_position_size(target_vol, volatility, ma_score)
+
+        # Then: position_size = 0
+        assert position_size == 0

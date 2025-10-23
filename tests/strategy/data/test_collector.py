@@ -20,6 +20,7 @@ class TestDataCollector:
     def collector(self, tmp_path):
         """DataCollector 인스턴스 생성"""
         from unittest.mock import Mock
+
         from src.strategy.cache.cache_manager import CacheManager
 
         cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")
@@ -270,6 +271,7 @@ class TestDataCollector:
         # 10월 15일에 첫 호출
         clock = FixedClock(datetime.datetime(2025, 10, 15, 10, 0, 0))
         from unittest.mock import Mock
+
         from src.strategy.cache.cache_manager import CacheManager
 
         cache_manager = CacheManager(cache_dir=str(tmp_path), file_suffix="data")

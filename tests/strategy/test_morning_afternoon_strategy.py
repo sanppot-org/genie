@@ -137,3 +137,85 @@ class TestMorningAfternoonStrategyExecute:
         # Then: 매수 주문이 실행되지 않음
         mock_order_executor.buy.assert_not_called()
         mock_order_executor.sell.assert_not_called()
+
+
+class TestMorningAfternoonStrategyPositionSize:
+    """MorningAfternoonStrategy의 position_size 계산 테스트"""
+
+    def test_position_size_with_normal_volatility(self, morning_afternoon_strategy, mock_order_executor, mock_clock, mock_collector, mock_cache_manager, mock_config):
+        """정상적인 변동성일 때 position_size가 올바르게 계산된다"""
+        # Given: target_vol=0.05, volatility=0.05
+        mock_clock.is_morning.return_value = True
+        import datetime as dt
+
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+        mock_cache_manager.load_strategy_cache.return_value = None
+
+        mock_history = Mock()
+        mock_history.yesterday_morning.volatility = 0.05
+        mock_history.yesterday_morning.volume = 100
+        mock_history.yesterday_afternoon.return_rate = 0.01
+        mock_history.yesterday_afternoon.volume = 200
+        mock_collector.collect_data.return_value = mock_history
+
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0.001
+        mock_order_executor.buy.return_value = execution_result
+
+        # When: execute 호출
+        morning_afternoon_strategy.execute()
+
+        # Then: position_size = 0.05 / 0.05 = 1.0, amount = min(1000000 * 1.0, 100000) = 100000
+        mock_order_executor.buy.assert_called_once_with("KRW-BTC", 100000, strategy_name="morning_afternoon")
+
+    def test_position_size_clamped_to_one_with_low_volatility(self, morning_afternoon_strategy, mock_order_executor, mock_clock, mock_collector, mock_cache_manager, mock_config):
+        """변동성이 낮을 때 position_size가 1.0으로 제한된다"""
+        # Given: target_vol=0.05, volatility=0.001 → position_size = 0.05 / 0.01 = 5.0 → clamped to 1.0
+        mock_clock.is_morning.return_value = True
+        import datetime as dt
+
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+        mock_cache_manager.load_strategy_cache.return_value = None
+
+        mock_history = Mock()
+        mock_history.yesterday_morning.volatility = 0.001
+        mock_history.yesterday_morning.volume = 100
+        mock_history.yesterday_afternoon.return_rate = 0.01
+        mock_history.yesterday_afternoon.volume = 200
+        mock_collector.collect_data.return_value = mock_history
+
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0.001
+        mock_order_executor.buy.return_value = execution_result
+
+        # When: execute 호출
+        morning_afternoon_strategy.execute()
+
+        # Then: position_size clamped to 1.0, amount = min(1000000 * 1.0, 100000) = 100000
+        mock_order_executor.buy.assert_called_once_with("KRW-BTC", 100000, strategy_name="morning_afternoon")
+
+    def test_position_size_with_high_volatility(self, morning_afternoon_strategy, mock_order_executor, mock_clock, mock_collector, mock_cache_manager, mock_config):
+        """변동성이 높을 때 position_size가 작아진다"""
+        # Given: target_vol=0.05, volatility=0.1 → position_size = 0.05 / 0.1 = 0.5
+        mock_clock.is_morning.return_value = True
+        import datetime as dt
+
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+        mock_cache_manager.load_strategy_cache.return_value = None
+
+        mock_history = Mock()
+        mock_history.yesterday_morning.volatility = 0.1
+        mock_history.yesterday_morning.volume = 100
+        mock_history.yesterday_afternoon.return_rate = 0.01
+        mock_history.yesterday_afternoon.volume = 200
+        mock_collector.collect_data.return_value = mock_history
+
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0.001
+        mock_order_executor.buy.return_value = execution_result
+
+        # When: execute 호출
+        morning_afternoon_strategy.execute()
+
+        # Then: position_size = 0.5, amount = min(1000000 * 0.5, 100000) = 100000
+        mock_order_executor.buy.assert_called_once_with("KRW-BTC", 100000, strategy_name="morning_afternoon")

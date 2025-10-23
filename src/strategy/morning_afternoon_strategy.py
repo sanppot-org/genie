@@ -15,8 +15,6 @@ class MorningAfternoonStrategy(BaseStrategy[StrategyCacheData]):
 
     def execute(self) -> None:
         """오전/오후 전략을 실행합니다."""
-        logger.info(f"============= {self._strategy_name} 전략 =============")
-
         if self._clock.is_morning():
             self._buy()
 
@@ -26,7 +24,10 @@ class MorningAfternoonStrategy(BaseStrategy[StrategyCacheData]):
     def _buy(self) -> None:
         if self._should_buy():
             history = self._collector.collect_data(self._config.ticker)
-            position_size = self._config.target_vol / max(history.yesterday_morning.volatility, 0.01)
+            position_size = min(
+                self._config.target_vol / max(history.yesterday_morning.volatility, 0.01),
+                1.0,
+            )
             amount = min(self._config.total_balance * position_size, self._config.allocated_balance)
 
             result = self._order_executor.buy(self._config.ticker, amount, strategy_name=self._strategy_name)

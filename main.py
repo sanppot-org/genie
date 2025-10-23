@@ -55,8 +55,6 @@ strategy_context = StrategyContext(
 def run_strategies() -> None:
     """1분마다 실행될 전략 실행 함수"""
     try:
-        logger.info("암호화폐 자동 매매 시작")
-
         balance = allocation_manager.get_allocated_amount()
         allocated_balance = (balance - RESERVED_BALANCE) / len(tickers)
 
@@ -70,12 +68,11 @@ def run_strategies() -> None:
                 logger.error(f"{ticker} 전략 실행 실패: {e}", exc_info=True)
                 slack_client.send_status(f"{ticker} 전략 실행 실패: {e}")
 
-        logger.info("암호화폐 자동 매매 완료")
-
         # 헬스체크 ping 전송 (성공 시)
         healthcheck_client.ping()
     except Exception as e:
         logger.error(f"전략 실행 중 예외 발생: {e}", exc_info=True)
+        slack_client.send_status(f"전략 실행 중 예외 발생: {e}")
 
 
 def check_upbit_status() -> None:
@@ -85,8 +82,6 @@ def check_upbit_status() -> None:
 
 
 if __name__ == "__main__":
-    logger.info("암호화폐 자동 매매 스케줄러 시작")
-
     check_upbit_status()
 
     # 스케줄러 초기화
@@ -106,7 +101,7 @@ if __name__ == "__main__":
 
     try:
         # 스케줄러 시작 (블로킹)
-        logger.info("스케줄러 시작됨 - 1분마다 실행")
+        logger.info("암호화폐 자동 매매 스케줄러 시작 (1분마다 실행)")
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         logger.info("스케줄러 종료")
