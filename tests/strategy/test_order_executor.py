@@ -90,7 +90,7 @@ class TestOrderExecutorBuy:
         mock_upbit_api.buy_market_order_and_wait.assert_called_once_with(ticker, amount)
 
     def test_buy_should_extract_execution_info_from_first_trade(self, order_executor, mock_upbit_api):
-        """매수 주문 시 첫 번째 체결 정보를 사용해야 한다"""
+        """매수 주문 시 모든 체결 정보를 합산해야 한다"""
         # Given
         ticker = "KRW-ETH"
         amount = 5000.0
@@ -115,6 +115,9 @@ class TestOrderExecutorBuy:
             side=OrderSide.BID,
         )
 
+        total_volume = 0.00167667
+        total_funds = 5030.0
+
         mock_order = OrderResult(
             uuid="test-uuid",
             side=OrderSide.BID,
@@ -125,7 +128,7 @@ class TestOrderExecutorBuy:
             created_at=datetime.now(),
             volume=None,
             remaining_volume=None,
-            executed_volume=0.00167667,
+            executed_volume=total_volume,
             reserved_fee=0.0,
             remaining_fee=0.0,
             paid_fee=2.5,
@@ -138,11 +141,15 @@ class TestOrderExecutorBuy:
         # When
         result = order_executor.buy(ticker, amount)
 
-        # Then
-        assert result.executed_price == first_trade.price
-        assert result.executed_volume == first_trade.volume
+        # Then: 모든 체결 정보가 합산되어야 함
+        assert result.executed_volume == total_volume
+        assert result.executed_amount == total_funds
+        # 가중평균 체결가 검증
+        expected_avg_price = total_funds / total_volume
+        assert result.executed_price == pytest.approx(expected_avg_price)
 
-    def test_buy_should_record_to_sheet_when_sheet_client_exists(self, order_executor_with_sheet, mock_upbit_api, mock_google_sheet_client):
+    def test_buy_should_record_to_sheet_when_sheet_client_exists(self, order_executor_with_sheet, mock_upbit_api,
+                                                                 mock_google_sheet_client):
         """GoogleSheetClient가 주입된 경우 매수 시 기록해야 한다"""
         # Given
         ticker = "KRW-BTC"
@@ -194,7 +201,8 @@ class TestOrderExecutorBuy:
         assert execution_result.executed_price == expected_price
         assert execution_result.executed_amount == amount
 
-    def test_buy_should_record_strategy_name_when_provided(self, order_executor_with_sheet, mock_upbit_api, mock_google_sheet_client):
+    def test_buy_should_record_strategy_name_when_provided(self, order_executor_with_sheet, mock_upbit_api,
+                                                           mock_google_sheet_client):
         """strategy_name을 전달하면 해당 이름이 기록되어야 한다"""
         # Given
         ticker = "KRW-BTC"
@@ -392,7 +400,8 @@ class TestOrderExecutorSell:
         assert result.executed_amount == expected_amount
         assert result.executed_amount == price * volume
 
-    def test_sell_should_record_to_sheet_when_sheet_client_exists(self, order_executor_with_sheet, mock_upbit_api, mock_google_sheet_client):
+    def test_sell_should_record_to_sheet_when_sheet_client_exists(self, order_executor_with_sheet, mock_upbit_api,
+                                                                  mock_google_sheet_client):
         """GoogleSheetClient가 주입된 경우 매도 시 기록해야 한다"""
         # Given
         ticker = "KRW-BTC"
@@ -444,7 +453,8 @@ class TestOrderExecutorSell:
         assert execution_result.executed_price == expected_price
         assert execution_result.executed_amount == expected_amount
 
-    def test_sell_should_record_strategy_name_when_provided(self, order_executor_with_sheet, mock_upbit_api, mock_google_sheet_client):
+    def test_sell_should_record_strategy_name_when_provided(self, order_executor_with_sheet, mock_upbit_api,
+                                                            mock_google_sheet_client):
         """strategy_name을 전달하면 해당 이름이 기록되어야 한다"""
         # Given
         ticker = "KRW-BTC"

@@ -43,12 +43,21 @@ class ExecutionResult:
 
     @staticmethod
     def of(strategy_name: str, order_direction: OrderDirection, order_result: OrderResult) -> "ExecutionResult":
+        # 모든 trades의 funds를 합산하여 총 체결 금액 계산
+        total_funds = sum(trade.funds for trade in order_result.trades)
+
+        # OrderResult.executed_volume은 이미 모든 체결량의 합계
+        executed_volume = order_result.executed_volume
+
+        # 가중평균 체결가 계산: 총 체결 금액 / 총 체결량
+        average_price = total_funds / executed_volume if executed_volume > 0 else 0.0
+
         return ExecutionResult(
             strategy_name=strategy_name,
             order_type=order_direction,
-            ticker=order_result.trades[0].market,
-            executed_price=order_result.trades[0].price,
-            executed_volume=order_result.trades[0].volume,
-            executed_amount=order_result.trades[0].funds,
+            ticker=order_result.market,
+            executed_price=average_price,
+            executed_volume=executed_volume,
+            executed_amount=total_funds,
             order=order_result,
         )
