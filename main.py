@@ -12,11 +12,12 @@ from src.common.slack.client import SlackClient
 from src.config import GoogleSheetConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST, RESERVED_BALANCE
 from src.logging_config import setup_logging
-from src.strategy import o_dol_strategy
 from src.strategy.cache.cache_manager import CacheManager
+from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.strategy_context import StrategyContext
+from src.strategy.volatility_strategy import VolatilityStrategy
 from src.upbit.upbit_api import UpbitAPI
 
 # Better Stack 로깅 설정 (가장 먼저 실행)
@@ -60,9 +61,15 @@ def run_strategies() -> None:
 
         for ticker in tickers:
             try:
-                o_dol_strategy.run(
-                    ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance, context=strategy_context
-                )
+                strategy_config = BaseStrategyConfig(ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance)
+
+                volatility_strategy = VolatilityStrategy(strategy_context.order_executor, strategy_config, strategy_context.clock, strategy_context.data_collector, strategy_context.cache_manager)
+
+                try:
+                    volatility_strategy.execute()
+                except Exception as e:
+                    strategy_context.slack_client.send_status(f"{ticker} 변동성 돌파 전략 에러 발생. log: {e}")
+
                 sleep(0.5)
             except Exception as e:
                 logger.error(f"{ticker} 전략 실행 실패: {e}", exc_info=True)
