@@ -3,6 +3,9 @@ from typing import Any
 import backtrader as bt
 from backtrader import Analyzer, Strategy
 
+from src.backtest.commission_config import CommissionConfig
+from src.backtest.sizer_config import SizerConfig
+
 
 class BacktestBuilder:
     """Backtest 설정을 위한 빌더 패턴 클래스"""
@@ -10,17 +13,31 @@ class BacktestBuilder:
     def __init__(self) -> None:
         """빌더 초기화 (기본값 설정)"""
         self.cerebro = bt.Cerebro()
-        self._commission = 0.001
-        self._commission_margin: float | None = None
-        self._commission_mult = 1.0
-        self._commission_stocklike = True
+        self._commission_config = CommissionConfig.stock(0.002)  # 기본값: 주식형 0.2%
         self._initial_cash: float | None = None  # 필수값으로 변경
-        self._position_percents = 10.0  # 포트폴리오의 10%
+        self._sizer_config: SizerConfig | None = None
         self._strategy_class: type[Strategy] | None = None
         self._strategy_params: dict[str, object] = {}
         self._slippage: float | None = None
         self._analyzers: list[tuple[type[Analyzer], str]] = []
         self._data_feeds: list[bt.AbstractDataBase] = []
+        """
+        1. Index (인덱스)
+    
+        datetime (pd.DatetimeIndex)
+        - 필수: DataFrame의 index는 반드시 datetime 타입
+        - 정렬: 오래된 데이터가 앞, 최신 데이터가 뒤 (오름차순)
+    
+        2. 필수 컬럼 (소문자)
+    
+        | 컬럼명    | 타입    | 설명  |
+        |--------|-------|-----|
+        | open   | float | 시가  |
+        | high   | float | 고가  |
+        | low    | float | 저가  |
+        | close  | float | 종가  |
+        | volume | float | 거래량 |
+        """
 
     def with_initial_cash(self, cash: float) -> "BacktestBuilder":
         """초기 자본 설정 (필수)"""
@@ -29,34 +46,31 @@ class BacktestBuilder:
         self._initial_cash = cash
         return self
 
-    def with_commission(
-        self,
-        commission: float,
-        margin: float | None = None,
-        mult: float = 1.0,
-        stocklike: bool = True,
-    ) -> "BacktestBuilder":
+    def with_commission(self, commission_config: CommissionConfig) -> "BacktestBuilder":
         """수수료 설정
 
         Args:
-            commission: 수수료율 (예: 0.001 = 0.1%)
-            margin: 마진 (선물/옵션 거래 시)
-            mult: 승수
-            stocklike: 주식형(True) vs 선물형(False)
+            commission_config: CommissionConfig 인스턴스
+
+        Example:
+            .with_commission(CommissionConfig.stock(0.0005))
+            .with_commission(CommissionConfig.futures(0.002, margin=2000))
         """
-        self._commission = commission
-        self._commission_margin = margin
-        self._commission_mult = mult
-        self._commission_stocklike = stocklike
+        self._commission_config = commission_config
         return self
 
-    def with_position_size(self, percents: float) -> "BacktestBuilder":
-        """포지션 크기 설정
+    def with_sizer(self, sizer_config: SizerConfig) -> "BacktestBuilder":
+        """Sizer 설정
 
         Args:
-            percents: 포트폴리오 대비 비율 (예: 10 = 포트폴리오의 10%)
+            sizer_config: SizerConfig 인스턴스
+
+        Example:
+            .with_sizer(SizerConfig.percent(95))
+            .with_sizer(SizerConfig.all_in())
+            .with_sizer(SizerConfig.custom(DynamicPercentSizer, base_percent=10))
         """
-        self._position_percents = percents
+        self._sizer_config = sizer_config
         return self
 
     def with_slippage(self, perc: float) -> "BacktestBuilder":
@@ -80,14 +94,16 @@ class BacktestBuilder:
         self._data_feeds.append(data_feed)
         return self
 
-    def build(self) -> bt.Cerebro:
-        """Cerebro 인스턴스 구성"""
-        # 필수값 검증
+    def _validate_required_fields(self) -> None:
+        """필수 필드 검증"""
         if self._initial_cash is None:
             raise ValueError("초기 자본이 설정되지 않았습니다. with_initial_cash()를 호출해주세요.")
 
         if self._strategy_class is None:
             raise ValueError("전략이 설정되지 않았습니다. with_strategy()를 호출해주세요.")
+
+        if self._sizer_config is None:
+            raise ValueError("Sizer가 설정되지 않았습니다. with_sizer()를 호출해주세요.")
 
         if not self._data_feeds:
             import warnings
@@ -95,25 +111,22 @@ class BacktestBuilder:
             warnings.warn(
                 "데이터 피드가 추가되지 않았습니다. add_data()를 호출해주세요.",
                 UserWarning,
-                stacklevel=2,
+                stacklevel=3,
             )
+
+    def build(self) -> bt.Cerebro:
+        """Cerebro 인스턴스 구성"""
+        # 필수값 검증
+        self._validate_required_fields()
 
         # Broker 설정
         self.cerebro.broker.setcash(self._initial_cash)
 
         # Commission 설정
-        commission_kwargs = {
-            "commission": self._commission,
-            "mult": self._commission_mult,
-            "stocklike": self._commission_stocklike,
-        }
-        if self._commission_margin is not None:
-            commission_kwargs["margin"] = self._commission_margin
-
-        self.cerebro.broker.setcommission(**commission_kwargs)
+        self.cerebro.broker.setcommission(**self._commission_config.to_kwargs())
 
         # Position sizer 설정
-        self.cerebro.addsizer(bt.sizers.PercentSizer, percents=self._position_percents)
+        self.cerebro.addsizer(self._sizer_config.sizer_class, **self._sizer_config.params)
 
         # 슬리피지 설정
         if self._slippage:
