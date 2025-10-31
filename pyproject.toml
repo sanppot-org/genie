@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
+    "backtrader2>=1.9.76.123",
     "python-dotenv>=1.1.1",
     "logtail-python>=0.2.0",
     "pyupbit>=0.2.34",
@@ -63,6 +64,9 @@ ignore = []
 "main.py" = [
     "E501", # 주석 처리된 코드의 줄 길이 무시
 ]
+"src/backtest/**/*.py" = [
+    "ANN401", # backtrader 타입 무시를 위해 Any 사용 허용
+]
 
 [tool.mypy]
 python_version = "3.12"
@@ -80,3 +84,13 @@ warn_return_any = false
 [[tool.mypy.overrides]]
 module = "src.config"
 disable_error_code = ["call-arg"]
+
+# backtrader 타입 무시
+[[tool.mypy.overrides]]
+module = "backtrader.*"
+ignore_missing_imports = true
+
+# backtest 모듈의 backtrader 반환값 타입 체크 완화
+[[tool.mypy.overrides]]
+module = "src.backtest.*"
+warn_return_any = false

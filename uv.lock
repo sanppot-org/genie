@@ -24,6 +24,15 @@ wheels = [
 ]
 
 [[package]]
+name = "backtrader2"
+version = "1.9.76.123"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/b6/a2955a38de01be85732d73ead2ea95cd02d8ad447a98a9b1288bb4772c0a/backtrader2-1.9.76.123.tar.gz", hash = "sha256:f9e4fca9543f8a4d96ee7d0480d8db10e66409d51355e924d04595123aef90e4", size = 259572, upload-time = "2020-07-30T18:55:21.784Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/ad/87720cffc61b0aaee4a48f60c04d501ac0aef9e354226bb28b77bf089072/backtrader2-1.9.76.123-py3-none-any.whl", hash = "sha256:713b1dae0fe2a30537ad1764a492f15c125472c5dd0dbd28fa3f6c2b4105c50b", size = 418983, upload-time = "2020-07-30T18:54:37.843Z" },
+]
+
+[[package]]
 name = "cachetools"
 version = "6.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -98,6 +107,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "apscheduler" },
+    { name = "backtrader2" },
     { name = "gspread" },
     { name = "gspread-dataframe" },
     { name = "logtail-python" },
@@ -125,6 +135,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "apscheduler", specifier = ">=3.10.0" },
+    { name = "backtrader2", specifier = ">=1.9.76.123" },
     { name = "gspread", specifier = ">=6.0.0" },
     { name = "gspread-dataframe", specifier = ">=4.0.0" },
     { name = "logtail-python", specifier = ">=0.2.0" },
