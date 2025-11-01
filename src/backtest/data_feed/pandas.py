@@ -121,6 +121,64 @@ class PandasDataFeedConfig(DataFeedConfig):
             datetime=datetime_param,
         )
 
+    @classmethod
+    def from_csv(
+            cls,
+            csv_path: str,
+            name: str = "",
+            from_date: pd.Timestamp | None = None,
+            to_date: pd.Timestamp | None = None,
+    ) -> "PandasDataFeedConfig":
+        """CSV 파일에서 PandasDataFeedConfig 생성 (팩터리 메서드)
+
+        CSV 파일의 컬럼명은 다음 중 하나여야 합니다:
+        - datetime 컬럼: 'datetime', 'date', 'time', 'timestamp', 'dt' 중 하나
+          또는 DatetimeIndex 사용
+        - OHLCV 컬럼: 'open', 'high', 'low', 'close', 'volume' (대소문자 무관)
+
+        특정 소스(예: Upbit)의 컬럼명이 다른 경우, 사용자가 직접 전처리 필요:
+            >>> import pandas as pd
+            >>> df = pd.read_csv('upbit_data.csv')
+            >>> df.rename(columns={'candle_date_time_kst': 'datetime'}, inplace=True)
+            >>> config = PandasDataFeedConfig.create(df)
+
+        Args:
+            csv_path: CSV 파일 경로 (예: '~/data_gd/hour/KRW-BTC_minute60_candles.csv')
+            name: 데이터 피드 이름 (플로팅용)
+            from_date: 시작 날짜 (None이면 전체)
+            to_date: 종료 날짜 (None이면 전체)
+
+        Returns:
+            PandasDataFeedConfig: 검증되고 정렬된 설정 객체
+
+        Raises:
+            ValueError: CSV 파일이 비어있거나 형식이 올바르지 않을 때
+
+        Example:
+            >>> # 표준 컬럼명 사용
+            >>> config = PandasDataFeedConfig.from_csv(
+            ...     csv_path='~/data/btc_ohlcv.csv',
+            ...     name='BTC-KRW'
+            ... )
+            >>> data_feed = config.to_data_feed()
+        """
+        import os
+
+        # 1. 홈 디렉토리 경로 확장
+        expanded_path = os.path.expanduser(csv_path)
+
+        # 2. CSV 파일 읽기
+        try:
+            df = pd.read_csv(expanded_path)
+        except pd.errors.EmptyDataError as e:
+            raise ValueError(f"CSV 파일이 비어있습니다: {csv_path}") from e
+
+        if df.empty:
+            raise ValueError(f"CSV 파일이 비어있습니다: {csv_path}")
+
+        # 3. create() 메서드를 사용하여 검증 및 정렬
+        return cls.create(df=df, name=name, from_date=from_date, to_date=to_date)
+
     def to_data_feed(self) -> bt.feeds.PandasData:
         """PandasData로 변환
 

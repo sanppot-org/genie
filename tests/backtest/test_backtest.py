@@ -6,9 +6,7 @@ import backtrader as bt
 import pandas as pd
 import pytest
 
-from src.backtest.backtest import (
-    BacktestBuilder,
-)
+from src.backtest.backtest_builder import BacktestBuilder
 from src.backtest.commission_config import CommissionConfig
 from src.backtest.data_feed.pandas import PandasDataFeedConfig
 from src.backtest.sizer_config import SizerConfig
