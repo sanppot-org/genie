@@ -4,6 +4,7 @@ import backtrader as bt
 from backtrader import Analyzer, Strategy
 
 from src.backtest.commission_config import CommissionConfig
+from src.backtest.data_feed.base import DataFeedConfig
 from src.backtest.sizer_config import SizerConfig
 
 
@@ -13,7 +14,7 @@ class BacktestBuilder:
     def __init__(self) -> None:
         """빌더 초기화 (기본값 설정)"""
         self.cerebro = bt.Cerebro()
-        self._commission_config = CommissionConfig.stock(0.002)  # 기본값: 주식형 0.2%
+        self._commission_config: CommissionConfig | None = None
         self._initial_cash: float | None = None  # 필수값으로 변경
         self._sizer_config: SizerConfig | None = None
         self._strategy_class: type[Strategy] | None = None
@@ -21,23 +22,6 @@ class BacktestBuilder:
         self._slippage: float | None = None
         self._analyzers: list[tuple[type[Analyzer], str]] = []
         self._data_feeds: list[bt.AbstractDataBase] = []
-        """
-        1. Index (인덱스)
-    
-        datetime (pd.DatetimeIndex)
-        - 필수: DataFrame의 index는 반드시 datetime 타입
-        - 정렬: 오래된 데이터가 앞, 최신 데이터가 뒤 (오름차순)
-    
-        2. 필수 컬럼 (소문자)
-    
-        | 컬럼명    | 타입    | 설명  |
-        |--------|-------|-----|
-        | open   | float | 시가  |
-        | high   | float | 고가  |
-        | low    | float | 저가  |
-        | close  | float | 종가  |
-        | volume | float | 거래량 |
-        """
 
     def with_initial_cash(self, cash: float) -> "BacktestBuilder":
         """초기 자본 설정 (필수)"""
@@ -89,8 +73,30 @@ class BacktestBuilder:
         self._strategy_params = params
         return self
 
-    def add_data(self, data_feed: bt.AbstractDataBase) -> "BacktestBuilder":
-        """외부에서 준비된 데이터 피드 추가"""
+    def add_data(self, data_config: DataFeedConfig) -> "BacktestBuilder":
+        """데이터 피드 설정 추가
+
+        Args:
+            data_config: DataFeedConfig 인스턴스
+
+        Returns:
+            BacktestBuilder: 체이닝을 위한 self 반환
+
+        Example:
+            >>> from src.backtest.data_feed.pandas import PandasDataFeedConfig
+            >>> import pandas as pd
+            >>>
+            >>> df = pd.DataFrame({
+            ...     'open': [100, 101],
+            ...     'high': [105, 106],
+            ...     'low': [99, 100],
+            ...     'close': [103, 104],
+            ...     'volume': [1000, 2000]
+            ... }, index=pd.DatetimeIndex(['2024-01-01', '2024-01-02']))
+            >>> config = PandasDataFeedConfig.create(df, name='BTC-KRW')
+            >>> builder.add_data(config)
+        """
+        data_feed = data_config.to_data_feed()
         self._data_feeds.append(data_feed)
         return self
 
@@ -102,46 +108,39 @@ class BacktestBuilder:
         if self._strategy_class is None:
             raise ValueError("전략이 설정되지 않았습니다. with_strategy()를 호출해주세요.")
 
-        if self._sizer_config is None:
-            raise ValueError("Sizer가 설정되지 않았습니다. with_sizer()를 호출해주세요.")
-
         if not self._data_feeds:
-            import warnings
-
-            warnings.warn(
-                "데이터 피드가 추가되지 않았습니다. add_data()를 호출해주세요.",
-                UserWarning,
-                stacklevel=3,
-            )
+            raise ValueError("데이터 피드가 추가되지 않았습니다. add_data()를 호출해주세요.")
 
     def build(self) -> bt.Cerebro:
-        """Cerebro 인스턴스 구성"""
+        """Cerebro 인스턴스 구성 (backtrader 권장 순서)"""
         # 필수값 검증
         self._validate_required_fields()
 
-        # Broker 설정
+        # 1. 전략 추가
+        self.cerebro.addstrategy(self._strategy_class, **self._strategy_params)
+
+        # 2. 데이터 피드 추가
+        for data_feed in self._data_feeds:
+            self.cerebro.adddata(data_feed)
+
+        # 3. Broker 설정
         self.cerebro.broker.setcash(self._initial_cash)
 
-        # Commission 설정
-        self.cerebro.broker.setcommission(**self._commission_config.to_kwargs())
+        # 4. Commission 설정 (설정된 경우만)
+        if self._commission_config:
+            self.cerebro.broker.setcommission(**self._commission_config.to_kwargs())
 
-        # Position sizer 설정
-        self.cerebro.addsizer(self._sizer_config.sizer_class, **self._sizer_config.params)
-
-        # 슬리피지 설정
+        # 5. 슬리피지 설정
         if self._slippage:
             self.cerebro.broker.set_slippage_perc(perc=self._slippage)
 
-        # 분석기 추가
+        # 6. Position sizer 설정 (설정된 경우만)
+        if self._sizer_config:
+            self.cerebro.addsizer(self._sizer_config.sizer_class, **self._sizer_config.params)
+
+        # 7. 분석기 추가
         for analyzer_class, name in self._analyzers:
             self.cerebro.addanalyzer(analyzer_class, _name=name)
-
-        # 전략 추가
-        self.cerebro.addstrategy(self._strategy_class, **self._strategy_params)
-
-        # 데이터 피드 추가
-        for data_feed in self._data_feeds:
-            self.cerebro.adddata(data_feed)
 
         return self.cerebro
 
