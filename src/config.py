@@ -81,8 +81,6 @@ class GoogleSheetConfig(BaseSettings):
         alias="GOOGLE_CREDENTIALS_PATH",
     )
 
-    sheet_name: str = Field(..., min_length=1, description="시트 이름", alias="SHEET_NAME")
-
     @field_validator("credentials_path")
     @classmethod
     def resolve_credentials_path(cls, v: str) -> str:
@@ -111,7 +109,8 @@ class HealthcheckConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
-    healthcheck_url: str | None = Field(default=None, description="Healthchecks.io ping URL (optional)", alias="HEALTHCHECK_URL")
+    healthcheck_url: str | None = Field(default=None, description="Healthchecks.io ping URL (optional)",
+                                        alias="HEALTHCHECK_URL")
 
 
 class LogtailConfig(BaseSettings):

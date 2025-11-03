@@ -3,7 +3,6 @@
 import logging
 
 import gspread
-from gspread import Spreadsheet, Worksheet
 from gspread.exceptions import APIError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -19,20 +18,18 @@ class GoogleSheetClient:
     Google Sheets API를 사용하여 거래 기록을 관리하는 클라이언트.
 
     이 클라이언트는 Google Sheets에 거래 기록을 추가하는 기능을 제공합니다.
-    테스트 환경에서는 Mock 객체를 주입하여 사용할 수 있습니다.
 
     Attributes:
         gc: gspread 클라이언트 인스턴스
         doc: Google Spreadsheet 문서
-        trades_sheet: 거래 기록 워크시트
+        sheet: 거래 기록 워크시트
 
     Examples:
         >>> from src.config import GoogleSheetConfig
-        >>> from src.models.trade_record import TradeRecord
+        >>> from src.common.google_sheet.trade_record import TradeRecord
         >>>
-        >>> # 프로덕션 환경
         >>> config = GoogleSheetConfig()
-        >>> client = GoogleSheetClient(config)
+        >>> client = GoogleSheetClient(config, sheet_name="trades")
         >>>
         >>> # 거래 기록 추가
         >>> record = TradeRecord(
@@ -46,27 +43,15 @@ class GoogleSheetClient:
         ... )
         >>> client.append_row(record)
         True
-        >>>
-        >>> # 테스트 환경 (Mock 주입)
-        >>> from unittest.mock import Mock
-        >>> mock_sheet = Mock()
-        >>> test_client = GoogleSheetClient(config, sheet=mock_sheet)
     """
 
-    gc: gspread.Client
-    doc: Spreadsheet
-    trades_sheet: Worksheet
-
-    def __init__(self, google_sheet_config: GoogleSheetConfig, sheet: Worksheet | None = None) -> None:
+    def __init__(self, google_sheet_config: GoogleSheetConfig, sheet_name: str) -> None:
         """
         Google Sheet 클라이언트를 초기화합니다.
 
-        프로덕션 환경에서는 실제 Google Sheets API에 연결하고,
-        테스트 환경에서는 Mock 객체를 주입받아 사용할 수 있습니다.
-
         Args:
-            google_sheet_config: Google Sheet 설정 (URL, 인증 파일 경로, 시트 이름)
-            sheet: 테스트용 Mock Worksheet (선택사항). None이면 실제 API 사용.
+            google_sheet_config: Google Sheet 설정 (URL, 인증 파일 경로)
+            sheet_name: 사용할 워크시트 이름
 
         Raises:
             APIError: Google Sheets API 호출 실패 시
@@ -75,21 +60,12 @@ class GoogleSheetClient:
                 - 워크시트를 찾을 수 없을 때
 
         Examples:
-            >>> # 프로덕션 환경
             >>> config = GoogleSheetConfig()
-            >>> client = GoogleSheetClient(config)
-            >>>
-            >>> # 테스트 환경
-            >>> from unittest.mock import Mock
-            >>> mock_sheet = Mock()
-            >>> test_client = GoogleSheetClient(config, sheet=mock_sheet)
+            >>> client = GoogleSheetClient(config, sheet_name="trades")
         """
-        if sheet is None:
-            self.gc = gspread.service_account(google_sheet_config.credentials_path)
-            self.doc = self.gc.open_by_url(google_sheet_config.google_sheet_url)
-            sheet = self.doc.worksheet(google_sheet_config.sheet_name)
-
-        self.trades_sheet = sheet
+        self.gc = gspread.service_account(google_sheet_config.credentials_path)
+        self.doc = self.gc.open_by_url(google_sheet_config.google_sheet_url)
+        self.sheet = self.doc.worksheet(sheet_name)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -114,7 +90,7 @@ class GoogleSheetClient:
             APIError: Google Sheets API 호출 실패 시 (재시도 후에도 실패)
 
         Examples:
-            >>> from src.models.trade_record import TradeRecord
+            >>> from src.common.google_sheet.trade_record import TradeRecord
             >>> record = TradeRecord(
             ...     timestamp="2025-01-15 10:30:00",
             ...     strategy_name="변동성돌파",
@@ -127,9 +103,18 @@ class GoogleSheetClient:
             >>> client.append_row(record)
             True
         """
-        self.trades_sheet.append_row(trade_record.to_list())
+        self.sheet.append_row(trade_record.to_list())
         return True
 
     def append_order_result(self, result: ExecutionResult) -> None:
         record = TradeRecord.from_result(result)
         self.append_row(record)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(APIError),
+        reraise=True,
+    )
+    def set(self, row: int, col: int, value: str | float | int) -> None:
+        self.sheet.update_cell(row, col, value)

@@ -2,6 +2,7 @@ import logging
 from time import sleep
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.allocation_manager import AllocatedBalanceProvider
@@ -28,6 +29,8 @@ logger = logging.getLogger(__name__)
 total_balance = 100_000_000
 tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
 
+data_google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="data")
+
 # 공유 클라이언트 및 헬스체크
 slack_client = SlackClient(SlackConfig())
 healthcheck_client = HealthcheckClient(HealthcheckConfig())
@@ -37,15 +40,15 @@ upbit_api = UpbitAPI(UpbitConfig())
 # 전략 실행에 필요한 공유 컴포넌트들 (1분마다 재사용)
 clock = SystemClock(KST)
 data_collector = DataCollector(clock, slack_client)
-google_sheet_client = GoogleSheetClient(GoogleSheetConfig())
+trades_google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="Trades")
 cache_manager = CacheManager()
-order_executor = OrderExecutor(upbit_api, google_sheet_client=google_sheet_client, slack_client=slack_client)
+order_executor = OrderExecutor(upbit_api, google_sheet_client=trades_google_sheet_client, slack_client=slack_client)
 
 # 전략 컨텍스트 생성
 strategy_context = StrategyContext(
     clock=clock,
     data_collector=data_collector,
-    google_sheet_client=google_sheet_client,
+    google_sheet_client=trades_google_sheet_client,
     slack_client=slack_client,
     upbit_api=upbit_api,
     order_executor=order_executor,
@@ -61,9 +64,12 @@ def run_strategies() -> None:
 
         for ticker in tickers:
             try:
-                strategy_config = BaseStrategyConfig(ticker=ticker, total_balance=total_balance, allocated_balance=allocated_balance)
+                strategy_config = BaseStrategyConfig(ticker=ticker, total_balance=total_balance,
+                                                     allocated_balance=allocated_balance)
 
-                volatility_strategy = VolatilityStrategy(strategy_context.order_executor, strategy_config, strategy_context.clock, strategy_context.data_collector, strategy_context.cache_manager)
+                volatility_strategy = VolatilityStrategy(strategy_context.order_executor, strategy_config,
+                                                         strategy_context.clock, strategy_context.data_collector,
+                                                         strategy_context.cache_manager)
 
                 try:
                     volatility_strategy.execute()
@@ -88,15 +94,31 @@ def check_upbit_status() -> None:
         raise SystemError
 
 
+def update_upbit_krw() -> None:
+    """Upbit KRW 잔고를 Google Sheet에 기록
+    Google Sheet의 (1, 2) 셀에 업데이트합니다.
+    """
+    amount = upbit_api.get_available_amount()
+    data_google_sheet_client.set(1, 2, amount)
+
+
 if __name__ == "__main__":
     check_upbit_status()
 
     # 스케줄러 초기화
     scheduler = BlockingScheduler()
 
+    scheduler.add_job(
+        func=update_upbit_krw,
+        trigger=CronTrigger(hour=23, minute=15),
+        id="update_upbit_krw",
+        name="Upbit KRW 잔고 업데이트",
+        replace_existing=True,
+    )
+
     # 1분마다 실행하도록 스케줄 등록
     scheduler.add_job(
-        run_strategies,
+        func=run_strategies,
         trigger=IntervalTrigger(minutes=1),
         id="crypto_trading",
         name="암호화폐 자동 매매",
