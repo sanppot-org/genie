@@ -79,6 +79,7 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
         """
         position_size_valid = position_size > 0
 
+        # TODO: 매번 찍지 않기
         logger.info(
             f"""
         변동성 돌파 전략 매수 시그널:

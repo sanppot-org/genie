@@ -127,7 +127,7 @@ class UpbitAPI:
         if amount <= 0:
             raise ValueError("amount는 0보다 커야 합니다")
 
-        result = self.upbit.buy_market_order(ticker, amount)
+        result = self.upbit.buy_market_order(ticker, amount) # FIXME: 에러 로그가 제대로 안 보여서 불편하다.
         logger.info(f"ticker={ticker}, amount={amount} 매수 주문 결과: {result}")
         self._check_api_error(result)
         return OrderResult.from_dict(result)
