@@ -74,6 +74,7 @@ def run_strategies() -> None:
                 try:
                     volatility_strategy.execute()
                 except Exception as e:
+                    logger.exception(f"에러 발생: {e}")
                     strategy_context.slack_client.send_status(f"{ticker} 변동성 돌파 전략 에러 발생. log: {e}")
 
                 sleep(0.5)
