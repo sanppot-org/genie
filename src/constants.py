@@ -10,7 +10,7 @@ DEFAULT_CACHE_DIR = ".cache"
 
 KST = ZoneInfo("Asia/Seoul")
 
-RESERVED_BALANCE = 50
+RESERVED_BALANCE = 10_000
 
 # 거래 관련 상수
 KRW_BTC = "KRW-BTC"
