@@ -53,7 +53,8 @@ class UpbitAPI:
         return pyupbit.get_current_price(ticker) or 0.0
 
     @staticmethod
-    def get_candles(ticker: str = constants.KRW_BTC, interval: CandleInterval = CandleInterval.MINUTE_60, count: int = 24) -> DataFrame[CandleSchema]:
+    def get_candles(ticker: str = constants.KRW_BTC, interval: CandleInterval = CandleInterval.MINUTE_60,
+                    count: int = 24) -> DataFrame[CandleSchema]:
         """
         캔들 데이터 조회
 
@@ -127,6 +128,7 @@ class UpbitAPI:
             raise ValueError("amount는 0보다 커야 합니다")
 
         result = self.upbit.buy_market_order(ticker, amount)
+        logger.info(f"ticker={ticker}, amount={amount} 매수 주문 결과: {result}")
         self._check_api_error(result)
         return OrderResult.from_dict(result)
 
@@ -149,6 +151,7 @@ class UpbitAPI:
             raise ValueError("volume은 0보다 커야 합니다")
 
         result = self.upbit.sell_market_order(ticker, volume)
+        logger.info(f"ticker={ticker}, volume={volume} 매도 주문 결과: {result}")
         self._check_api_error(result)
         return OrderResult.from_dict(result)
 
