@@ -120,7 +120,7 @@ if __name__ == "__main__":
     # 1분마다 실행하도록 스케줄 등록
     scheduler.add_job(
         func=run_strategies,
-        trigger=IntervalTrigger(minutes=1),
+        trigger=IntervalTrigger(minutes=5),
         id="crypto_trading",
         name="암호화폐 자동 매매",
         replace_existing=True,
