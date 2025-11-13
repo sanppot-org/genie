@@ -4,9 +4,8 @@ import FinanceDataReader as fdr  # noqa: N813
 import yfinance as yf
 
 from src.common.slack.client import SlackClient
-from src.config import HantuConfig, SlackConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI
-from src.upbit.upbit_api import UpbitAPI, CandleInterval
+from src.upbit.upbit_api import CandleInterval, UpbitAPI
 
 
 class Reporter:
@@ -79,8 +78,3 @@ USDT: {usdt_today:,.2f} {usdt_emoji} {usdt_change:+.2f}% (어제: {usdt_yesterda
         """
 
         self.slack_client.send_report(message)
-
-
-if __name__ == "__main__":
-    reporter = Reporter(UpbitAPI(UpbitConfig()), HantuDomesticAPI(HantuConfig()), SlackClient(SlackConfig()))
-    reporter.report()

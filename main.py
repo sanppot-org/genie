@@ -6,6 +6,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from src.allocation_manager import AllocatedBalanceProvider
+from src.collector.price_data_collector import PriceDataCollector
 from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
@@ -48,6 +49,7 @@ order_executor = OrderExecutor(upbit_api, google_sheet_client=trades_google_shee
 
 hantu_domestic_api = HantuDomesticAPI(HantuConfig())
 reporter = Reporter(upbit_api=upbit_api, hantu_api=hantu_domestic_api, slack_cient=slack_client)
+price_data_collector = PriceDataCollector(hantu_api=hantu_domestic_api, google_sheet_client=data_google_sheet_client)
 
 # 전략 컨텍스트 생성
 strategy_context = StrategyContext(
@@ -112,6 +114,10 @@ def report() -> None:
     reporter.report()
 
 
+def update_gold_price() -> None:
+    price_data_collector.collect_gold_price()
+
+
 if __name__ == "__main__":
     check_upbit_status()
 
@@ -134,12 +140,19 @@ if __name__ == "__main__":
         replace_existing=True,
     )
 
-    # 1분마다 실행하도록 스케줄 등록
     scheduler.add_job(
         func=run_strategies,
         trigger=IntervalTrigger(minutes=5),
         id="crypto_trading",
         name="암호화폐 자동 매매",
+        replace_existing=True,
+    )
+
+    scheduler.add_job(
+        func=update_gold_price,
+        trigger=IntervalTrigger(minutes=1),
+        id="collect_gold_price",
+        name="금현물 가격 업데이트",
         replace_existing=True,
     )
 
