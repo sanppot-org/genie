@@ -1,9 +1,4 @@
 import logging
-from time import sleep
-
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 
 from src.allocation_manager import AllocatedBalanceProvider
 from src.collector.price_data_collector import PriceDataCollector
@@ -12,16 +7,23 @@ from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
 from src.config import GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
-from src.constants import KST, RESERVED_BALANCE
+from src.constants import KST
 from src.hantu import HantuDomesticAPI
+from src.scheduled_tasks import (
+    ScheduledTasksContext,
+    check_upbit_status,
+    report,
+    run_strategies,
+    update_gold_price,
+    update_upbit_krw,
+)
+from src.scheduler_setup import setup_scheduler
 from src.logging_config import setup_logging
 from src.report.reporter import Reporter
 from src.strategy.cache.cache_manager import CacheManager
-from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.strategy_context import StrategyContext
-from src.strategy.volatility_strategy import VolatilityStrategy
 from src.upbit.upbit_api import UpbitAPI
 
 # Better Stack 로깅 설정 (가장 먼저 실행)
@@ -62,102 +64,34 @@ strategy_context = StrategyContext(
     cache_manager=cache_manager,
 )
 
-
-def run_strategies() -> None:
-    """1분마다 실행될 전략 실행 함수"""
-    try:
-        balance = allocation_manager.get_allocated_amount()
-        allocated_balance = (balance - RESERVED_BALANCE) / len(tickers)
-
-        for ticker in tickers:
-            try:
-                strategy_config = BaseStrategyConfig(ticker=ticker, total_balance=total_balance,
-                                                     allocated_balance=allocated_balance)
-
-                volatility_strategy = VolatilityStrategy(strategy_context.order_executor, strategy_config,
-                                                         strategy_context.clock, strategy_context.data_collector,
-                                                         strategy_context.cache_manager)
-
-                try:
-                    volatility_strategy.execute()
-                except Exception as e:
-                    logger.exception(f"에러 발생: {e}")
-                    strategy_context.slack_client.send_status(f"{ticker} 변동성 돌파 전략 에러 발생. log: {e}")
-
-                sleep(0.5)
-            except Exception as e:
-                logger.error(f"{ticker} 전략 실행 실패: {e}", exc_info=True)
-                slack_client.send_status(f"{ticker} 전략 실행 실패: {e}")
-
-        # 헬스체크 ping 전송 (성공 시)
-        healthcheck_client.ping()
-    except Exception as e:
-        logger.error(f"전략 실행 중 예외 발생: {e}", exc_info=True)
-        slack_client.send_status(f"전략 실행 중 예외 발생: {e}")
-
-
-def check_upbit_status() -> None:
-    if not upbit_api.get_available_amount():
-        slack_client.send_status("전략에 할당된 금액이 없거나, upbit에 접근할 수 없습니다.")
-        raise SystemError
-
-
-def update_upbit_krw() -> None:
-    """Upbit KRW 잔고를 Google Sheet에 기록
-    Google Sheet의 (1, 2) 셀에 업데이트합니다.
-    """
-    amount = upbit_api.get_available_amount()
-    data_google_sheet_client.set(1, 2, amount)
-
-
-def report() -> None:
-    reporter.report()
-
-
-def update_gold_price() -> None:
-    price_data_collector.collect_gold_price()
-
+# 스케줄러 작업 컨텍스트 생성
+tasks_context = ScheduledTasksContext(
+    allocation_manager=allocation_manager,
+    upbit_api=upbit_api,
+    slack_client=slack_client,
+    healthcheck_client=healthcheck_client,
+    reporter=reporter,
+    price_data_collector=price_data_collector,
+    data_google_sheet_client=data_google_sheet_client,
+    strategy_context=strategy_context,
+    tickers=tickers,
+    total_balance=total_balance,
+    logger=logger,
+)
 
 if __name__ == "__main__":
-    check_upbit_status()
+    check_upbit_status(tasks_context)
 
-    # 스케줄러 초기화
-    scheduler = BlockingScheduler()
-
-    scheduler.add_job(
-        func=report,
-        trigger=CronTrigger(hour=7, minute=55),
-        id="update report",
-        name="리포트 업데이트",
-        replace_existing=True,
-    )
-
-    scheduler.add_job(
-        func=update_upbit_krw,
-        trigger=CronTrigger(hour=23, minute=15),
-        id="update_upbit_krw",
-        name="Upbit KRW 잔고 업데이트",
-        replace_existing=True,
-    )
-
-    scheduler.add_job(
-        func=run_strategies,
-        trigger=IntervalTrigger(minutes=5),
-        id="crypto_trading",
-        name="암호화폐 자동 매매",
-        replace_existing=True,
-    )
-
-    scheduler.add_job(
-        func=update_gold_price,
-        trigger=IntervalTrigger(minutes=1),
-        id="collect_gold_price",
-        name="금현물 가격 업데이트",
-        replace_existing=True,
+    # 스케줄러 설정
+    scheduler = setup_scheduler(
+        report_func=lambda: report(tasks_context),
+        update_upbit_krw_func=lambda: update_upbit_krw(tasks_context),
+        run_strategies_func=lambda: run_strategies(tasks_context),
+        update_gold_price_func=lambda: update_gold_price(tasks_context),
     )
 
     # 즉시 한 번 실행
-    run_strategies()
+    run_strategies(tasks_context)
 
     try:
         # 스케줄러 시작 (블로킹)
