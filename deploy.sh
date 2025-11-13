@@ -20,10 +20,20 @@ echo "🚀 배포 시작..."
 # 작업 디렉토리로 이동
 cd /home/ubuntu/genie
 
-# 현재 커밋 저장 (롤백용)
-echo "💾 현재 버전 저장 중..."
-PREVIOUS_COMMIT=$(git rev-parse HEAD)
-echo "이전 커밋: $PREVIOUS_COMMIT"
+# 현재 버전과 이전 버전 확인
+echo "💾 버전 정보 확인 중..."
+CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || git rev-parse HEAD)
+# 현재 태그 바로 이전 태그 찾기 (semantic version 기준 정렬)
+PREVIOUS_VERSION=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 2 | tail -n 1)
+
+# 이전 버전이 없으면 현재 커밋의 부모 커밋 사용
+if [ -z "$PREVIOUS_VERSION" ]; then
+    PREVIOUS_VERSION=$(git rev-parse HEAD^)
+    echo "⚠️  이전 태그를 찾을 수 없어 부모 커밋을 사용합니다."
+fi
+
+echo "현재 버전: $CURRENT_VERSION"
+echo "롤백 대상: $PREVIOUS_VERSION"
 
 # 기존 .venv 디렉토리 삭제 (권한 문제 방지)
 if [ -d ".venv" ]; then
@@ -64,8 +74,8 @@ if ! sudo systemctl is-active --quiet genie; then
     echo ""
 
     # 롤백 시작
-    echo "🔄 이전 버전으로 롤백 시작..."
-    git checkout $PREVIOUS_COMMIT
+    echo "🔄 이전 버전($PREVIOUS_VERSION)으로 롤백 시작..."
+    git checkout $PREVIOUS_VERSION
 
     echo "📦 이전 버전 의존성 재설치 중..."
     uv sync
