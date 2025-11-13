@@ -7,7 +7,8 @@ import logging
 from time import sleep
 
 from src.allocation_manager import AllocatedBalanceProvider
-from src.collector.price_data_collector import PriceDataCollector
+from src.collector.price_data_collector import GoogleSheetDataCollector
+from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
@@ -37,18 +38,18 @@ class ScheduledTasksContext:
     """
 
     def __init__(
-        self,
-        allocation_manager: AllocatedBalanceProvider,
-        upbit_api: UpbitAPI,
-        slack_client: SlackClient,
-        healthcheck_client: HealthcheckClient,
-        reporter: Reporter,
-        price_data_collector: PriceDataCollector,
-        data_google_sheet_client: GoogleSheetClient,
-        strategy_context: StrategyContext,
-        tickers: list[str],
-        total_balance: int,
-        logger: logging.Logger,
+            self,
+            allocation_manager: AllocatedBalanceProvider,
+            upbit_api: UpbitAPI,
+            slack_client: SlackClient,
+            healthcheck_client: HealthcheckClient,
+            reporter: Reporter,
+            price_data_collector: GoogleSheetDataCollector,
+            data_google_sheet_client: GoogleSheetClient,
+            strategy_context: StrategyContext,
+            tickers: list[str],
+            total_balance: int,
+            logger: logging.Logger,
     ) -> None:
         self.allocation_manager = allocation_manager
         self.upbit_api = upbit_api
@@ -118,7 +119,10 @@ def update_upbit_krw(context: ScheduledTasksContext) -> None:
     Google Sheet의 (1, 2) 셀에 업데이트합니다.
     """
     amount = context.upbit_api.get_available_amount()
-    context.data_google_sheet_client.set(1, 2, amount)
+    context.data_google_sheet_client.batch_update(updates=[
+        CellUpdate.data(2, amount),
+        CellUpdate.now(2)
+    ])
 
 
 def report(context: ScheduledTasksContext) -> None:
@@ -126,6 +130,6 @@ def report(context: ScheduledTasksContext) -> None:
     context.reporter.report()
 
 
-def update_gold_price(context: ScheduledTasksContext) -> None:
-    """금현물 가격 업데이트"""
-    context.price_data_collector.collect_gold_price()
+def update_data(context: ScheduledTasksContext) -> None:
+    """구글 시트 데이터 업데이트"""
+    context.price_data_collector.collect_price()

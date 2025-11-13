@@ -1,7 +1,7 @@
 import logging
 
 from src.allocation_manager import AllocatedBalanceProvider
-from src.collector.price_data_collector import PriceDataCollector
+from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
@@ -9,17 +9,17 @@ from src.common.slack.client import SlackClient
 from src.config import GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST
 from src.hantu import HantuDomesticAPI
+from src.logging_config import setup_logging
+from src.report.reporter import Reporter
 from src.scheduled_tasks import (
     ScheduledTasksContext,
     check_upbit_status,
     report,
     run_strategies,
-    update_gold_price,
+    update_data,
     update_upbit_krw,
 )
 from src.scheduler_setup import setup_scheduler
-from src.logging_config import setup_logging
-from src.report.reporter import Reporter
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -31,10 +31,10 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # TODO: DB 설정
-total_balance = 110_000_000
+total_balance = 115_000_000
 tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
 
-data_google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="data")
+data_google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="auto_data")
 
 # 공유 클라이언트 및 헬스체크
 slack_client = SlackClient(SlackConfig())
@@ -51,7 +51,7 @@ order_executor = OrderExecutor(upbit_api, google_sheet_client=trades_google_shee
 
 hantu_domestic_api = HantuDomesticAPI(HantuConfig())
 reporter = Reporter(upbit_api=upbit_api, hantu_api=hantu_domestic_api, slack_cient=slack_client)
-price_data_collector = PriceDataCollector(hantu_api=hantu_domestic_api, google_sheet_client=data_google_sheet_client)
+price_data_collector = GoogleSheetDataCollector(hantu_api=hantu_domestic_api, google_sheet_client=data_google_sheet_client)
 
 # 전략 컨텍스트 생성
 strategy_context = StrategyContext(
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         report_func=lambda: report(tasks_context),
         update_upbit_krw_func=lambda: update_upbit_krw(tasks_context),
         run_strategies_func=lambda: run_strategies(tasks_context),
-        update_gold_price_func=lambda: update_gold_price(tasks_context),
+        update_data_func=lambda: update_data(tasks_context),
     )
 
     # 즉시 한 번 실행

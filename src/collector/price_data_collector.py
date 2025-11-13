@@ -1,21 +1,43 @@
+import FinanceDataReader as fdr  # noqa: N813
+import yfinance as yf
+
+from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.client import GoogleSheetClient
+from src.config import GoogleSheetConfig, HantuConfig
 from src.hantu import HantuDomesticAPI
 
 # 금 현물 종목 코드 (한국투자증권)
 GOLD_TICKER_CODE = "M04020000"
 
 # 구글 시트 금 가격 저장 위치 (행, 열)
-GOLD_PRICE_ROW = 2
-GOLD_PRICE_COL = 2
+DOMESTIC_GOLD_PRICE_ROW = 3
+INTERNATIONAL_GOLD_PRICE_ROW = 4
+USD_KRW_PRICE_ROW = 5
 
 
-class PriceDataCollector:
+class GoogleSheetDataCollector:
     def __init__(self, hantu_api: HantuDomesticAPI, google_sheet_client: GoogleSheetClient) -> None:
         self.hantu_api = hantu_api
         self.google_sheet_client = google_sheet_client
 
-    def collect_gold_price(self) -> None:
-        chart_response = self.hantu_api.get_stock_price(GOLD_TICKER_CODE)
-        gold_price = float(chart_response.output.stck_prpr)
+    def collect_price(self) -> None:
+        usd_krw = float(yf.Ticker('KRW=X').history(period='1d')['Close'].iloc[0])
+        domestic_gold_price = float(self.hantu_api.get_stock_price(GOLD_TICKER_CODE).output.stck_prpr)
+        international_gold_price = float(fdr.DataReader('GC=F')['Close'].iloc[-1] / 31.1 * usd_krw)
 
-        self.google_sheet_client.set(GOLD_PRICE_ROW, GOLD_PRICE_COL, gold_price)
+        self.google_sheet_client.batch_update([
+            CellUpdate.data(row=USD_KRW_PRICE_ROW, value=usd_krw),
+            CellUpdate.data(row=DOMESTIC_GOLD_PRICE_ROW, value=domestic_gold_price),
+            CellUpdate.data(row=INTERNATIONAL_GOLD_PRICE_ROW, value=international_gold_price),
+
+            CellUpdate.now(row=USD_KRW_PRICE_ROW),
+            CellUpdate.now(row=DOMESTIC_GOLD_PRICE_ROW),
+            CellUpdate.now(row=INTERNATIONAL_GOLD_PRICE_ROW)
+        ])
+
+
+if __name__ == "__main__":
+    hantu_api = HantuDomesticAPI(HantuConfig())
+    google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="auto_data")
+    collector = GoogleSheetDataCollector(hantu_api, google_sheet_client)
+    collector.collect_price()

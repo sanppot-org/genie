@@ -6,6 +6,7 @@ import gspread
 from gspread.exceptions import APIError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.trade_record import TradeRecord
 from src.config import GoogleSheetConfig
 from src.strategy.order.execution_result import ExecutionResult
@@ -118,3 +119,33 @@ class GoogleSheetClient:
     )
     def set(self, row: int, col: int, value: str | float | int) -> None:
         self.sheet.update_cell(row, col, value)
+
+    def set_now(self, row: int, col: int) -> None:
+        from datetime import datetime
+        self.set(row, col, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        retry=retry_if_exception_type(APIError),
+        reraise=True,
+    )
+    def batch_update(self, updates: list[CellUpdate]) -> None:
+        """
+        여러 셀을 한 번의 API 호출로 업데이트합니다.
+
+        Args:
+            updates: CellUpdate 객체의 리스트
+
+        Examples:
+            >>> from src.common.google_sheet.cell_update import CellUpdate
+            >>> client.batch_update([
+            ...     CellUpdate(row=1, col=1, value=100),
+            ...     CellUpdate(row=1, col=2, value="2025-01-15 10:30:00")
+            ... ])
+        """
+        cells = []
+        for update in updates:
+            row, col, value = update.to_tuple()
+            cells.append(gspread.cell.Cell(row, col, str(value)))
+        self.sheet.update_cells(cells)
