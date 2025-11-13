@@ -121,8 +121,3 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "yfinance"
 ignore_missing_imports = true
-
-# upbit 타입 무시
-[[tool.mypy.overrides]]
-module = "upbit.*"
-ignore_missing_imports = true
