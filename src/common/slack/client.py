@@ -23,6 +23,9 @@ class SlackClient:
         message = {"text": f"""[{now.strftime("%Y-%m-%d %H:%M:%S")}]\n{str(msg)}"""}
         requests.post(url, json=message, headers={"Content-Type": "application/json"})
 
+    def send_report(self, msg: str) -> None:
+        self._send_message(self.config.report_url, msg)
+
     def send_log(self, msg: str) -> None:
         self._send_message(self.config.log_url, msg)
 

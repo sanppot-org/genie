@@ -22,6 +22,8 @@ dependencies = [
     "gspread>=6.0.0",
     "gspread-dataframe>=4.0.0",
     "tenacity>=9.0.0",
+    "yfinance>=0.2.66",
+    "finance-datareader>=0.9.96",
 ]
 
 [tool.pytest.ini_options]

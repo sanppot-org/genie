@@ -5,12 +5,14 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from hantu import HantuDomesticAPI
+from report.reporter import Reporter
 from src.allocation_manager import AllocatedBalanceProvider
 from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
-from src.config import GoogleSheetConfig, HealthcheckConfig, SlackConfig, UpbitConfig
+from src.config import GoogleSheetConfig, HealthcheckConfig, SlackConfig, UpbitConfig, HantuConfig
 from src.constants import KST, RESERVED_BALANCE
 from src.logging_config import setup_logging
 from src.strategy.cache.cache_manager import CacheManager
@@ -26,7 +28,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 # TODO: DB 설정
-total_balance = 100_000_000
+total_balance = 110_000_000
 tickers = ["KRW-BTC", "KRW-ETH", "KRW-XRP"]
 
 data_google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="data")
@@ -43,6 +45,9 @@ data_collector = DataCollector(clock, slack_client)
 trades_google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="Trades")
 cache_manager = CacheManager()
 order_executor = OrderExecutor(upbit_api, google_sheet_client=trades_google_sheet_client, slack_client=slack_client)
+
+hantu_domestic_api = HantuDomesticAPI(HantuConfig())
+reporter = Reporter(upbit_api=upbit_api, hantu_api=hantu_domestic_api, slack_cient=slack_client)
 
 # 전략 컨텍스트 생성
 strategy_context = StrategyContext(
@@ -103,11 +108,23 @@ def update_upbit_krw() -> None:
     data_google_sheet_client.set(1, 2, amount)
 
 
+def report() -> None:
+    reporter.report()
+
+
 if __name__ == "__main__":
     check_upbit_status()
 
     # 스케줄러 초기화
     scheduler = BlockingScheduler()
+
+    scheduler.add_job(
+        func=report,
+        trigger=CronTrigger(hour=7, minute=55),
+        id="update report",
+        name="리포트 업데이트",
+        replace_existing=True,
+    )
 
     scheduler.add_job(
         func=update_upbit_krw,
