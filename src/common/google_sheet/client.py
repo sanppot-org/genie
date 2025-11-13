@@ -132,7 +132,7 @@ class GoogleSheetClient:
     )
     def batch_update(self, updates: list[CellUpdate]) -> None:
         """
-        여러 셀을 한 번의 API 호출로 업데이트합니다.
+        여러 셀을 한 번의 API 호출로 업데이트합니다 (서식 유지).
 
         Args:
             updates: CellUpdate 객체의 리스트
@@ -144,8 +144,13 @@ class GoogleSheetClient:
             ...     CellUpdate(row=1, col=2, value="2025-01-15 10:30:00")
             ... ])
         """
-        cells = []
+        batch_data = []
         for update in updates:
             row, col, value = update.to_tuple()
-            cells.append(gspread.cell.Cell(row, col, str(value)))
-        self.sheet.update_cells(cells)
+            # row, col을 A1 notation으로 변환 (예: 1, 1 -> "A1")
+            cell_address = gspread.utils.rowcol_to_a1(row, col)
+            batch_data.append({
+                'range': cell_address,
+                'values': [[value]]
+            })
+        self.sheet.batch_update(batch_data)
