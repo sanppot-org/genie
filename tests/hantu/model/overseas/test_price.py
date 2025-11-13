@@ -1,7 +1,7 @@
 """해외주식 시세 조회 모델 테스트"""
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from src.hantu.model.overseas.price import (
     OverseasMinuteCandleData,

@@ -1,6 +1,6 @@
+from datetime import datetime
 import json
 import logging
-from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, Field

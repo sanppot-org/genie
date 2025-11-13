@@ -1,17 +1,17 @@
 from datetime import datetime, timedelta
 
-import FinanceDataReader as fdr
+import FinanceDataReader as fdr  # noqa: N813
 import yfinance as yf
 
 from src.common.slack.client import SlackClient
-from src.config import UpbitConfig, HantuConfig, SlackConfig
+from src.config import HantuConfig, SlackConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI
 from src.upbit.upbit_api import UpbitAPI
 from upbit.upbit_api import CandleInterval
 
 
 class Reporter:
-    def __init__(self, upbit_api: UpbitAPI, hantu_api: HantuDomesticAPI, slack_cient: SlackClient):
+    def __init__(self, upbit_api: UpbitAPI, hantu_api: HantuDomesticAPI, slack_cient: SlackClient) -> None:
         self.upbit_api = upbit_api
         self.hantu_api = hantu_api
         self.slack_client = slack_cient
@@ -26,7 +26,7 @@ class Reporter:
         else:
             return "➡️"
 
-    def report(self):
+    def report(self) -> None:
         # 날짜 계산
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)

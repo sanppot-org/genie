@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "genie"
 version = "0.1.0"
@@ -26,6 +30,13 @@ dependencies = [
     "finance-datareader>=0.9.96",
 ]
 
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src", "src.*"]
+
 [tool.pytest.ini_options]
 pythonpath = "."
 
@@ -53,6 +64,10 @@ select = [
     "C4", # flake8-comprehensions
 ]
 ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+force-sort-within-sections = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = [
@@ -96,3 +111,18 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "src.backtest.*"
 warn_return_any = false
+
+# FinanceDataReader 타입 무시
+[[tool.mypy.overrides]]
+module = "FinanceDataReader"
+ignore_missing_imports = true
+
+# yfinance 타입 무시
+[[tool.mypy.overrides]]
+module = "yfinance"
+ignore_missing_imports = true
+
+# upbit 타입 무시
+[[tool.mypy.overrides]]
+module = "upbit.*"
+ignore_missing_imports = true

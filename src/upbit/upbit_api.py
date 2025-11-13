@@ -4,13 +4,13 @@
 업비트 거래소와 연동하여 잔고 조회, 시세 조회, 거래 등의 기능을 제공합니다.
 """
 
+from enum import Enum
 import logging
 import time
-from enum import Enum
 
 import pandas as pd
-import pyupbit  # type: ignore
 from pandera.typing import DataFrame
+import pyupbit  # type: ignore
 
 from src import constants
 from src.config import UpbitConfig

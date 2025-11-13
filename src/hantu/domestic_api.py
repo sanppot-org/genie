@@ -1,7 +1,7 @@
-import logging
-import time
 from datetime import date
 from datetime import time as time_obj
+import logging
+import time
 
 import requests
 

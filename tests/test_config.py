@@ -3,8 +3,8 @@
 import os
 from unittest.mock import patch
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from src.config import UpbitConfig
 

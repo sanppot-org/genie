@@ -1,7 +1,7 @@
 """OrderNotification 모델 테스트"""
 
-import pytest
 from pydantic import ValidationError
+import pytest
 
 from src.common.slack.order_notification import OrderNotification
 
