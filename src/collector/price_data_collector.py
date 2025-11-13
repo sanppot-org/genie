@@ -3,16 +3,15 @@ import yfinance as yf
 
 from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.client import GoogleSheetClient
-from src.config import GoogleSheetConfig, HantuConfig
 from src.hantu import HantuDomesticAPI
 
 # 금 현물 종목 코드 (한국투자증권)
 GOLD_TICKER_CODE = "M04020000"
 
 # 구글 시트 금 가격 저장 위치 (행, 열)
-DOMESTIC_GOLD_PRICE_ROW = 3
-INTERNATIONAL_GOLD_PRICE_ROW = 4
-USD_KRW_PRICE_ROW = 5
+USD_KRW_PRICE_ROW = 3
+DOMESTIC_GOLD_PRICE_ROW = 4
+INTERNATIONAL_GOLD_PRICE_ROW = 5
 
 
 class GoogleSheetDataCollector:
@@ -34,10 +33,3 @@ class GoogleSheetDataCollector:
             CellUpdate.now(row=DOMESTIC_GOLD_PRICE_ROW),
             CellUpdate.now(row=INTERNATIONAL_GOLD_PRICE_ROW)
         ])
-
-
-if __name__ == "__main__":
-    hantu_api = HantuDomesticAPI(HantuConfig())
-    google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), sheet_name="auto_data")
-    collector = GoogleSheetDataCollector(hantu_api, google_sheet_client)
-    collector.collect_price()
