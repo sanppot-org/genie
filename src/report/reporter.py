@@ -6,8 +6,7 @@ import yfinance as yf
 from src.common.slack.client import SlackClient
 from src.config import HantuConfig, SlackConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI
-from src.upbit.upbit_api import UpbitAPI
-from upbit.upbit_api import CandleInterval
+from src.upbit.upbit_api import UpbitAPI, CandleInterval
 
 
 class Reporter:
