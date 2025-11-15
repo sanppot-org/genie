@@ -35,9 +35,9 @@ class Reporter:
         krw_usd_today = float(krw_history['Close'].iloc[1])
 
         # 2. 국내 금가격 - HantuAPI
-        chart_response = self.hantu_api.get_daily_chart("M04020000", yesterday, today)
-        domestic_gold_yesterday = float(chart_response.output2[1].stck_clpr)
-        domestic_gold_today = float(chart_response.output2[0].stck_clpr)
+        domestic_gold_price = self.hantu_api.get_stock_price(ticker="M04020000")
+        domestic_gold_today = float(domestic_gold_price.output.stck_prpr)
+        domestic_gold_yesterday = domestic_gold_today + -float(domestic_gold_price.output.prdy_vrss)
 
         # 3. 국제 금가격 - FinanceDataReader
         gold_df = fdr.DataReader('GC=F', str(yesterday), str(today))
@@ -54,7 +54,7 @@ class Reporter:
         dollar_premium = (usdt_today / krw_usd_today - 1) * 100
 
         # 변화율 계산
-        domestic_gold_change = (domestic_gold_today / domestic_gold_yesterday - 1) * 100
+        domestic_gold_change = float(domestic_gold_price.output.prdy_ctrt)
         intl_gold_change = (intl_gold_today / intl_gold_yesterday - 1) * 100
         usdt_change = (usdt_today / usdt_yesterday - 1) * 100
         krw_usd_change = (krw_usd_today / krw_usd_yesterday - 1) * 100

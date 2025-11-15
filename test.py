@@ -1,8 +1,14 @@
 import logging
+from datetime import datetime, timedelta
 
-from src.config import HantuConfig, UpbitConfig
+import yfinance as yf
+
+from main import hantu_domestic_api
+from src.common.slack.client import SlackClient
+from src.config import HantuConfig, UpbitConfig, SlackConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
+from src.report.reporter import Reporter
 from src.upbit.upbit_api import UpbitAPI
 
 # 로깅 설정
@@ -87,3 +93,14 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 # slack_client.send_message("hi")
 
 # print(result)
+
+### report ###
+# reporter = Reporter(upbit_api=upbit_api, hantu_api=hantu_domestic_api, slack_cient=SlackClient(SlackConfig()))
+# reporter.report()
+
+# 2. 국내 금가격 - HantuAPI
+# chart_response = hantu_domestic_api.get_daily_chart("M04020000", yesterday, today)
+# print(chart_response)
+
+stock_price = hantu_domestic_api.get_stock_price(ticker="M04020000")
+print(stock_price)
