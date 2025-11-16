@@ -32,7 +32,7 @@ def setup_scheduler(
     schedules = [
         ScheduleConfig(
             func=report_func,
-            trigger=CronTrigger(hour=7, minute=55),
+            trigger=CronTrigger(hour="7-21", minute=56),
             id="update_report",
             name="리포트 업데이트",
         ),
