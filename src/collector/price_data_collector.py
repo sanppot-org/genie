@@ -20,7 +20,7 @@ class GoogleSheetDataCollector:
         self.google_sheet_client = google_sheet_client
 
     def collect_price(self) -> None:
-        usd_krw = float(yf.Ticker('KRW=X').history(period='1d')['Close'].iloc[0])
+        usd_krw = float(yf.Ticker('KRW=X').history(period='1d')['Close'].iloc[-1])
         domestic_gold_price = float(self.hantu_api.get_stock_price(GOLD_TICKER_CODE).output.stck_prpr)
         international_gold_price = float(fdr.DataReader('GC=F')['Close'].iloc[-1] / 31.1 * usd_krw)
 

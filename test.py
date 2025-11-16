@@ -2,6 +2,7 @@ import logging
 from datetime import datetime, timedelta
 
 import yfinance as yf
+import FinanceDataReader as fdr
 
 from main import hantu_domestic_api
 from src.common.slack.client import SlackClient
@@ -101,6 +102,3 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 # 2. 국내 금가격 - HantuAPI
 # chart_response = hantu_domestic_api.get_daily_chart("M04020000", yesterday, today)
 # print(chart_response)
-
-stock_price = hantu_domestic_api.get_stock_price(ticker="M04020000")
-print(stock_price)
