@@ -5,8 +5,10 @@ import yfinance as yf
 import FinanceDataReader as fdr
 
 from main import hantu_domestic_api
+from src.collector.price_data_collector import GoogleSheetDataCollector
+from src.common.google_sheet.client import GoogleSheetClient
 from src.common.slack.client import SlackClient
-from src.config import HantuConfig, UpbitConfig, SlackConfig
+from src.config import HantuConfig, UpbitConfig, SlackConfig, GoogleSheetConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
 from src.report.reporter import Reporter
@@ -22,6 +24,8 @@ hantu_overseas_api = HantuOverseasAPI(HantuConfig())  # type: ignore
 
 v_hantu_domestic_api = HantuDomesticAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
+
+google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), "auto_data")
 
 # Upbit
 
@@ -102,3 +106,6 @@ v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # t
 # 2. 국내 금가격 - HantuAPI
 # chart_response = hantu_domestic_api.get_daily_chart("M04020000", yesterday, today)
 # print(chart_response)
+
+### google sheet data collector ###
+GoogleSheetDataCollector(hantu_api=hantu_domestic_api, google_sheet_client=google_sheet_client).collect_price()

@@ -121,3 +121,13 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "yfinance"
 ignore_missing_imports = true
+
+# apscheduler 타입 무시
+[[tool.mypy.overrides]]
+module = "apscheduler.*"
+ignore_missing_imports = true
+
+# collector 모듈의 외부 라이브러리 반환값 타입 체크 완화
+[[tool.mypy.overrides]]
+module = "src.collector.*"
+warn_return_any = false

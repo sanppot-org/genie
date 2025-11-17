@@ -1,8 +1,5 @@
-from datetime import datetime, timedelta
 
-import FinanceDataReader as fdr  # noqa: N813
-import yfinance as yf
-
+from src.collector.data_fetcher import fetch_finance_data_reader, fetch_yfinance
 from src.common.slack.client import SlackClient
 from src.hantu import HantuDomesticAPI
 from src.upbit.upbit_api import UpbitAPI
@@ -25,21 +22,14 @@ class Reporter:
             return "➡️"
 
     def report(self) -> None:
-        # 날짜 계산
-        today = datetime.now().date()
-        yesterday = today - timedelta(days=1)
-
         # 1. 환율 (KRW/USD) - yfinance
-        krw_history = yf.Ticker('KRW=X').history(period='1d')
-        krw_usd_today = float(krw_history['Close'].iloc[-1])
+        krw_usd_today = float(fetch_yfinance('KRW=X')['Close'].iloc[-1])
 
         # 2. 국내 금가격 - HantuAPI
-        domestic_gold_price = self.hantu_api.get_stock_price(ticker="M04020000")
-        domestic_gold_today = float(domestic_gold_price.output.stck_prpr)
+        domestic_gold_today = float(self.hantu_api.get_stock_price(ticker="M04020000").output.stck_prpr)
 
         # 3. 국제 금가격 - FinanceDataReader
-        gold_df = fdr.DataReader('GC=F', str(yesterday), str(today))
-        intl_gold_today = float(gold_df['Close'].iloc[-1] / 31.1 * krw_usd_today)
+        intl_gold_today = float(fetch_finance_data_reader('GC=F')['Close'].iloc[-1] / 31.1 * krw_usd_today)
 
         # 4. USDT - UpbitAPI
         usdt_today = float(self.upbit_api.get_current_price("KRW-USDT"))
