@@ -1,17 +1,9 @@
 import logging
-from datetime import datetime, timedelta
 
-import yfinance as yf
-import FinanceDataReader as fdr
-
-from main import hantu_domestic_api
-from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.google_sheet.client import GoogleSheetClient
-from src.common.slack.client import SlackClient
-from src.config import HantuConfig, UpbitConfig, SlackConfig, GoogleSheetConfig
+from src.config import GoogleSheetConfig, HantuConfig, UpbitConfig
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
-from src.report.reporter import Reporter
 from src.upbit.upbit_api import UpbitAPI
 
 # 로깅 설정
@@ -108,4 +100,4 @@ google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), "auto_data")
 # print(chart_response)
 
 ### google sheet data collector ###
-GoogleSheetDataCollector(hantu_api=hantu_domestic_api, google_sheet_client=google_sheet_client).collect_price()
+# GoogleSheetDataCollector(hantu_api=hantu_domestic_api, google_sheet_client=google_sheet_client).collect_price()

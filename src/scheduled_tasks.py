@@ -7,6 +7,7 @@ import logging
 from time import sleep
 
 from src.allocation_manager import AllocatedBalanceProvider
+from src.bithumb.bithumb_api import BithumbApi
 from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.client import GoogleSheetClient
@@ -41,6 +42,7 @@ class ScheduledTasksContext:
             self,
             allocation_manager: AllocatedBalanceProvider,
             upbit_api: UpbitAPI,
+            bithumb_api: BithumbApi,
             slack_client: SlackClient,
             healthcheck_client: HealthcheckClient,
             reporter: Reporter,
@@ -53,6 +55,7 @@ class ScheduledTasksContext:
     ) -> None:
         self.allocation_manager = allocation_manager
         self.upbit_api = upbit_api
+        self.bithumb_api = bithumb_api
         self.slack_client = slack_client
         self.healthcheck_client = healthcheck_client
         self.reporter = reporter
@@ -119,11 +122,19 @@ def update_upbit_krw(context: ScheduledTasksContext) -> None:
     Google Sheet의 (1, 2) 셀에 업데이트합니다.
     """
     amount = context.upbit_api.get_available_amount()
+    row = 2
     context.data_google_sheet_client.batch_update(updates=[
-        CellUpdate.data(2, amount),
-        CellUpdate.now(2)
+        CellUpdate.data(row, amount),
+        CellUpdate.now(row)
     ])
 
+def update_bithumb_krw(context: ScheduledTasksContext) -> None:
+    amount = context.bithumb_api.get_available_amount("KRW")
+    row = 6
+    context.data_google_sheet_client.batch_update(updates=[
+        CellUpdate.data(row, amount),
+        CellUpdate.now(row)
+    ])
 
 def report(context: ScheduledTasksContext) -> None:
     """리포트 생성"""

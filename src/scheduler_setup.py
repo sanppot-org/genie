@@ -15,6 +15,7 @@ from src.scheduler_config import ScheduleConfig
 def setup_scheduler(
         report_func: Callable,
         update_upbit_krw_func: Callable,
+        update_bithumb_krw_func: Callable,
         run_strategies_func: Callable,
         update_data_func: Callable,
 ) -> BlockingScheduler:
@@ -41,6 +42,12 @@ def setup_scheduler(
             trigger=CronTrigger(hour=23, minute=15),
             id="update_upbit_krw",
             name="Upbit KRW 잔고 업데이트",
+        ),
+        ScheduleConfig(
+            func=update_bithumb_krw_func,
+            trigger=CronTrigger(hour=23, minute=15),
+            id="update_bithumb_krw",
+            name="Bithumb KRW 잔고 업데이트",
         ),
         ScheduleConfig(
             func=run_strategies_func,

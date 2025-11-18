@@ -16,6 +16,7 @@ from src.scheduled_tasks import (
     check_upbit_status,
     report,
     run_strategies,
+    update_bithumb_krw,
     update_data,
     update_upbit_krw,
 )
@@ -86,6 +87,7 @@ if __name__ == "__main__":
     scheduler = setup_scheduler(
         report_func=lambda: report(tasks_context),
         update_upbit_krw_func=lambda: update_upbit_krw(tasks_context),
+        update_bithumb_krw_func=lambda: update_bithumb_krw(tasks_context),
         run_strategies_func=lambda: run_strategies(tasks_context),
         update_data_func=lambda: update_data(tasks_context),
     )
