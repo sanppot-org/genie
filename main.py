@@ -1,12 +1,13 @@
 import logging
 
 from src.allocation_manager import AllocatedBalanceProvider
+from src.bithumb.bithumb_api import BithumbApi
 from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
-from src.config import GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
+from src.config import GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig, BithumbConfig
 from src.constants import KST
 from src.hantu import HantuDomesticAPI
 from src.logging_config import setup_logging
@@ -42,6 +43,7 @@ slack_client = SlackClient(SlackConfig())
 healthcheck_client = HealthcheckClient(HealthcheckConfig())
 allocation_manager = AllocatedBalanceProvider(slack_client)
 upbit_api = UpbitAPI(UpbitConfig())
+bithumb_api = BithumbApi(BithumbConfig())
 
 # 전략 실행에 필요한 공유 컴포넌트들 (1분마다 재사용)
 clock = SystemClock(KST)
@@ -69,6 +71,7 @@ strategy_context = StrategyContext(
 tasks_context = ScheduledTasksContext(
     allocation_manager=allocation_manager,
     upbit_api=upbit_api,
+    bithumb_api=bithumb_api,
     slack_client=slack_client,
     healthcheck_client=healthcheck_client,
     reporter=reporter,
@@ -77,7 +80,7 @@ tasks_context = ScheduledTasksContext(
     strategy_context=strategy_context,
     tickers=tickers,
     total_balance=total_balance,
-    logger=logger,
+    logger=logger
 )
 
 if __name__ == "__main__":
