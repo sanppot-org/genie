@@ -166,9 +166,9 @@ class GoogleSheetClient:
         Returns:
             str | float | int: NaN/None이면 빈 문자열, 아니면 원래 값
         """
-        if pd.isna(value):
+        if pd.isna(value):  # type: ignore[call-overload]
             return ""
-        return value
+        return value  # type: ignore[return-value]
 
     def _create_updates_from_series(
         self,

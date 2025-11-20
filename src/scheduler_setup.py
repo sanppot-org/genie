@@ -24,6 +24,7 @@ def setup_scheduler(
     Args:
         report_func: 리포트 업데이트 함수
         update_upbit_krw_func: Upbit KRW 잔고 업데이트 함수
+        update_bithumb_krw_func: Bithumb KRW 잔고 업데이트 함수
         run_strategies_func: 암호화폐 자동 매매 함수
         update_data_func: 구글 시트 업데이트 함수
 

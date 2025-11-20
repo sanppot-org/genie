@@ -54,7 +54,7 @@ class BithumbApi:
             requests.ConnectionError: 네트워크 연결 실패
             requests.Timeout: 요청 타임아웃
         """
-        return requests.request(method, url, **kwargs)
+        return requests.request(method, url, **kwargs)  # type: ignore[arg-type]
 
     def get_balances(self) -> list[BalanceInfo]:
         """전체 계좌 잔고를 조회합니다."""
