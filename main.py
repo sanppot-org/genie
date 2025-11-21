@@ -15,27 +15,23 @@ from src.scheduler_setup import setup_scheduler
 # Better Stack 로깅 설정 (가장 먼저 실행)
 setup_logging()
 logger = logging.getLogger(__name__)
+container = ApplicationContainer()  # DI Container 초기화 및 자동 와이어링
 
-# DI Container 초기화
-container = ApplicationContainer()
 
-if __name__ == "__main__":
-    # 필요한 컴포넌트 가져오기
-    tasks_context = container.tasks_context()
-
-    check_upbit_status(tasks_context)
+def main() -> None:
+    check_upbit_status()
 
     # 스케줄러 설정
     scheduler = setup_scheduler(
-        report_func=lambda: report(tasks_context),
-        update_upbit_krw_func=lambda: update_upbit_krw(tasks_context),
-        update_bithumb_krw_func=lambda: update_bithumb_krw(tasks_context),
-        run_strategies_func=lambda: run_strategies(tasks_context),
-        update_data_func=lambda: update_data(tasks_context),
+        report_func=report,
+        update_upbit_krw_func=update_upbit_krw,
+        update_bithumb_krw_func=update_bithumb_krw,
+        run_strategies_func=run_strategies,
+        update_data_func=update_data,
     )
 
     # 즉시 한 번 실행
-    run_strategies(tasks_context)
+    run_strategies()
 
     try:
         # 스케줄러 시작 (블로킹)
@@ -43,3 +39,7 @@ if __name__ == "__main__":
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         logger.info("스케줄러 종료")
+
+
+if __name__ == "__main__":
+    main()

@@ -20,11 +20,18 @@ from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.strategy_context import StrategyContext
+from src.strategy.volatility_strategy import VolatilityStrategy
 from src.upbit.upbit_api import UpbitAPI
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
     """Application DI container."""
+
+    wiring_config = containers.WiringConfiguration(
+        modules=[
+            "src.scheduled_tasks",
+        ],
+    )
 
     # Configuration
     google_sheet_config = providers.Singleton(GoogleSheetConfig)
@@ -68,6 +75,15 @@ class ApplicationContainer(containers.DeclarativeContainer):
         google_sheet_client=data_google_sheet_client,
     )
 
+    # Strategy Factories
+    volatility_strategy_factory = providers.Factory(
+        VolatilityStrategy,
+        order_executor=order_executor,
+        clock=clock,
+        data_collector=data_collector,
+        cache_manager=cache_manager,
+    )
+
     # Strategy Context
     strategy_context = providers.Singleton(
         StrategyContext,
@@ -84,14 +100,12 @@ class ApplicationContainer(containers.DeclarativeContainer):
     tasks_context = providers.Singleton(
         ScheduledTasksContext,
         allocation_manager=allocation_manager,
-        upbit_api=upbit_api,
-        bithumb_api=bithumb_api,
         slack_client=slack_client,
         healthcheck_client=healthcheck_client,
-        reporter=reporter,
-        price_data_collector=price_data_collector,
-        data_google_sheet_client=data_google_sheet_client,
-        strategy_context=strategy_context,
+        order_executor=order_executor,
+        clock=clock,
+        data_collector=data_collector,
+        cache_manager=cache_manager,
         tickers=["KRW-BTC", "KRW-ETH", "KRW-XRP"],
         total_balance=115_000_000,
         logger=providers.Object(logging.getLogger(__name__)),

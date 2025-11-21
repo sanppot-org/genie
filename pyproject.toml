@@ -135,3 +135,13 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "src.collector.*"
 warn_return_any = false
+
+# dependency_injector Provide 타입 체크 완화
+[[tool.mypy.overrides]]
+module = "dependency_injector.*"
+ignore_missing_imports = true
+
+# scheduled_tasks의 dependency injection 타입 체크 완화
+[[tool.mypy.overrides]]
+module = "src.scheduled_tasks"
+disable_error_code = ["has-type"]
