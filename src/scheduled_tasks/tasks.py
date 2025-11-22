@@ -3,7 +3,6 @@
 스케줄러에서 실행되는 모든 작업 함수들을 관리합니다.
 """
 
-from collections.abc import Callable
 from time import sleep
 
 from dependency_injector.wiring import Provide, inject
@@ -18,15 +17,12 @@ from src.container import ApplicationContainer
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.strategy.config import BaseStrategyConfig
-from src.strategy.volatility_strategy import VolatilityStrategy
 from src.upbit.upbit_api import UpbitAPI
 
 
 @inject
 def run_strategies(
         context: ScheduledTasksContext = Provide[ApplicationContainer.tasks_context],
-        create_volatility_strategy: Callable[[BaseStrategyConfig], VolatilityStrategy] = Provide[
-            ApplicationContainer.volatility_strategy_factory],
 ) -> None:
     """1분마다 실행될 전략 실행 함수 - 의존성 자동 주입"""
     try:
@@ -41,7 +37,7 @@ def run_strategies(
                     allocated_balance=allocated_balance,
                 )
 
-                volatility_strategy = create_volatility_strategy(config=strategy_config)  # type: ignore[call-arg]
+                volatility_strategy = context.create_volatility_strategy(config=strategy_config)
 
                 try:
                     volatility_strategy.execute()

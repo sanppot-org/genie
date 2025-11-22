@@ -10,8 +10,10 @@ from src.common.clock import Clock
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
 from src.strategy.cache.cache_manager import CacheManager
+from src.strategy.config import BaseStrategyConfig
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
+from src.strategy.volatility_strategy import VolatilityStrategy
 
 
 class ScheduledTasksContext:
@@ -53,3 +55,20 @@ class ScheduledTasksContext:
         self.tickers = tickers
         self.total_balance = total_balance
         self.logger = logger
+
+    def create_volatility_strategy(self, config: BaseStrategyConfig) -> VolatilityStrategy:
+        """변동성 전략 인스턴스를 생성합니다.
+
+        Args:
+            config: 전략 설정
+
+        Returns:
+            VolatilityStrategy 인스턴스
+        """
+        return VolatilityStrategy(
+            order_executor=self.order_executor,
+            clock=self.clock,
+            collector=self.data_collector,
+            cache_manager=self.cache_manager,
+            config=config,
+        )

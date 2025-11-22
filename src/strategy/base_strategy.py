@@ -26,10 +26,10 @@ class BaseStrategy[T: StrategyCacheData](ABC):
     def __init__(
             self,
             order_executor: OrderExecutor,
-            config: BaseStrategyConfig,
             clock: Clock,
             collector: DataCollector,
             cache_manager: CacheManager,
+            config: BaseStrategyConfig,
     ) -> None:
         self._order_executor = order_executor
         self._config = config

@@ -20,7 +20,6 @@ from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.strategy_context import StrategyContext
-from src.strategy.volatility_strategy import VolatilityStrategy
 from src.upbit.upbit_api import UpbitAPI
 
 
@@ -73,15 +72,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
         GoogleSheetDataCollector,
         hantu_api=hantu_domestic_api,
         google_sheet_client=data_google_sheet_client,
-    )
-
-    # Strategy Factories
-    volatility_strategy_factory = providers.Factory(
-        VolatilityStrategy,
-        order_executor=order_executor,
-        clock=clock,
-        data_collector=data_collector,
-        cache_manager=cache_manager,
     )
 
     # Strategy Context
