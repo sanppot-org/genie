@@ -15,7 +15,7 @@ from src.config import BithumbConfig, GoogleSheetConfig, HantuConfig, Healthchec
 from src.constants import KST
 from src.hantu import HantuDomesticAPI
 from src.report.reporter import Reporter
-from src.scheduled_tasks import ScheduledTasksContext
+from src.scheduled_tasks.context import ScheduledTasksContext
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -29,7 +29,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     wiring_config = containers.WiringConfiguration(
         modules=[
-            "src.scheduled_tasks",
+            "src.scheduled_tasks.tasks",  # tasks.py를 가리킴
         ],
     )
 

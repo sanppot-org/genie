@@ -2,7 +2,7 @@ import logging
 
 from src.container import ApplicationContainer
 from src.logging_config import setup_logging
-from src.scheduled_tasks import (
+from src.scheduled_tasks.tasks import (
     check_upbit_status,
     report,
     run_strategies,
