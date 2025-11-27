@@ -26,6 +26,8 @@ class UpbitConfig(BaseSettings):
 
     upbit_secret_key: str = Field(..., min_length=1, description="업비트 시크릿 키", alias="UPBIT_SECRET_KEY")
 
+    base_url: str = Field(..., min_length=1, description="업비트 url", alias="UPBIT_BASE_URL")
+
 
 class BithumbConfig(BaseSettings):
     """빗썸 API 설정"""

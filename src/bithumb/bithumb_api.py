@@ -3,9 +3,9 @@ import uuid
 
 import jwt
 import requests
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.bithumb.model import BalanceInfo
+from src.common.http_client import HTTPMethod, make_api_request
 from src.config import BithumbConfig
 
 
@@ -33,33 +33,10 @@ class BithumbApi:
         jwt_token = self._generate_jwt_token()
         return {"Authorization": f"Bearer {jwt_token}"}
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=4),
-        retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout)),
-        reraise=True,
-    )
-    def _make_api_request(self, url: str, method: str="GET", **kwargs: object) -> requests.Response:  # type: ignore[no-any-unimported]
-        """API 요청을 수행합니다. (재시도 로직 포함)
-
-        Args:
-            method: HTTP 메서드 (GET, POST 등)
-            url: 완전한 URL (예: "https://api.bithumb.com/v1/accounts")
-            **kwargs: requests.request에 전달할 추가 인자
-
-        Returns:
-            API 응답
-
-        Raises:
-            requests.ConnectionError: 네트워크 연결 실패
-            requests.Timeout: 요청 타임아웃
-        """
-        return requests.request(method, url, **kwargs)  # type: ignore[arg-type]
-
     def get_balances(self) -> list[BalanceInfo]:
         """전체 계좌 잔고를 조회합니다."""
         headers = self._get_headers()
-        response = self._make_api_request(f"{self.API_BASE_URL}/v1/accounts", headers=headers)
+        response = make_api_request(f"{self.API_BASE_URL}/v1/accounts", headers=headers)
 
         if response.status_code != 200:
             raise Exception(f"API Error: {response.status_code}, {response.text}")

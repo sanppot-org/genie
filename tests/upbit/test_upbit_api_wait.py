@@ -41,7 +41,7 @@ class TestUpbitAPIWaitForOrderCompletion:
             mock_config = MagicMock()
             api = UpbitAPI(mock_config)
 
-            result = api.wait_for_order_completion("test-uuid-done", timeout=30.0)
+            result = api._wait_for_order_completion("test-uuid-done", timeout=30.0)
 
             # 검증
             assert isinstance(result, OrderResult)
@@ -115,7 +115,7 @@ class TestUpbitAPIWaitForOrderCompletion:
             mock_config = MagicMock()
             api = UpbitAPI(mock_config)
 
-            result = api.wait_for_order_completion("test-uuid-wait", timeout=30.0, poll_interval=0.5)
+            result = api._wait_for_order_completion("test-uuid-wait", timeout=30.0, poll_interval=0.5)
 
             # 검증
             assert isinstance(result, OrderResult)
@@ -157,7 +157,7 @@ class TestUpbitAPIWaitForOrderCompletion:
             api = UpbitAPI(mock_config)
 
             with pytest.raises(OrderTimeoutError) as exc_info:
-                api.wait_for_order_completion("test-uuid-timeout", timeout=30.0)
+                api._wait_for_order_completion("test-uuid-timeout", timeout=30.0)
 
             assert exc_info.value.uuid == "test-uuid-timeout"
             assert exc_info.value.timeout == 30.0
