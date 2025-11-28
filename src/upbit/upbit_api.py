@@ -5,19 +5,24 @@
 """
 
 from enum import Enum
+import hashlib
 import logging
 import time
+from urllib.parse import unquote, urlencode
+import uuid
 
+import jwt
 import pandas as pd
 from pandera.typing import DataFrame
 import pyupbit  # type: ignore
 
 from src import constants
+from src.common.http_client import HTTPMethod, make_api_request
 from src.config import UpbitConfig
 from src.upbit.model.balance import BalanceInfo
 from src.upbit.model.candle import CandleSchema
 from src.upbit.model.error import OrderTimeoutError, UpbitAPIError
-from src.upbit.model.order import OrderResult, OrderState
+from src.upbit.model.order import OrderParams, OrderResult, OrderSide, OrderState, OrderType, TimeInForce
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +85,7 @@ class UpbitAPI:
     def __init__(self, config: UpbitConfig | None = None) -> None:
         if config is None:
             config = UpbitConfig()
+        self.config = config
         self.upbit = pyupbit.Upbit(config.upbit_access_key, config.upbit_secret_key)
 
     def get_available_amount(self, ticker: str = constants.CURRENCY_KRW) -> float:
@@ -127,7 +133,7 @@ class UpbitAPI:
         if amount <= 0:
             raise ValueError("amount는 0보다 커야 합니다")
 
-        result = self.upbit.buy_market_order(ticker, amount) # FIXME: 에러 로그가 제대로 안 보여서 불편하다.
+        result = self.upbit.buy_market_order(ticker, amount)  # FIXME: 에러 로그가 제대로 안 보여서 불편하다.
         logger.info(f"ticker={ticker}, amount={amount} 매수 주문 결과: {result}")
         self._check_api_error(result)
         return OrderResult.from_dict(result)
@@ -203,7 +209,70 @@ class UpbitAPI:
 
         return self.sell_market_order(ticker, volume)
 
-    def wait_for_order_completion(self, uuid: str, timeout: float = 30.0, poll_interval: float = 0.5) -> OrderResult:
+    def buy_market_order_and_wait(self, ticker: str, amount: float, timeout: float = 30.0) -> OrderResult:
+        """
+        시장가 매수 주문 후 체결 완료까지 대기
+
+        Args:
+            ticker: 마켓 ID
+            amount: 주문 금액 (ticker를 얼마나 살건지 - 절대 금액)
+            timeout: 최대 대기 시간(초). 기본값: 30초
+
+        Returns:
+            완료된 주문의 OrderResult
+
+        Raises:
+            ValueError: amount가 0 이하인 경우
+            OrderCancelledError: 주문이 취소된 경우
+            OrderTimeoutError: 타임아웃 시간을 초과한 경우
+            UpbitAPIError: API 호출 중 에러가 발생한 경우
+        """
+        order_result = self.buy_market_order(ticker, amount)
+        return self._wait_for_order_completion(order_result.uuid, timeout)
+
+    def sell_market_order_and_wait(self, ticker: str, volume: float, timeout: float = 30.0) -> OrderResult:
+        """
+        시장가 매도 주문 후 체결 완료까지 대기
+
+        Args:
+            ticker: 마켓 ID
+            volume: 주문 수량 (내가 가진 수량)
+            timeout: 최대 대기 시간(초). 기본값: 30초
+
+        Returns:
+            완료된 주문의 OrderResult
+
+        Raises:
+            ValueError: volume이 0 이하인 경우
+            OrderCancelledError: 주문이 취소된 경우
+            OrderTimeoutError: 타임아웃 시간을 초과한 경우
+            UpbitAPIError: API 호출 중 에러가 발생한 경우
+        """
+        order_result = self.sell_market_order(ticker, volume)
+        return self._wait_for_order_completion(order_result.uuid, timeout)
+
+    def sell_market_order_by_price_and_wait(self, ticker: str, price: float, timeout: float = 30.0) -> OrderResult:
+        """
+        KRW 금액 기반 시장가 매도 주문 후 체결 완료까지 대기
+
+        Args:
+            ticker: 마켓 ID (예: 'KRW-BTC')
+            price: 매도할 금액 (KRW)
+            timeout: 최대 대기 시간(초). 기본값: 30초
+
+        Returns:
+            완료된 주문의 OrderResult
+
+        Raises:
+            ValueError: price가 0 이하이거나 현재가가 0이거나 조회 실패 시
+            OrderCancelledError: 주문이 취소된 경우
+            OrderTimeoutError: 타임아웃 시간을 초과한 경우
+            UpbitAPIError: API 호출 중 에러가 발생한 경우
+        """
+        order_result = self.sell_market_order_by_price(ticker, price)
+        return self._wait_for_order_completion(order_result.uuid, timeout)
+
+    def _wait_for_order_completion(self, uuid: str, timeout: float = 30.0, poll_interval: float = 0.5) -> OrderResult:
         """
         주문 완료를 대기하고 체결 내역을 반환
 
@@ -245,68 +314,199 @@ class UpbitAPI:
             # 다음 폴링까지 대기
             time.sleep(poll_interval)
 
-    def buy_market_order_and_wait(self, ticker: str, amount: float, timeout: float = 30.0) -> OrderResult:
+    def place_order(
+            self,
+            market: str,
+            side: OrderSide,
+            ord_type: OrderType,
+            time_in_force: TimeInForce | None = None,
+            volume: float | None = None,
+            price: float | None = None,
+    ) -> OrderResult:
         """
-        시장가 매수 주문 후 체결 완료까지 대기
+        주문 실행 (지정가/시장가/최유리지정가 모두 지원)
 
         Args:
-            ticker: 마켓 ID
-            amount: 주문 금액 (ticker를 얼마나 살건지 - 절대 금액)
-            timeout: 최대 대기 시간(초). 기본값: 30초
+            market: 마켓 ID (예: 'KRW-BTC')
+            side: 'bid' (매수) 또는 'ask' (매도)
+            ord_type: 'limit' (지정가), 'price' (시장가 매수), 'market' (시장가 매도), 'best' (최유리지정가)
+            time_in_force: 주문 실행 조건 (선택, 최유리지정가 시 필수)
+            volume: 주문량 (양수 float)
+            price: 주문 가격 (양수 float)
 
         Returns:
-            완료된 주문의 OrderResult
+            주문 결과
 
         Raises:
-            ValueError: amount가 0 이하인 경우
-            OrderCancelledError: 주문이 취소된 경우
-            OrderTimeoutError: 타임아웃 시간을 초과한 경우
-            UpbitAPIError: API 호출 중 에러가 발생한 경우
+            ValidationError: 파라미터 유효성 검사 실패 시
+            UpbitAPIError: API 호출 중 에러 발생 시
         """
-        order_result = self.buy_market_order(ticker, amount)
-        return self.wait_for_order_completion(order_result.uuid, timeout)
+        path = "/v1/orders"
 
-    def sell_market_order_and_wait(self, ticker: str, volume: float, timeout: float = 30.0) -> OrderResult:
+        order_params = OrderParams(
+            market=market,
+            side=side,
+            ord_type=ord_type,
+            time_in_force=time_in_force,
+            volume=volume,
+            price=price,
+        )
+
+        params = order_params.to_dict()
+
+        headers = {
+            "Authorization": f"Bearer {self._generate_jwt_token(params)}",
+            "Accept": "application/json",
+        }
+
+        response = make_api_request(f"{self.config.base_url}{path}", HTTPMethod.POST, headers=headers, json=params)
+        result = response.json()
+
+        logger.info(f"주문 실행 결과: {result}")
+        self._check_api_error(result)
+
+        return OrderResult.from_dict(result)
+
+    def buy_best_fok_order(self, market: str, amount: float) -> OrderResult:
         """
-        시장가 매도 주문 후 체결 완료까지 대기
+        최유리 FOK 매수 주문
+
+        Fill or Kill 조건으로 최유리 가격에 매수 주문을 넣습니다.
+        지정한 금액만큼 즉시 체결되지 않으면 주문이 취소됩니다.
 
         Args:
-            ticker: 마켓 ID
-            volume: 주문 수량 (내가 가진 수량)
-            timeout: 최대 대기 시간(초). 기본값: 30초
+            market: 마켓 ID (예: 'KRW-BTC')
+            amount: 주문 금액 (양수 float)
 
         Returns:
-            완료된 주문의 OrderResult
+            주문 결과
+
+        Raises:
+            ValueError: price가 0 이하인 경우
+            ValidationError: 파라미터 유효성 검사 실패 시
+            UpbitAPIError: API 호출 중 에러 발생 시
+        """
+        if amount <= 0:
+            raise ValueError("price는 0보다 커야 합니다")
+
+        return self.place_order(
+            market=market,
+            side=OrderSide.BID,
+            ord_type=OrderType.BEST,
+            time_in_force=TimeInForce.FOK,
+            price=amount
+        )
+
+    def sell_best_ioc_order(self, market: str, volume: float) -> OrderResult:
+        """
+        최유리 IOC 매도 주문
+
+        Immediate or Cancel 조건으로 최유리 가격에 매도 주문을 넣습니다.
+        즉시 체결 가능한 수량만큼만 체결되고, 나머지는 취소됩니다.
+
+        Args:
+            market: 마켓 ID (예: 'KRW-BTC')
+            volume: 주문 수량 (양수 float)
+
+        Returns:
+            주문 결과
 
         Raises:
             ValueError: volume이 0 이하인 경우
-            OrderCancelledError: 주문이 취소된 경우
-            OrderTimeoutError: 타임아웃 시간을 초과한 경우
-            UpbitAPIError: API 호출 중 에러가 발생한 경우
+            ValidationError: 파라미터 유효성 검사 실패 시
+            UpbitAPIError: API 호출 중 에러 발생 시
         """
-        order_result = self.sell_market_order(ticker, volume)
-        return self.wait_for_order_completion(order_result.uuid, timeout)
+        if volume <= 0:
+            raise ValueError("volume은 0보다 커야 합니다")
 
-    def sell_market_order_by_price_and_wait(self, ticker: str, price: float, timeout: float = 30.0) -> OrderResult:
+        return self.place_order(
+            market=market,
+            side=OrderSide.ASK,
+            ord_type=OrderType.BEST,
+            time_in_force=TimeInForce.IOC,
+            volume=volume
+        )
+
+    def buy_best_fok_order_and_wait(
+            self,
+            market: str,
+            amount: float,
+            timeout: float = 30.0
+    ) -> OrderResult:
         """
-        KRW 금액 기반 시장가 매도 주문 후 체결 완료까지 대기
+        최유리 FOK 매수 주문 후 체결 완료까지 대기
+
+        Fill or Kill이므로:
+        - 성공: state = DONE, executed_volume > 0
+        - 실패: state = CANCEL, executed_volume = 0
 
         Args:
-            ticker: 마켓 ID (예: 'KRW-BTC')
-            price: 매도할 금액 (KRW)
+            market: 마켓 ID (예: 'KRW-BTC')
+            amount: 주문 금액 (원화)
             timeout: 최대 대기 시간(초). 기본값: 30초
 
         Returns:
             완료된 주문의 OrderResult
 
         Raises:
-            ValueError: price가 0 이하이거나 현재가가 0이거나 조회 실패 시
-            OrderCancelledError: 주문이 취소된 경우
-            OrderTimeoutError: 타임아웃 시간을 초과한 경우
-            UpbitAPIError: API 호출 중 에러가 발생한 경우
+            OrderCancelledError: FOK 조건 미충족으로 주문 취소
+            OrderTimeoutError: 타임아웃 초과
+            UpbitAPIError: API 호출 오류
         """
-        order_result = self.sell_market_order_by_price(ticker, price)
-        return self.wait_for_order_completion(order_result.uuid, timeout)
+        order_result = self.buy_best_fok_order(market, amount)
+        return self._wait_for_order_completion(order_result.uuid, timeout)
+
+    def sell_best_ioc_order_and_wait(
+            self,
+            market: str,
+            volume: float,
+            timeout: float = 30.0
+    ) -> OrderResult:
+        """
+        최유리 IOC 매도 주문 후 체결 완료까지 대기
+
+        Immediate or Cancel이므로:
+        - 항상 state = DONE
+        - executed_volume은 즉시 체결 가능한 만큼
+
+        Args:
+            market: 마켓 ID (예: 'KRW-BTC')
+            volume: 주문 수량
+            timeout: 최대 대기 시간(초). 기본값: 30초
+
+        Returns:
+            완료된 주문의 OrderResult
+
+        Raises:
+            OrderTimeoutError: 타임아웃 초과
+            UpbitAPIError: API 호출 오류
+        """
+        order_result = self.sell_best_ioc_order(market, volume)
+        return self._wait_for_order_completion(order_result.uuid, timeout)
+
+    def _generate_jwt_token(self, params: dict) -> str:
+        """
+        주문 파라미터로부터 JWT 토큰 생성
+
+        Args:
+            params: 주문 파라미터 딕셔너리
+
+        Returns:
+            생성된 JWT 토큰
+        """
+        query_string = unquote(urlencode(params, doseq=True)).encode("utf-8")
+        m = hashlib.sha512()
+        m.update(query_string)
+        query_hash = m.hexdigest()
+
+        payload = {
+            "access_key": self.config.upbit_access_key,
+            "nonce": str(uuid.uuid4()),
+            "query_hash": query_hash,
+            "query_hash_alg": "SHA512",
+        }
+
+        return jwt.encode(payload, self.config.upbit_secret_key, algorithm="HS256")
 
     @staticmethod
     def _check_api_error(result: dict | list | None) -> None:

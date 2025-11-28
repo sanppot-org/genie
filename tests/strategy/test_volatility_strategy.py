@@ -121,12 +121,131 @@ class TestVolatilityStrategyExecute:
         mock_history.calculate_morning_noise_average.return_value = 0.5
         mock_collector.collect_data.return_value = mock_history
 
+        # Mock ExecutionResult: 전량 체결
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0.001
+        mock_order_executor.sell.return_value = execution_result
+
         # When: execute 호출
         volatility_strategy.execute()
 
         # Then: 매도 주문이 실행되고 캐시가 삭제됨
         mock_order_executor.sell.assert_called_once_with("KRW-BTC", 0.001, strategy_name="volatility")
         mock_cache_manager.delete_strategy_cache.assert_called_once_with("KRW-BTC", "volatility")
+
+    def test_execute_sell_partial_fill_should_update_cache(self, volatility_strategy, mock_order_executor, mock_clock, mock_cache_manager):
+        """매도 부분 체결 시 남은 수량으로 캐시를 업데이트한다"""
+        # Given: 오전이 아니고, 보유 수량 1.0 BTC
+        mock_clock.is_morning.return_value = False
+        import datetime as dt
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+
+        from src.strategy.cache.cache_models import VolatilityStrategyCacheData
+
+        initial_volume = 1.0
+        mock_cache = VolatilityStrategyCacheData(
+            execution_volume=initial_volume,
+            last_run_date=dt.date(2024, 1, 1),
+            position_size=1.0,
+            threshold=50500000,
+        )
+        mock_cache_manager.load_strategy_cache.return_value = mock_cache
+
+        # Mock ExecutionResult: 0.3 BTC만 체결 (부분 체결)
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0.3
+        mock_order_executor.sell.return_value = execution_result
+
+        # When: execute 호출
+        volatility_strategy.execute()
+
+        # Then: 매도 주문 실행됨
+        mock_order_executor.sell.assert_called_once_with("KRW-BTC", initial_volume, strategy_name="volatility")
+
+        # 캐시가 삭제되지 않고 업데이트됨 (남은 수량 = 1.0 - 0.3 = 0.7)
+        mock_cache_manager.delete_strategy_cache.assert_not_called()
+        mock_cache_manager.save_strategy_cache.assert_called_once()
+
+        # 저장된 캐시 확인
+        save_call_args = mock_cache_manager.save_strategy_cache.call_args
+        saved_cache = save_call_args[0][2]
+        assert isinstance(saved_cache, VolatilityStrategyCacheData)
+        assert saved_cache.execution_volume == 0.7  # 1.0 - 0.3
+        assert saved_cache.position_size == 1.0
+        assert saved_cache.threshold == 50500000
+
+    def test_execute_sell_no_fill_should_keep_cache(self, volatility_strategy, mock_order_executor, mock_clock, mock_cache_manager):
+        """매도 미체결 시 캐시를 유지한다"""
+        # Given: 오전이 아니고, 보유 수량 1.0 BTC
+        mock_clock.is_morning.return_value = False
+        import datetime as dt
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+
+        from src.strategy.cache.cache_models import VolatilityStrategyCacheData
+
+        initial_volume = 1.0
+        mock_cache = VolatilityStrategyCacheData(
+            execution_volume=initial_volume,
+            last_run_date=dt.date(2024, 1, 1),
+            position_size=1.0,
+            threshold=50500000,
+        )
+        mock_cache_manager.load_strategy_cache.return_value = mock_cache
+
+        # Mock ExecutionResult: 미체결 (executed_volume = 0)
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0
+        mock_order_executor.sell.return_value = execution_result
+
+        # When: execute 호출
+        volatility_strategy.execute()
+
+        # Then: 매도 주문 실행됨
+        mock_order_executor.sell.assert_called_once_with("KRW-BTC", initial_volume, strategy_name="volatility")
+
+        # 캐시가 삭제되지도 않고 업데이트되지도 않음 (유지)
+        mock_cache_manager.delete_strategy_cache.assert_not_called()
+        mock_cache_manager.save_strategy_cache.assert_not_called()
+
+    def test_execute_buy_no_fill_should_not_save_cache(self, volatility_strategy, mock_order_executor, mock_clock, mock_collector, mock_cache_manager):
+        """매수 미체결 시 캐시를 저장하지 않는다"""
+        # Given: 오전이고, 매수 조건 충족하지만 FOK 미체결
+        mock_clock.is_morning.return_value = True
+        import datetime as dt
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+
+        mock_cache_manager.load_strategy_cache.return_value = None
+
+        # Mock history data
+        mock_history = Mock()
+        mock_history.yesterday_morning.volatility = 0.05
+        mock_history.yesterday_morning.range = 1000000
+        mock_history.yesterday_afternoon.close = 50000000
+        mock_history.calculate_ma_score.return_value = 1.0
+        mock_history.calculate_morning_noise_average.return_value = 0.5
+        mock_collector.collect_data.return_value = mock_history
+
+        with patch("src.strategy.volatility_strategy.UpbitAPI.get_current_price") as mock_price:
+            mock_price.return_value = 51000000
+
+            # Mock ExecutionResult: FOK 미체결 (executed_volume = 0)
+            execution_result = Mock(spec=ExecutionResult)
+            execution_result.executed_volume = 0
+            mock_order_executor.buy.return_value = execution_result
+
+            # When: execute 호출
+            volatility_strategy.execute()
+
+            # Then: 매수 주문은 실행됨
+            mock_order_executor.buy.assert_called_once()
+
+            # 하지만 캐시 저장은 1번만 (계산 시), 매수 후에는 저장 안 됨
+            assert mock_cache_manager.save_strategy_cache.call_count == 1
+
+            # 저장된 캐시의 execution_volume은 0이어야 함
+            save_call_args = mock_cache_manager.save_strategy_cache.call_args
+            saved_cache = save_call_args[0][2]
+            assert saved_cache.execution_volume == 0
 
     def test_execute_no_buy_when_morning_but_position_size_zero(self, volatility_strategy, mock_order_executor, mock_clock, mock_collector, mock_cache_manager):
         """오전이지만 포지션 크기가 0이면 매수하지 않는다"""

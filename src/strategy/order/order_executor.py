@@ -47,7 +47,7 @@ class OrderExecutor:
 
     def buy(self, ticker: str, amount: float, strategy_name: str = "Unknown") -> ExecutionResult:
         """
-        시장가 매수 주문 실행
+        최유리 FOK 매수 주문 실행 (체결 완료까지 대기)
 
         Args:
             ticker: 마켓 ID (예: "KRW-BTC")
@@ -57,7 +57,7 @@ class OrderExecutor:
         Returns:
             ExecutionResult: 체결 결과
         """
-        order_result = self._upbit_api.buy_market_order_and_wait(ticker, amount)
+        order_result = self._upbit_api.buy_best_fok_order_and_wait(ticker, amount)
 
         result = ExecutionResult.buy(strategy_name=strategy_name, order_result=order_result)
 
@@ -67,7 +67,7 @@ class OrderExecutor:
 
     def sell(self, ticker: str, volume: float, strategy_name: str = "Unknown") -> ExecutionResult:
         """
-        시장가 매도 주문 실행
+        최유리 IOC 매도 주문 실행 (체결 완료까지 대기)
 
         Args:
             ticker: 마켓 ID (예: "KRW-BTC")
@@ -77,7 +77,7 @@ class OrderExecutor:
         Returns:
             ExecutionResult: 체결 결과
         """
-        order_result: OrderResult = self._upbit_api.sell_market_order_and_wait(ticker, volume)
+        order_result: OrderResult = self._upbit_api.sell_best_ioc_order_and_wait(ticker, volume)
 
         result = ExecutionResult.sell(strategy_name=strategy_name, order_result=order_result)
 

@@ -1,7 +1,10 @@
 import logging
 
+from numba.core.typeinfer import BuildTupleConstraint
+
 from src.common.google_sheet.client import GoogleSheetClient
 from src.config import GoogleSheetConfig, HantuConfig, UpbitConfig
+from src.constants import KRW_BTC
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
 from src.upbit.upbit_api import UpbitAPI
@@ -30,6 +33,9 @@ google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), "auto_data")
 # result = upbit_api.buy_market_order_and_wait(ticker='KRW-ETH', amount=5000)
 # result = upbit_api.sell_market_order_and_wait(ticker='KRW-ETH', volume=0.0009)
 # result = upbit_api.upbit.get_order('e9e04adc-b0dc-47a4-bd98-ff544e2846da')
+# result = upbit_api.buy_best_fok_order_and_wait(KRW_BTC, 6000)
+# result = upbit_api.sell_best_ioc_order_and_wait(KRW_BTC, 0.00004417)
+# print(result)
 
 #################################### KIS ####################################
 ### Domastic ###

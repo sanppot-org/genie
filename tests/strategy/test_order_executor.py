@@ -75,7 +75,7 @@ class TestOrderExecutorBuy:
                 )
             ],
         )
-        mock_upbit_api.buy_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.buy_best_fok_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor.buy(ticker, amount)
@@ -87,7 +87,7 @@ class TestOrderExecutorBuy:
         assert result.executed_price == expected_price
         assert result.executed_amount == amount
         assert result.order == mock_order
-        mock_upbit_api.buy_market_order_and_wait.assert_called_once_with(ticker, amount)
+        mock_upbit_api.buy_best_fok_order_and_wait.assert_called_once_with(ticker, amount)
 
     def test_buy_should_extract_execution_info_from_first_trade(self, order_executor, mock_upbit_api):
         """매수 주문 시 모든 체결 정보를 합산해야 한다"""
@@ -136,7 +136,7 @@ class TestOrderExecutorBuy:
             trades_count=2,
             trades=[first_trade, second_trade],
         )
-        mock_upbit_api.buy_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.buy_best_fok_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor.buy(ticker, amount)
@@ -186,7 +186,7 @@ class TestOrderExecutorBuy:
                 )
             ],
         )
-        mock_upbit_api.buy_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.buy_best_fok_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor_with_sheet.buy(ticker, amount)
@@ -240,7 +240,7 @@ class TestOrderExecutorBuy:
                 )
             ],
         )
-        mock_upbit_api.buy_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.buy_best_fok_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor_with_sheet.buy(ticker, amount, strategy_name=strategy_name)
@@ -290,7 +290,7 @@ class TestOrderExecutorBuy:
                 )
             ],
         )
-        mock_upbit_api.buy_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.buy_best_fok_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor.buy(ticker, amount)
@@ -340,7 +340,7 @@ class TestOrderExecutorSell:
                 )
             ],
         )
-        mock_upbit_api.sell_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.sell_best_ioc_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor.sell(ticker, volume)
@@ -352,7 +352,7 @@ class TestOrderExecutorSell:
         assert result.executed_price == expected_price
         assert result.executed_amount == expected_amount
         assert result.order == mock_order
-        mock_upbit_api.sell_market_order_and_wait.assert_called_once_with(ticker, volume)
+        mock_upbit_api.sell_best_ioc_order_and_wait.assert_called_once_with(ticker, volume)
 
     def test_sell_should_calculate_amount_from_price_and_volume(self, order_executor, mock_upbit_api):
         """매도 주문 시 가격 * 수량으로 금액을 계산해야 한다"""
@@ -391,7 +391,7 @@ class TestOrderExecutorSell:
                 )
             ],
         )
-        mock_upbit_api.sell_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.sell_best_ioc_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor.sell(ticker, volume)
@@ -438,7 +438,7 @@ class TestOrderExecutorSell:
                 )
             ],
         )
-        mock_upbit_api.sell_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.sell_best_ioc_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor_with_sheet.sell(ticker, volume)
@@ -492,7 +492,7 @@ class TestOrderExecutorSell:
                 )
             ],
         )
-        mock_upbit_api.sell_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.sell_best_ioc_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor_with_sheet.sell(ticker, volume, strategy_name=strategy_name)
@@ -542,7 +542,7 @@ class TestOrderExecutorSell:
                 )
             ],
         )
-        mock_upbit_api.sell_market_order_and_wait.return_value = mock_order
+        mock_upbit_api.sell_best_ioc_order_and_wait.return_value = mock_order
 
         # When
         result = order_executor.sell(ticker, volume)

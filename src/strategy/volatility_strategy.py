@@ -34,14 +34,34 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
 
             result = self._order_executor.buy(self._config.ticker, amount, strategy_name=self._strategy_name)
 
-            self._save_cache(execution_volume=result.executed_volume, position_size=position_size, threshold=threshold)
+            # FOK 체결 성공 시에만 캐시 저장
+            if result.executed_volume > 0:
+                self._save_cache(execution_volume=result.executed_volume, position_size=position_size, threshold=threshold)
 
     def _sell(self) -> None:
-        # TODO: 공통 메서드로 리팩터링?
         cache = self._load_cache()
         if cache and cache.has_position(self._clock.today()):
-            self._order_executor.sell(self._config.ticker, cache.execution_volume, strategy_name=self._strategy_name)
-            self._delete_strategy_cache()
+            result = self._order_executor.sell(
+                self._config.ticker,
+                cache.execution_volume,
+                strategy_name=self._strategy_name
+            )
+
+            if result.executed_volume <= 0:
+                return
+
+            remaining_volume = cache.execution_volume - result.executed_volume
+
+            if remaining_volume <= 0:
+                self._delete_strategy_cache()
+                return
+
+            # 부분 체결: 남은 수량으로 캐시 업데이트
+            self._save_cache(
+                execution_volume=remaining_volume,
+                position_size=cache.position_size,
+                threshold=cache.threshold
+            )
 
     def _get_strategy_params(self) -> tuple[float, float, bool]:
         """전략 파라미터를 캐시에서 가져오거나 새로 계산합니다.

@@ -26,6 +26,8 @@ class UpbitConfig(BaseSettings):
 
     upbit_secret_key: str = Field(..., min_length=1, description="업비트 시크릿 키", alias="UPBIT_SECRET_KEY")
 
+    base_url: str = Field(default="https://api.upbit.com/v1", min_length=1, description="업비트 url", alias="UPBIT_BASE_URL")
+
 
 class BithumbConfig(BaseSettings):
     """빗썸 API 설정"""
@@ -35,6 +37,7 @@ class BithumbConfig(BaseSettings):
     access_key: str = Field(..., min_length=1, description="액세스 키", alias="BITHUMB_ACCESS_KEY")
 
     secret_key: str = Field(..., min_length=1, description="시크릿 키", alias="BITHUMB_SECRET_KEY")
+
 
 class HantuConfig(BaseSettings):
     """한국투자증권 API 설정"""

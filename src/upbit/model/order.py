@@ -3,6 +3,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from pydantic import BaseModel, field_validator
+
 
 class OrderSide(Enum):
     BID = "bid"  # 매수
@@ -21,6 +23,116 @@ class OrderState(Enum):
     WATCH = "watch"
     DONE = "done"
     CANCEL = "cancel"
+
+
+class TimeInForce(Enum):
+    IOC = "ioc"
+    FOK = "fok"
+    POST_ONLY = "post_only"
+
+
+class OrderParams(BaseModel):
+    """
+    주문 요청 파라미터
+
+    주문 생성 시 사용되는 파라미터를 검증합니다.
+
+    Attributes:
+        market: 마켓 ID (필수, 예: "KRW-BTC")
+        side: 주문 방향 (필수, "bid": 매수, "ask": 매도)
+        ord_type: 주문 타입 (필수, "limit": 지정가, "price": 시장가 매수, "market": 시장가 매도, "best": 최유리지정가)
+        volume: 주문량 (선택, 지정가/시장가 매도/최유리지정가 매도 시 필수, 양수 float)
+        price: 주문 가격/금액 (선택, 지정가/시장가 매수/최유리지정가 매수 시 필수, 양수 float)
+        time_in_force: 주문 실행 조건 (선택, 최유리지정가 주문 시 필수)
+    """
+
+    market: str
+    side: OrderSide
+    ord_type: OrderType
+    volume: float | None = None
+    price: float | None = None
+    time_in_force: TimeInForce | None = None
+
+    @field_validator("market")
+    @classmethod
+    def validate_market(cls, v: str) -> str:
+        """마켓 ID는 비어있지 않아야 한다"""
+        if not v or not v.strip():
+            raise ValueError("market은 비어있을 수 없습니다")
+        return v
+
+    @field_validator("volume", "price")
+    @classmethod
+    def validate_positive_number(cls, v: float | None) -> float | None:
+        """volume과 price는 양수여야 한다"""
+        if v is not None and v <= 0:
+            raise ValueError("양수여야 합니다")
+        return v
+
+    def model_post_init(self, __context: object) -> None:
+        """ord_type에 따른 필수 파라미터 검증"""
+        # 지정가 주문: price와 volume 필수
+        if self.ord_type == OrderType.LIMIT:
+            if self.price is None:
+                raise ValueError("지정가 주문에는 price가 필요합니다")
+            if self.volume is None:
+                raise ValueError("지정가 주문에는 volume이 필요합니다")
+
+        # 시장가 매수(price): price 필수
+        elif self.ord_type == OrderType.PRICE:
+            if self.price is None:
+                raise ValueError("시장가 매수에는 price가 필요합니다")
+
+        # 시장가 매도(market): volume 필수
+        elif self.ord_type == OrderType.MARKET:
+            if self.volume is None:
+                raise ValueError("시장가 매도에는 volume이 필요합니다")
+
+        # 최유리지정가(best): time_in_force 필수 (ioc 또는 fok만 허용)
+        elif self.ord_type == OrderType.BEST:
+            # time_in_force 필수
+            if self.time_in_force is None:
+                raise ValueError("최유리지정가 주문에는 time_in_force가 필요합니다")
+
+            # ioc 또는 fok만 허용
+            if self.time_in_force not in [TimeInForce.IOC, TimeInForce.FOK]:
+                raise ValueError("최유리지정가 주문은 time_in_force를 ioc 또는 fok로 설정해야 합니다")
+
+            # 매수(bid): price 필수
+            if self.side == OrderSide.BID:
+                if self.price is None:
+                    raise ValueError("최유리지정가 매수에는 price가 필요합니다")
+
+            # 매도(ask): volume 필수
+            elif self.side == OrderSide.ASK:
+                if self.volume is None:
+                    raise ValueError("최유리지정가 매도에는 volume이 필요합니다")
+
+    def to_dict(self) -> dict[str, str]:
+        """
+        API 요청용 딕셔너리로 변환
+
+        None 값은 제외하고, Enum 값은 value로 변환하며, float는 문자열로 변환합니다.
+
+        Returns:
+            API 요청에 사용할 딕셔너리
+        """
+        result: dict[str, str] = {
+            "market": self.market,
+            "side": self.side.value,
+            "ord_type": self.ord_type.value,
+        }
+
+        if self.volume is not None:
+            result["volume"] = str(self.volume)
+
+        if self.price is not None:
+            result["price"] = str(self.price)
+
+        if self.time_in_force is not None:
+            result["time_in_force"] = self.time_in_force.value
+
+        return result
 
 
 @dataclass
