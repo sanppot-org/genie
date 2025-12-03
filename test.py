@@ -1,5 +1,7 @@
 import logging
 
+from src import constants
+from src.common import DataSource
 from src.config import HantuConfig
 from src.container import ApplicationContainer
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
@@ -26,7 +28,7 @@ google_sheet_client = di_container.data_google_sheet_client()
 # Upbit
 
 # result = upbit_api.get_current_price()
-result = upbit_api.get_candles(interval=UpbitCandleInterval.MINUTE_1, count=1440)
+result = upbit_api.get_candles(interval=UpbitCandleInterval.MINUTE_1, count=100)
 # result = upbit_api.get_available_amount()
 # result = upbit_api.get_balances()
 # result = upbit_api.buy_market_order(ticker='KRW-ETH', amount=11000)
@@ -38,7 +40,7 @@ result = upbit_api.get_candles(interval=UpbitCandleInterval.MINUTE_1, count=1440
 # result = upbit_api.sell_best_ioc_order_and_wait(KRW_BTC, 0.00004417)
 # print(result)
 
-# candle_service.save_candles(result, DataSource.UPBIT, constants.KRW_BTC, UpbitCandleInterval.MINUTE_1)
+candle_service.save_candles(result, DataSource.UPBIT, constants.KRW_BTC, UpbitCandleInterval.MINUTE_1)
 
 #################################### KIS ####################################
 ### Domastic ###
