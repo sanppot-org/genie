@@ -8,6 +8,7 @@ import hashlib
 import logging
 import time
 import uuid
+from datetime import date
 from enum import Enum
 from urllib.parse import unquote, urlencode
 
@@ -59,7 +60,7 @@ class UpbitAPI:
 
     @staticmethod
     def get_candles(ticker: str = constants.KRW_BTC, interval: UpbitCandleInterval = UpbitCandleInterval.MINUTE_60,
-                    count: int = 24) -> DataFrame[CandleSchema]:
+                    count: int = 24, to: date | None = None) -> DataFrame[CandleSchema]:
         """
         캔들 데이터 조회
 
@@ -67,12 +68,13 @@ class UpbitAPI:
             ticker: 티커 코드 (기본값: 'KRW-BTC')
             interval: 캔들 간격 (기본값: CandleInterval.HOUR)
             count: 조회할 캔들 개수 (기본값: 24)
+            to: 해당 날짜 이전까지의 데이터만 조회한다.
 
         Returns:
             CandleSchema를 따르는 DataFrame, 실패 시 빈 DataFrame
         """
         try:
-            df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count)
+            df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count, to=to.strftime("%Y%m%d") if to else None)
 
             if df is None or df.empty:
                 return pd.DataFrame()  # type: ignore
