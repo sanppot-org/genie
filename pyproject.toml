@@ -32,6 +32,9 @@ dependencies = [
     "pyjwt>=2.10.1",
     "dependency-injector>=4.48.2",
     "pandas-ta>=0.4.71b0",
+    "sqlalchemy>=2.0.44",
+    "psycopg2-binary>=2.9.11",
+    "alembic>=1.17.2",
 ]
 
 [tool.setuptools]
