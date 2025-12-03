@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         'price_data',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', sa.DateTime(), nullable=False),
+        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
         sa.Column('symbol', sa.String(length=20), nullable=False),
         sa.Column('price', sa.Float(), nullable=False),
         sa.Column('source', sa.String(length=50), nullable=False),
@@ -40,7 +40,7 @@ def upgrade() -> None:
     op.create_table(
         'candle_minute_1',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', sa.DateTime(), nullable=False),
+        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),
@@ -58,7 +58,7 @@ def upgrade() -> None:
     op.create_table(
         'candle_daily',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', sa.DateTime(), nullable=False),
+        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),

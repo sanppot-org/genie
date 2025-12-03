@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Float, Index, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Float, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -29,7 +29,7 @@ class CandleBase(Base):
     __abstract__ = True  # 추상 클래스로 설정 (테이블 생성 안 함)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ticker: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     open: Mapped[float] = mapped_column(Float, nullable=False)
     high: Mapped[float] = mapped_column(Float, nullable=False)
@@ -82,7 +82,7 @@ class PriceData(Base):
     __tablename__ = "price_data"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)
     source: Mapped[str] = mapped_column(String(50), nullable=False)
