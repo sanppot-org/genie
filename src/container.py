@@ -4,6 +4,7 @@ import logging
 
 from dependency_injector import containers, providers
 
+from src.adapters.adapter_factory import CandleAdapterFactory
 from src.allocation_manager import AllocatedBalanceProvider
 from src.bithumb.bithumb_api import BithumbApi
 from src.collector.price_data_collector import GoogleSheetDataCollector
@@ -11,11 +12,14 @@ from src.common.clock import SystemClock
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
-from src.config import BithumbConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
+from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST
+from src.database.database import Database
+from src.database.repositories import CandleDailyRepository, CandleMinute1Repository, PriceRepository
 from src.hantu import HantuDomesticAPI
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.candle_service import CandleService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -33,6 +37,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
 
     # Configuration
+    database_config = providers.Singleton(DatabaseConfig)
     google_sheet_config = providers.Singleton(GoogleSheetConfig)
     slack_config = providers.Singleton(SlackConfig)
     upbit_config = providers.Singleton(UpbitConfig)
@@ -46,6 +51,12 @@ class ApplicationContainer(containers.DeclarativeContainer):
     upbit_api = providers.Singleton(UpbitAPI, upbit_config)
     bithumb_api = providers.Singleton(BithumbApi, bithumb_config)
     hantu_domestic_api = providers.Singleton(HantuDomesticAPI, hantu_config)
+
+    # Database
+    database = providers.Singleton(Database, database_config)
+    candle_minute1_repository = providers.Factory(CandleMinute1Repository, session=database.provided.get_session.call())
+    candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
+    price_repository = providers.Factory(PriceRepository, session=database.provided.get_session.call())
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -99,4 +110,15 @@ class ApplicationContainer(containers.DeclarativeContainer):
         tickers=["KRW-BTC", "KRW-ETH", "KRW-XRP"],
         total_balance=115_000_000,
         logger=providers.Object(logging.getLogger(__name__)),
+    )
+
+    # Adapters
+    candle_adapter_factory = providers.Singleton(CandleAdapterFactory)
+
+    # Services
+    candle_service = providers.Factory(
+        CandleService,
+        minute1_repository=candle_minute1_repository,
+        daily_repository=candle_daily_repository,
+        adapter_factory=candle_adapter_factory,
     )

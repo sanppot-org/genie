@@ -10,7 +10,7 @@ import pytest
 from src.common.clock import FixedClock, SystemClock
 from src.strategy.data.collector import DataCollector
 from src.strategy.data.models import Period
-from src.upbit.upbit_api import CandleInterval
+from src.upbit.upbit_api import UpbitCandleInterval
 
 
 class TestDataCollector:
@@ -100,7 +100,7 @@ class TestDataCollector:
         # 검증
         mock_get_candles.assert_called_once_with(
             ticker="KRW-BTC",
-            interval=CandleInterval.MINUTE_60,
+            interval=UpbitCandleInterval.MINUTE_60,
             count=504,  # 21일 * 24시간
         )
 

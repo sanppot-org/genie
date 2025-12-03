@@ -4,17 +4,17 @@
 업비트 거래소와 연동하여 잔고 조회, 시세 조회, 거래 등의 기능을 제공합니다.
 """
 
-from enum import Enum
 import hashlib
 import logging
 import time
-from urllib.parse import unquote, urlencode
 import uuid
+from enum import Enum
+from urllib.parse import unquote, urlencode
 
 import jwt
 import pandas as pd
-from pandera.typing import DataFrame
 import pyupbit  # type: ignore
+from pandera.typing import DataFrame
 
 from src import constants
 from src.common.http_client import HTTPMethod, make_api_request
@@ -27,7 +27,7 @@ from src.upbit.model.order import OrderParams, OrderResult, OrderSide, OrderStat
 logger = logging.getLogger(__name__)
 
 
-class CandleInterval(Enum):
+class UpbitCandleInterval(Enum):
     """캔들 간격"""
 
     DAY = "day"
@@ -58,7 +58,7 @@ class UpbitAPI:
         return pyupbit.get_current_price(ticker) or 0.0
 
     @staticmethod
-    def get_candles(ticker: str = constants.KRW_BTC, interval: CandleInterval = CandleInterval.MINUTE_60,
+    def get_candles(ticker: str = constants.KRW_BTC, interval: UpbitCandleInterval = UpbitCandleInterval.MINUTE_60,
                     count: int = 24) -> DataFrame[CandleSchema]:
         """
         캔들 데이터 조회

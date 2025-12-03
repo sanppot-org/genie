@@ -142,3 +142,20 @@ class LogtailConfig(BaseSettings):
         description="Better Stack (Logtail) Source Host (optional)",
         alias="LOGTAIL_SOURCE_HOST"
     )
+
+
+class DatabaseConfig(BaseSettings):
+    """PostgreSQL/TimescaleDB 데이터베이스 설정"""
+
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
+
+    postgres_db: str = Field(default="genie_trading", description="데이터베이스 이름", alias="POSTGRES_DB")
+    postgres_user: str = Field(default="genie", description="데이터베이스 사용자", alias="POSTGRES_USER")
+    postgres_password: str = Field(..., min_length=1, description="데이터베이스 비밀번호", alias="POSTGRES_PASSWORD")
+    postgres_host: str = Field(default="localhost", description="데이터베이스 호스트", alias="POSTGRES_HOST")
+    postgres_port: int = Field(default=5432, description="데이터베이스 포트", alias="POSTGRES_PORT")
+
+    @property
+    def database_url(self) -> str:
+        """데이터베이스 연결 URL"""
+        return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

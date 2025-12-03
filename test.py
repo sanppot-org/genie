@@ -1,31 +1,32 @@
 import logging
 
-from numba.core.typeinfer import BuildTupleConstraint
-
-from src.common.google_sheet.client import GoogleSheetClient
-from src.config import GoogleSheetConfig, HantuConfig, UpbitConfig
-from src.constants import KRW_BTC
+from src.config import HantuConfig
+from src.container import ApplicationContainer
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.hantu.model.domestic import AccountType
-from src.upbit.upbit_api import UpbitAPI
+from src.upbit.upbit_api import UpbitCandleInterval
+
+di_container = ApplicationContainer()  # DI Container 초기화 및 자동 와이어링
 
 # 로깅 설정
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-upbit_api = UpbitAPI(UpbitConfig())  # type: ignore
+candle_service = di_container.candle_service()
 
-hantu_domestic_api = HantuDomesticAPI(HantuConfig())  # type: ignore
+upbit_api = di_container.upbit_api()
+
+hantu_domestic_api = di_container.hantu_domestic_api()  # type: ignore
 hantu_overseas_api = HantuOverseasAPI(HantuConfig())  # type: ignore
 
 v_hantu_domestic_api = HantuDomesticAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 v_hantu_overseas_api = HantuOverseasAPI(HantuConfig(), AccountType.VIRTUAL)  # type: ignore
 
-google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), "auto_data")
+google_sheet_client = di_container.data_google_sheet_client()
 
 # Upbit
 
 # result = upbit_api.get_current_price()
-# result = upbit_api.get_candles()
+result = upbit_api.get_candles(interval=UpbitCandleInterval.MINUTE_1, count=1440)
 # result = upbit_api.get_available_amount()
 # result = upbit_api.get_balances()
 # result = upbit_api.buy_market_order(ticker='KRW-ETH', amount=11000)
@@ -36,6 +37,8 @@ google_sheet_client = GoogleSheetClient(GoogleSheetConfig(), "auto_data")
 # result = upbit_api.buy_best_fok_order_and_wait(KRW_BTC, 6000)
 # result = upbit_api.sell_best_ioc_order_and_wait(KRW_BTC, 0.00004417)
 # print(result)
+
+# candle_service.save_candles(result, DataSource.UPBIT, constants.KRW_BTC, UpbitCandleInterval.MINUTE_1)
 
 #################################### KIS ####################################
 ### Domastic ###
