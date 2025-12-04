@@ -8,7 +8,7 @@ import hashlib
 import logging
 import time
 import uuid
-from datetime import date
+from datetime import datetime
 from enum import Enum
 from urllib.parse import unquote, urlencode
 
@@ -29,19 +29,29 @@ logger = logging.getLogger(__name__)
 
 
 class UpbitCandleInterval(Enum):
-    """캔들 간격"""
+    """캔들 간격 (값, API 엔드포인트)"""
 
-    DAY = "day"
-    MINUTE_1 = "minute1"
-    MINUTE_3 = "minute3"
-    MINUTE_5 = "minute5"
-    MINUTE_10 = "minute10"
-    MINUTE_15 = "minute15"
-    MINUTE_30 = "minute30"
-    MINUTE_60 = "minute60"
-    MINUTE_240 = "minute240"
-    WEEK = "week"
-    MONTH = "month"
+    DAY = ("day", "/v1/candles/days")
+    MINUTE_1 = ("minute1", "/v1/candles/minutes/1")
+    MINUTE_3 = ("minute3", "/v1/candles/minutes/3")
+    MINUTE_5 = ("minute5", "/v1/candles/minutes/5")
+    MINUTE_10 = ("minute10", "/v1/candles/minutes/10")
+    MINUTE_15 = ("minute15", "/v1/candles/minutes/15")
+    MINUTE_30 = ("minute30", "/v1/candles/minutes/30")
+    MINUTE_60 = ("minute60", "/v1/candles/minutes/60")
+    MINUTE_240 = ("minute240", "/v1/candles/minutes/240")
+    WEEK = ("week", "/v1/candles/weeks")
+    MONTH = ("month", "/v1/candles/months")
+
+    @property
+    def interval_name(self) -> str:
+        """pyupbit 호환을 위한 간격 이름"""
+        return self.value[0]
+
+    @property
+    def endpoint(self) -> str:
+        """Upbit API 엔드포인트"""
+        return self.value[1]
 
 
 class UpbitAPI:
@@ -57,32 +67,6 @@ class UpbitAPI:
             현재가, 실패 시 0.0
         """
         return pyupbit.get_current_price(ticker) or 0.0
-
-    @staticmethod
-    def get_candles(ticker: str = constants.KRW_BTC, interval: UpbitCandleInterval = UpbitCandleInterval.MINUTE_60,
-                    count: int = 24, to: date | None = None) -> DataFrame[CandleSchema]:
-        """
-        캔들 데이터 조회
-
-        Args:
-            ticker: 티커 코드 (기본값: 'KRW-BTC')
-            interval: 캔들 간격 (기본값: CandleInterval.HOUR)
-            count: 조회할 캔들 개수 (기본값: 24)
-            to: 해당 날짜 이전까지의 데이터만 조회한다.
-
-        Returns:
-            CandleSchema를 따르는 DataFrame, 실패 시 빈 DataFrame
-        """
-        try:
-            df = pyupbit.get_ohlcv(ticker, interval=interval.value, count=count, to=to.strftime("%Y%m%d") if to else None)
-
-            if df is None or df.empty:
-                return pd.DataFrame()  # type: ignore
-
-            return CandleSchema.validate(df)
-        except Exception:
-            logger.exception(f"캔들 데이터 조회 실패: ticker={ticker}, interval={interval.value}, count={count}")
-            return pd.DataFrame()  # type: ignore
 
     def __init__(self, config: UpbitConfig | None = None) -> None:
         if config is None:
@@ -528,3 +512,163 @@ class UpbitAPI:
 
         if isinstance(result, dict) and "error" in result:
             raise UpbitAPIError(result["error"])
+
+    @staticmethod
+    def _response_to_dataframe(response_data: list) -> pd.DataFrame:
+        """
+        Upbit API 응답을 CandleSchema 형식의 DataFrame으로 변환
+
+        Args:
+            response_data: Upbit API 응답 데이터 (리스트)
+
+        Returns:
+            CandleSchema 컬럼을 가진 DataFrame
+        """
+        if not response_data:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(response_data)
+
+        column_mapping = {
+            "opening_price": "open",
+            "high_price": "high",
+            "low_price": "low",
+            "trade_price": "close",
+            "candle_acc_trade_volume": "volume",
+            "candle_acc_trade_price": "value",
+            "candle_date_time_utc": "index",
+        }
+
+        # 컬럼명 변경
+        df = df.rename(columns=column_mapping)
+
+        # 인덱스를 datetime으로 설정
+        df["index"] = pd.to_datetime(df["index"])
+        df = df.set_index("index")
+
+        # 필요한 컬럼만 선택
+        df = df[["open", "high", "low", "close", "volume", "value"]]
+
+        return df
+
+    def get_candles(
+            self,
+            market: str,
+            interval: UpbitCandleInterval = UpbitCandleInterval.DAY,
+            count: int = 1,
+            to: datetime | None = None,
+    ) -> DataFrame[CandleSchema]:
+        """
+        캔들 데이터 조회
+
+        Args:
+            market: 마켓 ID (예: 'KRW-BTC')
+            interval: 조회할 캔들 간격 (예: UpbitCandleInterval.DAY)
+            count: 조회할 캔들 개수 (기본값: 1, 제한 없음)
+            to: 특정 시점 이전 데이터만 조회 (선택)
+
+        Returns:
+            CandleSchema를 따르는 DataFrame
+
+        Raises:
+            ValueError: count가 0 이하이거나 market이 비어있는 경우
+            UpbitAPIError: API 호출 중 에러가 발생한 경우
+
+        Examples:
+            >>> api = UpbitAPI()
+            >>> # 100개 조회
+            >>> daily_candles = api.get_candles(
+            ...     market='KRW-BTC',
+            ...     interval=UpbitCandleInterval.DAY,
+            ...     count=100
+            ... )
+            >>> # 500개 조회 (내부적으로 3번 호출)
+            >>> many_candles = api.get_candles(
+            ...     market='KRW-BTC',
+            ...     interval=UpbitCandleInterval.MINUTE_60,
+            ...     count=500
+            ... )
+        """
+        if not market or not market.strip():
+            raise ValueError("market은 비어있을 수 없습니다")
+        if count <= 0:
+            raise ValueError("count는 1 이상이어야 합니다")
+
+        try:
+            # count가 200 이하면 단일 호출
+            if count <= 200:
+                return self._fetch_single_candles(market, interval, count, to)
+
+            # count가 200 초과면 반복 호출
+            all_dataframes = []
+            remaining = count
+            current_to = to
+
+            while remaining > 0:
+                batch_count = min(remaining, 200)
+
+                df = self._fetch_single_candles(market, interval, batch_count, current_to)
+
+                if df.empty:
+                    break
+
+                all_dataframes.append(df)
+                remaining -= len(df)
+
+                if remaining > 0 and len(df) > 0:
+                    current_to = df.index.min()
+                    time.sleep(0.11)
+                else:
+                    break
+
+            if not all_dataframes:
+                return pd.DataFrame()  # type: ignore
+
+            combined_df = pd.concat(all_dataframes)
+            # 중복 제거 및 시간순 정렬 (과거 -> 최신)
+            combined_df = combined_df[~combined_df.index.duplicated(keep='first')]
+            combined_df = combined_df.sort_index(ascending=True)
+
+            result_df = combined_df.head(count)
+
+            return CandleSchema.validate(result_df)
+
+        except Exception as e:
+            logger.error(f"캔들 데이터 조회 실패: market={market}, interval={interval}, count={count}, error={e}")
+            return pd.DataFrame()  # type: ignore
+
+    def _fetch_single_candles(
+            self,
+            market: str,
+            interval: UpbitCandleInterval,
+            count: int,
+            to: datetime | None = None,
+    ) -> DataFrame[CandleSchema]:
+        """
+        단일 API 호출로 캔들 데이터 조회 (최대 200개)
+
+        Args:
+            market: 마켓 ID
+            interval: 캔들 간격
+            count: 조회할 개수 (1-200)
+            to: 특정 시점 이전 데이터만 조회
+
+        Returns:
+            CandleSchema DataFrame
+        """
+        params = {"market": market, "count": min(count, 200)}
+        if to:
+            params["to"] = to.strftime("%Y-%m-%d %H:%M:%S")
+
+        response = make_api_request(
+            url=f"{self.config.base_url}{interval.endpoint}",
+            method=HTTPMethod.GET,
+            params=params,
+            headers={"accept": "application/json"},
+        )
+
+        response_data = response.json()
+        self._check_api_error(response_data)
+
+        df = self._response_to_dataframe(response_data)
+        return CandleSchema.validate(df)  # type: ignore

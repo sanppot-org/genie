@@ -8,46 +8,204 @@ import pytest
 from src.upbit.model.balance import BalanceInfo
 from src.upbit.model.error import UpbitAPIError
 from src.upbit.model.order import OrderResult, OrderSide, OrderType
-from src.upbit.upbit_api import UpbitAPI
+from src.upbit.upbit_api import UpbitAPI, UpbitCandleInterval
 
 
 class TestGetCandles:
-    """get_candles 함수 테스트"""
+    """get_candles 메서드 테스트"""
 
-    @patch("src.upbit.upbit_api.pyupbit.get_ohlcv")
-    def test_get_candles_여러_캔들_반환(self, mock_get_ohlcv):
-        """get_candles는 여러 개의 캔들 데이터를 DataFrame으로 반환할 수 있다"""
-
-        # Mock DataFrame 생성
-        mock_df = pd.DataFrame(
+    @patch("src.upbit.upbit_api.make_api_request")
+    def test_get_candles_정상_조회_200개_이하(self, mock_request):
+        """200개 이하 캔들 조회 시 단일 API 호출로 정상 동작한다"""
+        # Given
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
             {
-                "open": [95000000, 95500000],
-                "high": [96000000, 97000000],
-                "low": [94000000, 95000000],
-                "close": [95500000, 96500000],
-                "volume": [15.75, 20.5],
-                "value": [1503750000.0, 1978250000.0],
+                "market": "KRW-BTC",
+                "candle_date_time_utc": "2024-10-27T03:00:00",
+                "opening_price": 95000000.0,
+                "high_price": 96000000.0,
+                "low_price": 94000000.0,
+                "trade_price": 95500000.0,
+                "candle_acc_trade_volume": 15.75,
+                "candle_acc_trade_price": 1503750000.0,
             },
-            index=[pd.Timestamp("2025-10-11 09:00:00"), pd.Timestamp("2025-10-11 10:00:00")],
-        )
+            {
+                "market": "KRW-BTC",
+                "candle_date_time_utc": "2024-10-27T02:00:00",
+                "opening_price": 95500000.0,
+                "high_price": 97000000.0,
+                "low_price": 95000000.0,
+                "trade_price": 96500000.0,
+                "candle_acc_trade_volume": 20.5,
+                "candle_acc_trade_price": 1978250000.0,
+            },
+        ]
+        mock_request.return_value = mock_response
 
-        mock_get_ohlcv.return_value = mock_df
+        config = MagicMock()
+        config.base_url = "https://api.upbit.com"
+        api = UpbitAPI(config)
 
-        # 함수 호출
-        result = UpbitAPI.get_candles(count=2)
+        # When
+        result = api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=2)
 
-        # 검증
+        # Then
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
         assert list(result.columns) == ["open", "high", "low", "close", "volume", "value"]
+        assert mock_request.call_count == 1
 
-    @patch("src.upbit.upbit_api.pyupbit.get_ohlcv")
-    def test_get_candles_API_호출_실패시_빈_DataFrame_반환(self, mock_get_ohlcv):
+    @patch("src.upbit.upbit_api.make_api_request")
+    @patch("src.upbit.upbit_api.time.sleep")
+    def test_get_candles_대용량_조회_200개_초과(self, mock_sleep, mock_request):
+        """200개 초과 캔들 조회 시 반복 호출로 정상 동작한다"""
+        # Given
+        from datetime import datetime, timedelta
+
+        # 첫 번째 호출 응답 (200개)
+        first_response = MagicMock()
+        base_date = datetime(2024, 10, 27)
+        first_batch = [
+            {
+                "market": "KRW-BTC",
+                "candle_date_time_utc": (base_date - timedelta(days=i)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "opening_price": 95000000.0 + i * 10000,
+                "high_price": 96000000.0 + i * 10000,
+                "low_price": 94000000.0 + i * 10000,
+                "trade_price": 95500000.0 + i * 10000,
+                "candle_acc_trade_volume": 15.75,
+                "candle_acc_trade_price": 1503750000.0,
+            }
+            for i in range(200)
+        ]
+        first_response.json.return_value = first_batch
+
+        # 두 번째 호출 응답 (100개)
+        second_response = MagicMock()
+        second_batch = [
+            {
+                "market": "KRW-BTC",
+                "candle_date_time_utc": (base_date - timedelta(days=i + 200)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "opening_price": 95000000.0 + (i + 200) * 10000,
+                "high_price": 96000000.0 + (i + 200) * 10000,
+                "low_price": 94000000.0 + (i + 200) * 10000,
+                "trade_price": 95500000.0 + (i + 200) * 10000,
+                "candle_acc_trade_volume": 15.75,
+                "candle_acc_trade_price": 1503750000.0,
+            }
+            for i in range(100)
+        ]
+        second_response.json.return_value = second_batch
+
+        mock_request.side_effect = [first_response, second_response]
+
+        config = MagicMock()
+        config.base_url = "https://api.upbit.com"
+        api = UpbitAPI(config)
+
+        # When
+        result = api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=300)
+
+        # Then
+        assert isinstance(result, pd.DataFrame)
+        assert len(result) == 300
+        assert mock_request.call_count == 2
+        assert mock_sleep.call_count == 1  # Rate limit 대기  # Rate limit 대기
+
+    def test_get_candles_market_빈_값_검증(self):
+        """market이 빈 값이면 ValueError를 발생시킨다"""
+        # Given
+        config = MagicMock()
+        api = UpbitAPI(config)
+
+        # When & Then
+        with pytest.raises(ValueError, match="market은 비어있을 수 없습니다"):
+            api.get_candles(market="", interval=UpbitCandleInterval.DAY, count=10)
+
+        with pytest.raises(ValueError, match="market은 비어있을 수 없습니다"):
+            api.get_candles(market="   ", interval=UpbitCandleInterval.DAY, count=10)
+
+    def test_get_candles_count_0_이하_검증(self):
+        """count가 0 이하면 ValueError를 발생시킨다"""
+        # Given
+        config = MagicMock()
+        api = UpbitAPI(config)
+
+        # When & Then
+        with pytest.raises(ValueError, match="count는 1 이상이어야 합니다"):
+            api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=0)
+
+        with pytest.raises(ValueError, match="count는 1 이상이어야 합니다"):
+            api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=-1)
+
+    @patch("src.upbit.upbit_api.make_api_request")
+    def test_get_candles_to_파라미터_전달(self, mock_request):
+        """to 파라미터가 올바르게 API에 전달된다"""
+        # Given
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "market": "KRW-BTC",
+                "candle_date_time_utc": "2024-10-27T00:00:00",
+                "opening_price": 95000000.0,
+                "high_price": 96000000.0,
+                "low_price": 94000000.0,
+                "trade_price": 95500000.0,
+                "candle_acc_trade_volume": 15.75,
+                "candle_acc_trade_price": 1503750000.0,
+            }
+        ]
+        mock_request.return_value = mock_response
+
+        config = MagicMock()
+        config.base_url = "https://api.upbit.com"
+        api = UpbitAPI(config)
+
+        from datetime import datetime
+
+        to_datetime = datetime(2024, 10, 27, 12, 0, 0)
+
+        # When
+        api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=1, to=to_datetime)
+
+        # Then
+        call_args = mock_request.call_args
+        assert call_args[1]["params"]["to"] == "2024-10-27 12:00:00"
+
+    @patch("src.upbit.upbit_api.make_api_request")
+    def test_get_candles_API_에러_처리(self, mock_request):
         """API 호출 실패 시 빈 DataFrame을 반환한다"""
-        mock_get_ohlcv.return_value = None
+        # Given
+        mock_request.side_effect = Exception("API Error")
 
-        result = UpbitAPI.get_candles()
+        config = MagicMock()
+        config.base_url = "https://api.upbit.com"
+        api = UpbitAPI(config)
 
+        # When
+        result = api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=10)
+
+        # Then
+        assert isinstance(result, pd.DataFrame)
+        assert result.empty
+
+    @patch("src.upbit.upbit_api.make_api_request")
+    def test_get_candles_빈_응답_처리(self, mock_request):
+        """API 응답이 빈 리스트면 빈 DataFrame을 반환한다"""
+        # Given
+        mock_response = MagicMock()
+        mock_response.json.return_value = []
+        mock_request.return_value = mock_response
+
+        config = MagicMock()
+        config.base_url = "https://api.upbit.com"
+        api = UpbitAPI(config)
+
+        # When
+        result = api.get_candles(market="KRW-BTC", interval=UpbitCandleInterval.DAY, count=10)
+
+        # Then
         assert isinstance(result, pd.DataFrame)
         assert result.empty
 
