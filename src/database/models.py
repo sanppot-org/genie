@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Index, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, Float, Index, Integer, PrimaryKeyConstraint, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -16,19 +16,22 @@ class CandleBase(Base):
     """캔들 데이터 공통 베이스 모델 (추상 클래스)
 
     Attributes:
-        id: 기본 키
-        timestamp: 캔들 시각 (UTC)
-        ticker: 티커 (예: KRW-BTC)
+        id: 자동 증가 ID (primary key 아님)
+        timestamp: 캔들 시각 (UTC) - primary key의 일부
+        ticker: 티커 (예: KRW-BTC) - primary key의 일부
         open: 시가
         high: 고가
         low: 저가
         close: 종가
         volume: 거래량
+
+    Note:
+        TimescaleDB hypertable 요구사항에 따라 (timestamp, ticker)가 복합 primary key입니다.
     """
 
     __abstract__ = True  # 추상 클래스로 설정 (테이블 생성 안 함)
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ticker: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     open: Mapped[float] = mapped_column(Float, nullable=False)
@@ -44,6 +47,7 @@ class CandleMinute1(CandleBase):
     __tablename__ = "candle_minute_1"
 
     __table_args__ = (
+        PrimaryKeyConstraint("timestamp", "ticker"),
         UniqueConstraint("timestamp", "ticker", name="uix_minute1_timestamp_ticker"),
         Index("idx_minute1_ticker_timestamp", "ticker", "timestamp"),
     )
@@ -59,6 +63,7 @@ class CandleDaily(CandleBase):
     __tablename__ = "candle_daily"
 
     __table_args__ = (
+        PrimaryKeyConstraint("timestamp", "ticker"),
         UniqueConstraint("timestamp", "ticker", name="uix_daily_timestamp_ticker"),
         Index("idx_daily_ticker_timestamp", "ticker", "timestamp"),
     )
