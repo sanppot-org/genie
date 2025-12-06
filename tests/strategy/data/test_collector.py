@@ -99,7 +99,7 @@ class TestDataCollector:
 
         # 검증
         mock_get_candles.assert_called_once_with(
-            ticker="KRW-BTC",
+            market="KRW-BTC",
             interval=UpbitCandleInterval.MINUTE_60,
             count=504,  # 21일 * 24시간
         )

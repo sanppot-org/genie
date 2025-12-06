@@ -3,9 +3,9 @@
 from datetime import datetime
 
 import pandas as pd
+from pandera.typing import DataFrame
 import pytest
 import pytz
-from pandera.typing import DataFrame
 
 from src.adapters.candle_adapters import UpbitCandleAdapter
 from src.database.models import CandleDaily, CandleMinute1

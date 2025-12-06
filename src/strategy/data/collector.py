@@ -76,7 +76,7 @@ class DataCollector:
             return file_cache.history
 
         # API 호출
-        df = UpbitAPI.get_candles(ticker=ticker, interval=upbit_api.UpbitCandleInterval.MINUTE_60, count=(days + 1) * 24)
+        df = UpbitAPI().get_candles(market=ticker, interval=upbit_api.UpbitCandleInterval.MINUTE_60, count=(days + 1) * 24)
 
         self._slack_client.send_log(f"{ticker} 데이터 업데이트 완료.")
 

@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     import pandas as pd
 
     from src.adapters.adapter_factory import CandleAdapterFactory
-    from src.database.models import CandleMinute1
     from src.database.repositories import CandleDailyRepository, CandleMinute1Repository
 
 
