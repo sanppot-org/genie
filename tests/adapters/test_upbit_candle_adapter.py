@@ -24,7 +24,7 @@ def sample_candle_df() -> DataFrame[CandleSchema]:
     """유효한 Upbit 캔들 DataFrame을 반환합니다.
 
     - 3개의 행
-    - KST timezone-naive DatetimeIndex
+    - UTC timezone-aware DatetimeIndex (upbit_api.py에서 pd.to_datetime(..., utc=True) 사용)
     - 컬럼: open, high, low, close, volume, value
     """
     data = {
@@ -37,9 +37,9 @@ def sample_candle_df() -> DataFrame[CandleSchema]:
     }
     index = pd.DatetimeIndex(
         [
-            datetime(2024, 1, 1, 9, 0, 0),  # KST 2024-01-01 09:00:00
-            datetime(2024, 1, 1, 10, 0, 0),  # KST 2024-01-01 10:00:00
-            datetime(2024, 1, 1, 11, 0, 0),  # KST 2024-01-01 11:00:00
+            datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC),  # UTC 2024-01-01 09:00:00+00:00
+            datetime(2024, 1, 1, 10, 0, 0, tzinfo=pytz.UTC),  # UTC 2024-01-01 10:00:00+00:00
+            datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC),  # UTC 2024-01-01 11:00:00+00:00
         ]
     )
     df = pd.DataFrame(data, index=index)
@@ -74,9 +74,9 @@ def candle_df_with_nat() -> DataFrame[CandleSchema]:
     }
     index = pd.DatetimeIndex(
         [
-            datetime(2024, 1, 1, 9, 0, 0),
+            datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC),
             pd.NaT,  # NaT 값
-            datetime(2024, 1, 1, 11, 0, 0),
+            datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC),
         ]
     )
     df = pd.DataFrame(data, index=index)
@@ -107,12 +107,10 @@ def test_to_candle_models_with_valid_data(
     assert first_candle.close == 105.0
     assert first_candle.volume == 1000.0
 
-    # 타임존이 UTC로 변환되었는지 확인
-    assert first_candle.timestamp.tzinfo == pytz.UTC
-
-    # KST 2024-01-01 09:00:00 → UTC 2024-01-01 00:00:00
-    expected_utc_time = datetime(2024, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
-    assert first_candle.timestamp == expected_utc_time
+    # UTC timezone-aware datetime으로 저장됨
+    expected_time = datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC)
+    assert first_candle.timestamp == expected_time
+    assert first_candle.timestamp.tzinfo is not None
 
 
 def test_to_candle_models_with_empty_dataframe(
@@ -158,15 +156,15 @@ def test_to_candle_models_skips_nat_values(
     # NaT 행은 스킵되므로 2개만 반환되어야 함
     assert len(result) == 2
 
-    # 첫 번째와 세 번째 행만 변환됨
-    assert result[0].timestamp == datetime(2024, 1, 1, 0, 0, 0, tzinfo=pytz.UTC)
-    assert result[1].timestamp == datetime(2024, 1, 1, 2, 0, 0, tzinfo=pytz.UTC)
+    # 첫 번째와 세 번째 행만 변환됨 (UTC timezone-aware)
+    assert result[0].timestamp == datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC)
+    assert result[1].timestamp == datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC)
 
 
-def test_timezone_conversion_kst_to_utc(
+def test_timezone_preserved_as_utc_aware(
         upbit_adapter: UpbitCandleAdapter, sample_candle_df: DataFrame[CandleSchema]
 ) -> None:
-    """KST 타임존이 UTC로 정확히 변환되는지 테스트합니다."""
+    """UTC timezone-aware timestamp가 그대로 유지되는지 테스트합니다."""
     # Given
     ticker = "KRW-BTC"
     interval = UpbitInterval.MINUTE_1
@@ -175,20 +173,20 @@ def test_timezone_conversion_kst_to_utc(
     result = upbit_adapter.to_candle_models(sample_candle_df, ticker, interval)
 
     # Then
-    # KST와 UTC는 9시간 차이
-    # KST 2024-01-01 09:00:00 → UTC 2024-01-01 00:00:00
-    # KST 2024-01-01 10:00:00 → UTC 2024-01-01 01:00:00
-    # KST 2024-01-01 11:00:00 → UTC 2024-01-01 02:00:00
+    # UTC aware → UTC aware (변환 없이 그대로 유지)
+    # UTC 2024-01-01 09:00:00+00:00 (aware) → UTC 2024-01-01 09:00:00+00:00 (aware)
+    # UTC 2024-01-01 10:00:00+00:00 (aware) → UTC 2024-01-01 10:00:00+00:00 (aware)
+    # UTC 2024-01-01 11:00:00+00:00 (aware) → UTC 2024-01-01 11:00:00+00:00 (aware)
 
-    expected_utc_times = [
-        datetime(2024, 1, 1, 0, 0, 0, tzinfo=pytz.UTC),
-        datetime(2024, 1, 1, 1, 0, 0, tzinfo=pytz.UTC),
-        datetime(2024, 1, 1, 2, 0, 0, tzinfo=pytz.UTC),
+    expected_times = [
+        datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC),
+        datetime(2024, 1, 1, 10, 0, 0, tzinfo=pytz.UTC),
+        datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC),
     ]
 
     for i, candle in enumerate(result):
-        assert candle.timestamp == expected_utc_times[i]
-        assert candle.timestamp.tzinfo == pytz.UTC
+        assert candle.timestamp == expected_times[i]
+        assert candle.timestamp.tzinfo is not None  # timezone-aware datetime 확인
 
 
 @pytest.mark.parametrize(

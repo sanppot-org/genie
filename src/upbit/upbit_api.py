@@ -543,7 +543,7 @@ class UpbitAPI:
         df = df.rename(columns=column_mapping)
 
         # 인덱스를 datetime으로 설정
-        df["index"] = pd.to_datetime(df["index"])
+        df["index"] = pd.to_datetime(df["index"], utc=True)
         df = df.set_index("index")
 
         # 필요한 컬럼만 선택

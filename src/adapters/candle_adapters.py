@@ -4,10 +4,8 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 import pandas as pd
-from pytz import UTC
 
 from src.common.data_adapter import CandleDataAdapter
-from src.constants import KST
 from src.database.models import CandleBase, CandleDaily, CandleMinute1
 
 T = TypeVar("T", bound=CandleBase)
@@ -21,7 +19,7 @@ class UpbitCandleAdapter(CandleDataAdapter):
 
     Upbit 특징:
     - 컬럼명: 소문자 (open, high, low, close, volume, value)
-    - 타임존: KST (timezone-naive)
+    - 타임존: UTC (또는 timezone-naive → UTC로 간주)
     - 추가 컬럼: value (누적 거래 대금) - DB에 저장하지 않음
     - Interval: UpbitCandleInterval enum
     """
@@ -31,7 +29,7 @@ class UpbitCandleAdapter(CandleDataAdapter):
     ) -> Sequence[CandleBase]:
         """Upbit DataFrame → 캔들 모델 리스트.
 
-        타임존 변환: KST (naive) → UTC (aware)
+        타임존: 이미 UTC (또는 naive → UTC로 간주)
         Interval에 따라 CandleMinute1 또는 CandleDaily 반환
         """
         from src.upbit.upbit_api import UpbitCandleInterval
@@ -66,11 +64,10 @@ class UpbitCandleAdapter(CandleDataAdapter):
             timestamp = row.Index  # type: ignore[union-attr]
             if pd.isna(timestamp):
                 continue
-            utc_timestamp = timestamp.tz_localize(KST).tz_convert(UTC)  # type: ignore[union-attr]
 
             models.append(
                 model_class(
-                    timestamp=utc_timestamp.to_pydatetime(),  # type: ignore[union-attr]
+                    timestamp=timestamp.to_pydatetime(),  # type: ignore[union-attr]
                     ticker=ticker,
                     open=float(row.open),  # type: ignore[arg-type]
                     high=float(row.high),  # type: ignore[arg-type]
@@ -202,7 +199,8 @@ class HantuCandleAdapter(CandleDataAdapter):
         elif isinstance(interval, OverseasCandlePeriod) and interval == OverseasCandlePeriod.DAILY:
             return self._to_daily_models(df_renamed, ticker)
         else:
-            raise ValueError(f"Unsupported interval: {interval}. Only OverseasMinuteInterval.MIN_1 and OverseasCandlePeriod.DAILY are supported.")
+            raise ValueError(
+                f"Unsupported interval: {interval}. Only OverseasMinuteInterval.MIN_1 and OverseasCandlePeriod.DAILY are supported.")
 
     @staticmethod
     def _df_to_models(df: pd.DataFrame, ticker: str, model_class: type[T]) -> list[T]:
