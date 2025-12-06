@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '001_initial'
@@ -23,7 +24,7 @@ def upgrade() -> None:
     op.create_table(
         'price_data',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column('symbol', sa.String(length=20), nullable=False),
         sa.Column('price', sa.Float(), nullable=False),
         sa.Column('source', sa.String(length=50), nullable=False),
@@ -40,7 +41,7 @@ def upgrade() -> None:
     op.create_table(
         'candle_minute_1',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),
@@ -58,7 +59,7 @@ def upgrade() -> None:
     op.create_table(
         'candle_daily',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),
@@ -85,8 +86,10 @@ def upgrade() -> None:
     op.execute("SELECT setval('candle_daily_id_seq', 1, false);")
 
     # Convert to TimescaleDB hypertables for time-series optimization
-    op.execute("SELECT create_hypertable('candle_minute_1', 'timestamp', chunk_time_interval => INTERVAL '1 day', migrate_data => TRUE, if_not_exists => TRUE)")
-    op.execute("SELECT create_hypertable('candle_daily', 'timestamp', chunk_time_interval => INTERVAL '1 year', migrate_data => TRUE, if_not_exists => TRUE)")
+    op.execute(
+        "SELECT create_hypertable('candle_minute_1', 'timestamp', chunk_time_interval => INTERVAL '1 day', migrate_data => TRUE, if_not_exists => TRUE)")
+    op.execute(
+        "SELECT create_hypertable('candle_daily', 'timestamp', chunk_time_interval => INTERVAL '1 year', migrate_data => TRUE, if_not_exists => TRUE)")
 
 
 def downgrade() -> None:

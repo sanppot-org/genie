@@ -11,7 +11,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-genie_trading}
       POSTGRES_USER: ${POSTGRES_USER:-genie}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-genie_password}
-      TZ: Asia/Seoul
+      TZ: UTC
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
