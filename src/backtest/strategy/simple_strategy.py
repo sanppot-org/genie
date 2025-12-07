@@ -20,7 +20,7 @@ class SimpleStrategy(bt.Strategy):
         self.dataclose = self.datas[0].close
 
         # Add Simple Moving Average indicator
-        self.sma = bt.indicators.SimpleMovingAverage(
+        self.sma = bt.indicators.MovingAverageSimple(
             self.datas[0], period=self.params.ma_period  # type: ignore[attr-defined]
         )
 
