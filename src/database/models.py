@@ -31,7 +31,7 @@ class CandleBase(Base):
 
     __abstract__ = True  # 추상 클래스로 설정 (테이블 생성 안 함)
 
-    id: Mapped[int] = mapped_column(Integer, autoincrement=True, nullable=False)
+    id: Mapped[int | None] = mapped_column(Integer, autoincrement=True, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ticker: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     open: Mapped[float] = mapped_column(Float, nullable=False)

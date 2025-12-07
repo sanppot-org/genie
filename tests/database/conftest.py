@@ -4,8 +4,9 @@ import pytest
 from sqlalchemy.orm import Session
 
 from src.config import DatabaseConfig
+from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
-from src.database.repositories import CandleDailyRepository, CandleMinute1Repository, PriceRepository
+from src.database.repositories import PriceRepository
 
 
 @pytest.fixture
