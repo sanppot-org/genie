@@ -1,6 +1,6 @@
 """Candle data repositories for database access."""
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import override
 
@@ -12,8 +12,10 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
     """캔들 데이터를 위한 공통 Repository 기능
 
     캔들 데이터 Repository들이 공유하는 공통 메서드를 제공합니다.
+    각 서브클래스는 자신의 시간 필드(timestamp vs date)에 맞게 구현해야 합니다.
     """
 
+    @abstractmethod
     def get_candles(
             self,
             ticker: str,
@@ -24,29 +26,15 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
 
         Args:
             ticker: 티커
-            start_datetime: 시작 시각 (기본값: 현재로부터 1일 전)
-            end_datetime: 종료 시각 (기본값: 현재 시각)
+            start_datetime: 시작 시각
+            end_datetime: 종료 시각
 
         Returns:
             캔들 리스트 (시간 순 정렬)
         """
-        if end_datetime is None:
-            end_datetime = datetime.now()
-        if start_datetime is None:
-            start_datetime = end_datetime - timedelta(days=1)
+        pass
 
-        model_class = self._get_model_class()
-        return (
-            self.session.query(model_class)
-            .filter(
-                model_class.ticker == ticker,  # type: ignore[attr-defined, arg-type]
-                model_class.timestamp >= start_datetime,  # type: ignore[attr-defined, arg-type]
-                model_class.timestamp <= end_datetime,  # type: ignore[attr-defined, arg-type]
-            )
-            .order_by(model_class.timestamp)  # type: ignore[attr-defined, arg-type]
-            .all()
-        )
-
+    @abstractmethod
     def get_latest_candle(self, ticker: str) -> T | None:
         """최신 캔들 데이터 조회
 
@@ -56,63 +44,16 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
         Returns:
             최신 캔들 또는 None
         """
-        model_class = self._get_model_class()
-        return (
-            self.session.query(model_class)
-            .filter(model_class.ticker == ticker)  # type: ignore[attr-defined, arg-type]
-            .order_by(model_class.timestamp.desc())  # type: ignore[attr-defined]
-            .first()
-        )
+        pass
 
+    @abstractmethod
     def bulk_upsert(self, entities: list[T]) -> None:
         """캔들 데이터 벌크 upsert
 
-        PostgreSQL의 ON CONFLICT를 사용하여 한 번의 쿼리로
-        여러 레코드를 삽입하거나 업데이트합니다.
-
         Args:
             entities: 저장할 캔들 리스트
-
-        Example:
-            >>> candles = [CandleMinute1(...), CandleMinute1(...), ...]
-            >>> repository.bulk_upsert(candles)
         """
-        from sqlalchemy.dialects.postgresql import insert
-
-        if not entities:
-            return
-
-        model_class = self._get_model_class()
-
-        # 딕셔너리 리스트로 변환 (SQLAlchemy 객체 → dict)
-        values = [
-            {
-                "timestamp": e.timestamp,  # type: ignore[attr-defined]
-                "ticker": e.ticker,  # type: ignore[attr-defined]
-                "open": e.open,  # type: ignore[attr-defined]
-                "high": e.high,  # type: ignore[attr-defined]
-                "low": e.low,  # type: ignore[attr-defined]
-                "close": e.close,  # type: ignore[attr-defined]
-                "volume": e.volume,  # type: ignore[attr-defined]
-            }
-            for e in entities
-        ]
-
-        # INSERT ... ON CONFLICT DO UPDATE
-        stmt = insert(model_class).values(values)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["timestamp", "ticker"],
-            set_={
-                "open": stmt.excluded.open,
-                "high": stmt.excluded.high,
-                "low": stmt.excluded.low,
-                "close": stmt.excluded.close,
-                "volume": stmt.excluded.volume,
-            },
-        )
-
-        self.session.execute(stmt)
-        self.session.commit()
+        pass
 
 
 class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
@@ -139,6 +80,103 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         """
         return "timestamp", "ticker"
 
+    @override
+    def get_candles(
+            self,
+            ticker: str,
+            start_datetime: datetime | None = None,
+            end_datetime: datetime | None = None,
+    ) -> list[CandleMinute1]:
+        """캔들 데이터 조회
+
+        Args:
+            ticker: 티커
+            start_datetime: 시작 시각 (기본값: 현재로부터 1일 전)
+            end_datetime: 종료 시각 (기본값: 현재 시각)
+
+        Returns:
+            캔들 리스트 (시간 순 정렬)
+        """
+        if end_datetime is None:
+            end_datetime = datetime.now()
+        if start_datetime is None:
+            start_datetime = end_datetime - timedelta(days=1)
+
+        return (
+            self.session.query(CandleMinute1)
+            .filter(
+                CandleMinute1.ticker == ticker,
+                CandleMinute1.timestamp >= start_datetime,
+                CandleMinute1.timestamp <= end_datetime,
+            )
+            .order_by(CandleMinute1.timestamp)
+            .all()
+        )
+
+    @override
+    def get_latest_candle(self, ticker: str) -> CandleMinute1 | None:
+        """최신 캔들 데이터 조회
+
+        Args:
+            ticker: 티커
+
+        Returns:
+            최신 캔들 또는 None
+        """
+        return (
+            self.session.query(CandleMinute1)
+            .filter(CandleMinute1.ticker == ticker)
+            .order_by(CandleMinute1.timestamp.desc())
+            .first()
+        )
+
+    @override
+    def bulk_upsert(self, entities: list[CandleMinute1]) -> None:
+        """캔들 데이터 벌크 upsert
+
+        PostgreSQL의 ON CONFLICT를 사용하여 한 번의 쿼리로
+        여러 레코드를 삽입하거나 업데이트합니다.
+
+        Args:
+            entities: 저장할 캔들 리스트
+        """
+        from sqlalchemy.dialects.postgresql import insert
+
+        if not entities:
+            return
+
+        # 딕셔너리 리스트로 변환 (SQLAlchemy 객체 → dict)
+        values = [
+            {
+                "timestamp": e.timestamp,
+                "localtime": e.localtime,
+                "ticker": e.ticker,
+                "open": e.open,
+                "high": e.high,
+                "low": e.low,
+                "close": e.close,
+                "volume": e.volume,
+            }
+            for e in entities
+        ]
+
+        # INSERT ... ON CONFLICT DO UPDATE
+        stmt = insert(CandleMinute1).values(values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["timestamp", "ticker"],
+            set_={
+                "localtime": stmt.excluded.localtime,
+                "open": stmt.excluded.open,
+                "high": stmt.excluded.high,
+                "low": stmt.excluded.low,
+                "close": stmt.excluded.close,
+                "volume": stmt.excluded.volume,
+            },
+        )
+
+        self.session.execute(stmt)
+        self.session.commit()
+
 
 class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
     """일봉 캔들 데이터 Repository
@@ -160,6 +198,104 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         """Unique constraint 필드 반환
 
         Returns:
-            (timestamp, ticker)
+            (date, ticker)
         """
-        return "timestamp", "ticker"
+        return "date", "ticker"
+
+    @override
+    def get_candles(
+            self,
+            ticker: str,
+            start_datetime: datetime | None = None,
+            end_datetime: datetime | None = None,
+    ) -> list[CandleDaily]:
+        """캔들 데이터 조회 (일봉은 date 필드 사용)
+
+        Args:
+            ticker: 티커
+            start_datetime: 시작 시각 (날짜로 변환됨, 기본값: 현재로부터 1일 전)
+            end_datetime: 종료 시각 (날짜로 변환됨, 기본값: 현재 시각)
+
+        Returns:
+            캔들 리스트 (날짜 순 정렬)
+        """
+        if end_datetime is None:
+            end_datetime = datetime.now()
+        if start_datetime is None:
+            start_datetime = end_datetime - timedelta(days=1)
+
+        start_date = start_datetime.date()
+        end_date = end_datetime.date()
+
+        return (
+            self.session.query(CandleDaily)
+            .filter(
+                CandleDaily.ticker == ticker,
+                CandleDaily.date >= start_date,
+                CandleDaily.date <= end_date,
+            )
+            .order_by(CandleDaily.date)
+            .all()
+        )
+
+    @override
+    def get_latest_candle(self, ticker: str) -> CandleDaily | None:
+        """최신 캔들 데이터 조회 (일봉은 date 필드 사용)
+
+        Args:
+            ticker: 티커
+
+        Returns:
+            최신 캔들 또는 None
+        """
+        return (
+            self.session.query(CandleDaily)
+            .filter(CandleDaily.ticker == ticker)
+            .order_by(CandleDaily.date.desc())
+            .first()
+        )
+
+    @override
+    def bulk_upsert(self, entities: list[CandleDaily]) -> None:
+        """캔들 데이터 벌크 upsert (일봉은 date 필드 사용)
+
+        PostgreSQL의 ON CONFLICT를 사용하여 한 번의 쿼리로
+        여러 레코드를 삽입하거나 업데이트합니다.
+
+        Args:
+            entities: 저장할 캔들 리스트
+        """
+        from sqlalchemy.dialects.postgresql import insert
+
+        if not entities:
+            return
+
+        # 딕셔너리 리스트로 변환 (SQLAlchemy 객체 → dict)
+        values = [
+            {
+                "date": e.date,
+                "ticker": e.ticker,
+                "open": e.open,
+                "high": e.high,
+                "low": e.low,
+                "close": e.close,
+                "volume": e.volume,
+            }
+            for e in entities
+        ]
+
+        # INSERT ... ON CONFLICT DO UPDATE
+        stmt = insert(CandleDaily).values(values)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["date", "ticker"],
+            set_={
+                "open": stmt.excluded.open,
+                "high": stmt.excluded.high,
+                "low": stmt.excluded.low,
+                "close": stmt.excluded.close,
+                "volume": stmt.excluded.volume,
+            },
+        )
+
+        self.session.execute(stmt)
+        self.session.commit()

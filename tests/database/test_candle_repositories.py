@@ -15,6 +15,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=51000000,
@@ -24,6 +25,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 1),
                 ticker="KRW-BTC",
                 open=50500000,
                 high=51500000,
@@ -33,6 +35,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 2, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 2),
                 ticker="KRW-BTC",
                 open=51000000,
                 high=52000000,
@@ -62,6 +65,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=51000000,
@@ -71,6 +75,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 1),
                 ticker="KRW-BTC",
                 open=50500000,
                 high=51500000,
@@ -104,6 +109,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=51000000,
@@ -113,6 +119,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 1),
                 ticker="KRW-BTC",
                 open=50500000,
                 high=51500000,
@@ -139,6 +146,7 @@ class TestCandleMinute1Repository:
         existing = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=51000000,
@@ -151,6 +159,7 @@ class TestCandleMinute1Repository:
 
         updated_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+            localtime=datetime(2024, 1, 1, 18, 0),
             ticker="KRW-BTC",
             open=50000000,
             high=52000000,  # 변경
@@ -173,10 +182,14 @@ class TestCandleMinute1Repository:
         """get_candles를 기본값(최근 하루)으로 호출."""
         # Given
         from datetime import timedelta
+        from zoneinfo import ZoneInfo
         now = datetime.now(UTC)
+        kst_now_2h = now.astimezone(ZoneInfo("Asia/Seoul")) - timedelta(hours=2)
+        kst_now_1h = now.astimezone(ZoneInfo("Asia/Seoul")) - timedelta(hours=1)
         candles = [
             CandleMinute1(
                 timestamp=now - timedelta(hours=2),
+                localtime=kst_now_2h.replace(tzinfo=None),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=51000000,
@@ -186,6 +199,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=now - timedelta(hours=1),
+                localtime=kst_now_1h.replace(tzinfo=None),
                 ticker="KRW-BTC",
                 open=50500000,
                 high=51500000,
@@ -213,7 +227,7 @@ class TestCandleDailyRepository:
         # Given
         candles = [
             CandleDaily(
-                timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+                date=datetime(2024, 1, 1).date(),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=52000000,
@@ -222,7 +236,7 @@ class TestCandleDailyRepository:
                 volume=1000.5,
             ),
             CandleDaily(
-                timestamp=datetime(2024, 1, 2, tzinfo=UTC),
+                date=datetime(2024, 1, 2).date(),
                 ticker="KRW-BTC",
                 open=51000000,
                 high=53000000,
@@ -231,7 +245,7 @@ class TestCandleDailyRepository:
                 volume=1200.3,
             ),
             CandleDaily(
-                timestamp=datetime(2024, 1, 3, tzinfo=UTC),
+                date=datetime(2024, 1, 3).date(),
                 ticker="KRW-BTC",
                 open=52000000,
                 high=54000000,
@@ -251,16 +265,15 @@ class TestCandleDailyRepository:
 
         # Then
         assert len(result) == 2
-        # SQLite는 timezone 정보를 저장하지 않으므로 naive datetime으로 비교
-        assert result[0].timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, tzinfo=UTC)
-        assert result[1].timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 2, tzinfo=UTC)
+        assert result[0].date == datetime(2024, 1, 1).date()
+        assert result[1].date == datetime(2024, 1, 2).date()
 
     def test_get_latest_candle_returns_most_recent_candle(self, daily_repo: CandleDailyRepository):
         """get_latest_candle로 최신 캔들 조회."""
         # Given
         candles = [
             CandleDaily(
-                timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+                date=datetime(2024, 1, 1).date(),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=52000000,
@@ -269,7 +282,7 @@ class TestCandleDailyRepository:
                 volume=1000.5,
             ),
             CandleDaily(
-                timestamp=datetime(2024, 1, 2, tzinfo=UTC),
+                date=datetime(2024, 1, 2).date(),
                 ticker="KRW-BTC",
                 open=51000000,
                 high=53000000,
@@ -285,8 +298,7 @@ class TestCandleDailyRepository:
 
         # Then
         assert result is not None
-        # SQLite는 timezone 정보를 저장하지 않으므로 naive datetime으로 비교
-        assert result.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 2, tzinfo=UTC)
+        assert result.date == datetime(2024, 1, 2).date()
         assert result.close == 52000000
 
     def test_get_latest_candle_returns_none_when_no_data(self, daily_repo: CandleDailyRepository):
@@ -302,7 +314,7 @@ class TestCandleDailyRepository:
         # Given
         candles = [
             CandleDaily(
-                timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+                date=datetime(2024, 1, 1).date(),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=52000000,
@@ -311,7 +323,7 @@ class TestCandleDailyRepository:
                 volume=1000.5,
             ),
             CandleDaily(
-                timestamp=datetime(2024, 1, 2, tzinfo=UTC),
+                date=datetime(2024, 1, 2).date(),
                 ticker="KRW-BTC",
                 open=51000000,
                 high=53000000,
@@ -337,7 +349,7 @@ class TestCandleDailyRepository:
         # Given
         existing = [
             CandleDaily(
-                timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+                date=datetime(2024, 1, 1).date(),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=52000000,
@@ -349,7 +361,7 @@ class TestCandleDailyRepository:
         daily_repo.bulk_upsert(existing)
 
         updated_candle = CandleDaily(
-            timestamp=datetime(2024, 1, 1, tzinfo=UTC),
+            date=datetime(2024, 1, 1).date(),
             ticker="KRW-BTC",
             open=50000000,
             high=54000000,  # 변경
@@ -375,7 +387,7 @@ class TestCandleDailyRepository:
         now = datetime.now(UTC)
         candles = [
             CandleDaily(
-                timestamp=now - timedelta(hours=12),
+                date=(now - timedelta(hours=12)).date(),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=52000000,
@@ -384,7 +396,7 @@ class TestCandleDailyRepository:
                 volume=1000.5,
             ),
             CandleDaily(
-                timestamp=now - timedelta(hours=6),
+                date=(now - timedelta(hours=6)).date(),
                 ticker="KRW-BTC",
                 open=51000000,
                 high=53000000,

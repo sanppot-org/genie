@@ -42,6 +42,7 @@ def upgrade() -> None:
         'candle_minute_1',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
         sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column('localtime', sa.DateTime(), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),
@@ -54,24 +55,25 @@ def upgrade() -> None:
     op.create_index('idx_minute1_ticker_timestamp', 'candle_minute_1', ['ticker', 'timestamp'])
     op.create_index(op.f('ix_candle_minute_1_ticker'), 'candle_minute_1', ['ticker'])
     op.create_index(op.f('ix_candle_minute_1_timestamp'), 'candle_minute_1', ['timestamp'])
+    op.create_index(op.f('ix_candle_minute_1_localtime'), 'candle_minute_1', ['localtime'])
 
     # Create candle_daily table (TimescaleDB hypertable)
     op.create_table(
         'candle_daily',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column('date', sa.Date(), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),
         sa.Column('low', sa.Float(), nullable=False),
         sa.Column('close', sa.Float(), nullable=False),
         sa.Column('volume', sa.Float(), nullable=False),
-        sa.PrimaryKeyConstraint('timestamp', 'ticker'),  # TimescaleDB requirement
-        sa.UniqueConstraint('timestamp', 'ticker', name='uix_daily_timestamp_ticker')
+        sa.PrimaryKeyConstraint('date', 'ticker'),  # TimescaleDB requirement
+        sa.UniqueConstraint('date', 'ticker', name='uix_daily_date_ticker')
     )
-    op.create_index('idx_daily_ticker_timestamp', 'candle_daily', ['ticker', 'timestamp'])
+    op.create_index('idx_daily_ticker_date', 'candle_daily', ['ticker', 'date'])
     op.create_index(op.f('ix_candle_daily_ticker'), 'candle_daily', ['ticker'])
-    op.create_index(op.f('ix_candle_daily_timestamp'), 'candle_daily', ['timestamp'])
+    op.create_index(op.f('ix_candle_daily_date'), 'candle_daily', ['date'])
 
     # Create sequences for id columns
     op.execute("CREATE SEQUENCE IF NOT EXISTS candle_minute_1_id_seq;")
@@ -89,20 +91,21 @@ def upgrade() -> None:
     op.execute(
         "SELECT create_hypertable('candle_minute_1', 'timestamp', chunk_time_interval => INTERVAL '1 day', migrate_data => TRUE, if_not_exists => TRUE)")
     op.execute(
-        "SELECT create_hypertable('candle_daily', 'timestamp', chunk_time_interval => INTERVAL '1 year', migrate_data => TRUE, if_not_exists => TRUE)")
+        "SELECT create_hypertable('candle_daily', 'date', chunk_time_interval => INTERVAL '1 year', migrate_data => TRUE, if_not_exists => TRUE)")
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # Drop candle tables
+    op.drop_index(op.f('ix_candle_minute_1_localtime'), table_name='candle_minute_1')
     op.drop_index(op.f('ix_candle_minute_1_timestamp'), table_name='candle_minute_1')
     op.drop_index(op.f('ix_candle_minute_1_ticker'), table_name='candle_minute_1')
     op.drop_index('idx_minute1_ticker_timestamp', table_name='candle_minute_1')
     op.drop_table('candle_minute_1')
 
-    op.drop_index(op.f('ix_candle_daily_timestamp'), table_name='candle_daily')
+    op.drop_index(op.f('ix_candle_daily_date'), table_name='candle_daily')
     op.drop_index(op.f('ix_candle_daily_ticker'), table_name='candle_daily')
-    op.drop_index('idx_daily_ticker_timestamp', table_name='candle_daily')
+    op.drop_index('idx_daily_ticker_date', table_name='candle_daily')
     op.drop_table('candle_daily')
 
     # Drop sequences

@@ -4,18 +4,18 @@
 업비트 거래소와 연동하여 잔고 조회, 시세 조회, 거래 등의 기능을 제공합니다.
 """
 
-from datetime import datetime
-from enum import Enum
 import hashlib
 import logging
 import time
-from urllib.parse import unquote, urlencode
 import uuid
+from datetime import datetime
+from enum import Enum
+from urllib.parse import unquote, urlencode
 
 import jwt
 import pandas as pd
-from pandera.typing import DataFrame
 import pyupbit  # type: ignore
+from pandera.typing import DataFrame
 
 from src import constants
 from src.common.http_client import HTTPMethod, make_api_request
@@ -537,17 +537,19 @@ class UpbitAPI:
             "candle_acc_trade_volume": "volume",
             "candle_acc_trade_price": "value",
             "candle_date_time_utc": "index",
+            "candle_date_time_kst": "localtime",
         }
 
         # 컬럼명 변경
         df = df.rename(columns=column_mapping)
 
-        # 인덱스를 datetime으로 설정
         df["index"] = pd.to_datetime(df["index"], utc=True)
         df = df.set_index("index")
 
+        df["localtime"] = pd.to_datetime(df["localtime"])
+
         # 필요한 컬럼만 선택
-        df = df[["open", "high", "low", "close", "volume", "value"]]
+        df = df[["localtime", "open", "high", "low", "close", "volume", "value"]]
 
         return df
 

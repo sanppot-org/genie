@@ -31,6 +31,7 @@ class Database:
             max_overflow=20,  # 최대 추가 연결 수
             pool_pre_ping=True,  # 연결 상태 확인
             echo=False,  # SQL 로그 (개발시 True)
+            connect_args={"options": "-c timezone=Asia/Seoul"},  # 세션 타임존 설정
         )
         self.SessionLocal = sessionmaker(
             autocommit=False,

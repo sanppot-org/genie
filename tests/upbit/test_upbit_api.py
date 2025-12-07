@@ -23,6 +23,7 @@ class TestGetCandles:
             {
                 "market": "KRW-BTC",
                 "candle_date_time_utc": "2024-10-27T03:00:00",
+                "candle_date_time_kst": "2024-10-27T12:00:00",
                 "opening_price": 95000000.0,
                 "high_price": 96000000.0,
                 "low_price": 94000000.0,
@@ -33,6 +34,7 @@ class TestGetCandles:
             {
                 "market": "KRW-BTC",
                 "candle_date_time_utc": "2024-10-27T02:00:00",
+                "candle_date_time_kst": "2024-10-27T11:00:00",
                 "opening_price": 95500000.0,
                 "high_price": 97000000.0,
                 "low_price": 95000000.0,
@@ -53,7 +55,7 @@ class TestGetCandles:
         # Then
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
-        assert list(result.columns) == ["open", "high", "low", "close", "volume", "value"]
+        assert list(result.columns) == ["localtime", "open", "high", "low", "close", "volume", "value"]
         assert mock_request.call_count == 1
 
     @patch("src.upbit.upbit_api.make_api_request")
@@ -70,6 +72,8 @@ class TestGetCandles:
             {
                 "market": "KRW-BTC",
                 "candle_date_time_utc": (base_date - timedelta(days=i)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "candle_date_time_kst": (base_date - timedelta(days=i) + timedelta(hours=9)).strftime(
+                    "%Y-%m-%dT%H:%M:%S"),
                 "opening_price": 95000000.0 + i * 10000,
                 "high_price": 96000000.0 + i * 10000,
                 "low_price": 94000000.0 + i * 10000,
@@ -87,6 +91,8 @@ class TestGetCandles:
             {
                 "market": "KRW-BTC",
                 "candle_date_time_utc": (base_date - timedelta(days=i + 200)).strftime("%Y-%m-%dT%H:%M:%S"),
+                "candle_date_time_kst": (base_date - timedelta(days=i + 200) + timedelta(hours=9)).strftime(
+                    "%Y-%m-%dT%H:%M:%S"),
                 "opening_price": 95000000.0 + (i + 200) * 10000,
                 "high_price": 96000000.0 + (i + 200) * 10000,
                 "low_price": 94000000.0 + (i + 200) * 10000,
@@ -362,7 +368,8 @@ class TestUpbitAPIGetBalances:
         """에러 응답 시 UpbitAPIError 예외를 발생시킨다"""
         # Mock 설정 - 에러 응답
         mock_upbit_instance = MagicMock()
-        mock_upbit_instance.get_balances.return_value = {"error": {"message": "This is not a verified IP.", "name": "no_authorization_ip"}}
+        mock_upbit_instance.get_balances.return_value = {
+            "error": {"message": "This is not a verified IP.", "name": "no_authorization_ip"}}
         mock_upbit_class.return_value = mock_upbit_instance
 
         with patch("src.upbit.upbit_api.UpbitConfig") as mock_config_class:
@@ -461,7 +468,8 @@ class TestUpbitAPIBuyMarketOrder:
     def test_buy_market_order_에러_응답시_예외_발생(self, mock_upbit_class):
         """에러 응답 시 UpbitAPIError 예외를 발생시킨다"""
         mock_upbit_instance = MagicMock()
-        mock_upbit_instance.buy_market_order.return_value = {"error": {"message": "Insufficient funds.", "name": "insufficient_funds"}}
+        mock_upbit_instance.buy_market_order.return_value = {
+            "error": {"message": "Insufficient funds.", "name": "insufficient_funds"}}
         mock_upbit_class.return_value = mock_upbit_instance
 
         with patch("src.upbit.upbit_api.UpbitConfig") as mock_config_class:
@@ -560,7 +568,8 @@ class TestUpbitAPISellMarketOrder:
     def test_sell_market_order_에러_응답시_예외_발생(self, mock_upbit_class):
         """에러 응답 시 UpbitAPIError 예외를 발생시킨다"""
         mock_upbit_instance = MagicMock()
-        mock_upbit_instance.sell_market_order.return_value = {"error": {"message": "Insufficient volume.", "name": "insufficient_volume"}}
+        mock_upbit_instance.sell_market_order.return_value = {
+            "error": {"message": "Insufficient volume.", "name": "insufficient_volume"}}
         mock_upbit_class.return_value = mock_upbit_instance
 
         with patch("src.upbit.upbit_api.UpbitConfig") as mock_config_class:

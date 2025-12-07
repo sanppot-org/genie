@@ -65,17 +65,35 @@ class UpbitCandleAdapter(CandleDataAdapter):
             if pd.isna(timestamp):
                 continue
 
-            models.append(
-                model_class(
-                    timestamp=timestamp.to_pydatetime(),  # type: ignore[union-attr]
-                    ticker=ticker,
-                    open=float(row.open),  # type: ignore[arg-type]
-                    high=float(row.high),  # type: ignore[arg-type]
-                    low=float(row.low),  # type: ignore[arg-type]
-                    close=float(row.close),  # type: ignore[arg-type]
-                    volume=float(row.volume),  # type: ignore[arg-type]
+            utc_dt = timestamp.to_pydatetime()  # type: ignore[union-attr]
+            localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+
+            # CandleMinute1과 CandleDaily를 구분하여 생성
+            if model_class == CandleMinute1:
+                models.append(
+                    model_class(
+                        timestamp=utc_dt,
+                        localtime=localtime_dt,
+                        ticker=ticker,
+                        open=float(row.open),  # type: ignore[arg-type]
+                        high=float(row.high),  # type: ignore[arg-type]
+                        low=float(row.low),  # type: ignore[arg-type]
+                        close=float(row.close),  # type: ignore[arg-type]
+                        volume=float(row.volume),  # type: ignore[arg-type]
+                    )
                 )
-            )
+            elif model_class == CandleDaily:
+                models.append(
+                    model_class(
+                        date=localtime_dt.date(),
+                        ticker=ticker,
+                        open=float(row.open),  # type: ignore[arg-type]
+                        high=float(row.high),  # type: ignore[arg-type]
+                        low=float(row.low),  # type: ignore[arg-type]
+                        close=float(row.close),  # type: ignore[arg-type]
+                        volume=float(row.volume),  # type: ignore[arg-type]
+                    )
+                )
 
         return models
 
@@ -114,7 +132,7 @@ class BinanceCandleAdapter(CandleDataAdapter):
         """Binance DataFrame → 캔들 모델 리스트 (공통 로직).
 
         Args:
-            df: Binance DataFrame (컬럼: Open, High, Low, Close, Volume)
+            df: Binance DataFrame (컬럼: Open, High, Low, Close, Volume, localtime)
             ticker: 티커
             model_class: CandleMinute1 또는 CandleDaily 클래스
 
@@ -135,17 +153,35 @@ class BinanceCandleAdapter(CandleDataAdapter):
             else:
                 utc_timestamp = timestamp.tz_convert("UTC")  # type: ignore[union-attr]
 
-            models.append(
-                model_class(
-                    timestamp=utc_timestamp.to_pydatetime(),  # type: ignore[union-attr]
-                    ticker=ticker,
-                    open=float(row.Open),  # type: ignore[arg-type]
-                    high=float(row.High),  # type: ignore[arg-type]
-                    low=float(row.Low),  # type: ignore[arg-type]
-                    close=float(row.Close),  # type: ignore[arg-type]
-                    volume=float(row.Volume),  # type: ignore[arg-type]
+            utc_dt = utc_timestamp.to_pydatetime()  # type: ignore[union-attr]
+            localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+
+            # CandleMinute1과 CandleDaily를 구분하여 생성
+            if model_class == CandleMinute1:
+                models.append(
+                    model_class(
+                        timestamp=utc_dt,
+                        localtime=localtime_dt,
+                        ticker=ticker,
+                        open=float(row.Open),  # type: ignore[arg-type]
+                        high=float(row.High),  # type: ignore[arg-type]
+                        low=float(row.Low),  # type: ignore[arg-type]
+                        close=float(row.Close),  # type: ignore[arg-type]
+                        volume=float(row.Volume),  # type: ignore[arg-type]
+                    )
                 )
-            )
+            elif model_class == CandleDaily:
+                models.append(
+                    model_class(
+                        date=localtime_dt.date(),
+                        ticker=ticker,
+                        open=float(row.Open),  # type: ignore[arg-type]
+                        high=float(row.High),  # type: ignore[arg-type]
+                        low=float(row.Low),  # type: ignore[arg-type]
+                        close=float(row.Close),  # type: ignore[arg-type]
+                        volume=float(row.Volume),  # type: ignore[arg-type]
+                    )
+                )
 
         return models
 
@@ -207,7 +243,7 @@ class HantuCandleAdapter(CandleDataAdapter):
         """Hantu DataFrame → 캔들 모델 리스트 (공통 로직).
 
         Args:
-            df: Hantu DataFrame (컬럼: open, high, low, close, volume - 이미 영어로 rename됨)
+            df: Hantu DataFrame (컬럼: open, high, low, close, volume, localtime - 이미 영어로 rename됨)
             ticker: 티커
             model_class: CandleMinute1 또는 CandleDaily 클래스
 
@@ -225,17 +261,35 @@ class HantuCandleAdapter(CandleDataAdapter):
             # Hantu: KST naive → UTC aware
             utc_timestamp = timestamp.tz_localize("Asia/Seoul").tz_convert("UTC")  # type: ignore[union-attr]
 
-            models.append(
-                model_class(
-                    timestamp=utc_timestamp.to_pydatetime(),  # type: ignore[union-attr]
-                    ticker=ticker,
-                    open=float(row.open),  # type: ignore[arg-type]
-                    high=float(row.high),  # type: ignore[arg-type]
-                    low=float(row.low),  # type: ignore[arg-type]
-                    close=float(row.close),  # type: ignore[arg-type]
-                    volume=float(row.volume),  # type: ignore[arg-type]
+            utc_dt = utc_timestamp.to_pydatetime()  # type: ignore[union-attr]
+            localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+
+            # CandleMinute1과 CandleDaily를 구분하여 생성
+            if model_class == CandleMinute1:
+                models.append(
+                    model_class(
+                        timestamp=utc_dt,
+                        localtime=localtime_dt,
+                        ticker=ticker,
+                        open=float(row.open),  # type: ignore[arg-type]
+                        high=float(row.high),  # type: ignore[arg-type]
+                        low=float(row.low),  # type: ignore[arg-type]
+                        close=float(row.close),  # type: ignore[arg-type]
+                        volume=float(row.volume),  # type: ignore[arg-type]
+                    )
                 )
-            )
+            elif model_class == CandleDaily:
+                models.append(
+                    model_class(
+                        date=localtime_dt.date(),
+                        ticker=ticker,
+                        open=float(row.open),  # type: ignore[arg-type]
+                        high=float(row.high),  # type: ignore[arg-type]
+                        low=float(row.low),  # type: ignore[arg-type]
+                        close=float(row.close),  # type: ignore[arg-type]
+                        volume=float(row.volume),  # type: ignore[arg-type]
+                    )
+                )
 
         return models
 

@@ -25,7 +25,7 @@ def sample_candle_df() -> DataFrame[CandleSchema]:
 
     - 3개의 행
     - UTC timezone-aware DatetimeIndex (upbit_api.py에서 pd.to_datetime(..., utc=True) 사용)
-    - 컬럼: open, high, low, close, volume, value
+    - 컬럼: open, high, low, close, volume, value, localtime
     """
     data = {
         "open": [100.0, 200.0, 300.0],
@@ -34,6 +34,11 @@ def sample_candle_df() -> DataFrame[CandleSchema]:
         "close": [105.0, 205.0, 305.0],
         "volume": [1000.0, 2000.0, 3000.0],
         "value": [105000.0, 410000.0, 915000.0],  # Upbit에만 있는 컬럼
+        "localtime": [
+            datetime(2024, 1, 1, 18, 0, 0),  # KST (UTC + 9h)
+            datetime(2024, 1, 1, 19, 0, 0),  # KST (UTC + 9h)
+            datetime(2024, 1, 1, 20, 0, 0),  # KST (UTC + 9h)
+        ],
     }
     index = pd.DatetimeIndex(
         [
@@ -56,6 +61,7 @@ def empty_candle_df() -> DataFrame[CandleSchema]:
         "close": [],
         "volume": [],
         "value": [],
+        "localtime": [],
     }
     df = pd.DataFrame(data, index=pd.DatetimeIndex([]))
     return CandleSchema.validate(df)
@@ -71,6 +77,11 @@ def candle_df_with_nat() -> DataFrame[CandleSchema]:
         "close": [105.0, 205.0, 305.0],
         "volume": [1000.0, 2000.0, 3000.0],
         "value": [105000.0, 410000.0, 915000.0],
+        "localtime": [
+            datetime(2024, 1, 1, 18, 0, 0),  # KST (UTC + 9h)
+            datetime(2024, 1, 1, 19, 0, 0),  # 임의값 (NaT row)
+            datetime(2024, 1, 1, 20, 0, 0),  # KST (UTC + 9h)
+        ],
     }
     index = pd.DatetimeIndex(
         [
@@ -111,6 +122,11 @@ def test_to_candle_models_with_valid_data(
     expected_time = datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC)
     assert first_candle.timestamp == expected_time
     assert first_candle.timestamp.tzinfo is not None
+
+    # localtime은 KST naive datetime (UTC + 9시간)
+    expected_localtime = datetime(2024, 1, 1, 18, 0, 0)
+    assert first_candle.localtime == expected_localtime
+    assert first_candle.localtime.tzinfo is None
 
 
 def test_to_candle_models_with_empty_dataframe(
@@ -156,9 +172,9 @@ def test_to_candle_models_skips_nat_values(
     # NaT 행은 스킵되므로 2개만 반환되어야 함
     assert len(result) == 2
 
-    # 첫 번째와 세 번째 행만 변환됨 (UTC timezone-aware)
-    assert result[0].timestamp == datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC)
-    assert result[1].timestamp == datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC)
+    # 첫 번째와 세 번째 행만 변환됨 (CandleDaily는 date만 가짐)
+    assert result[0].date == datetime(2024, 1, 1).date()
+    assert result[1].date == datetime(2024, 1, 1).date()
 
 
 def test_timezone_preserved_as_utc_aware(
@@ -184,9 +200,17 @@ def test_timezone_preserved_as_utc_aware(
         datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC),
     ]
 
+    expected_localtimes = [
+        datetime(2024, 1, 1, 18, 0, 0),  # UTC + 9h
+        datetime(2024, 1, 1, 19, 0, 0),  # UTC + 9h
+        datetime(2024, 1, 1, 20, 0, 0),  # UTC + 9h
+    ]
+
     for i, candle in enumerate(result):
         assert candle.timestamp == expected_times[i]
         assert candle.timestamp.tzinfo is not None  # timezone-aware datetime 확인
+        assert candle.localtime == expected_localtimes[i]
+        assert candle.localtime.tzinfo is None  # naive datetime 확인
 
 
 @pytest.mark.parametrize(
