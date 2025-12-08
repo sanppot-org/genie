@@ -15,7 +15,7 @@ from src.common.slack.client import SlackClient
 from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST
 from src.database.database import Database
-from src.database.repositories import CandleDailyRepository, CandleMinute1Repository, PriceRepository
+from src.database.repositories import CandleDailyRepository, CandleMinute1Repository
 from src.hantu import HantuDomesticAPI
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
@@ -56,7 +56,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
     database = providers.Singleton(Database, database_config)
     candle_minute1_repository = providers.Factory(CandleMinute1Repository, session=database.provided.get_session.call())
     candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
-    price_repository = providers.Factory(PriceRepository, session=database.provided.get_session.call())
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")

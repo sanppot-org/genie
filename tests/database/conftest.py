@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from src.config import DatabaseConfig
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
-from src.database.repositories import PriceRepository
 
 
 @pytest.fixture
@@ -67,9 +66,3 @@ def minute1_repo(session: Session) -> CandleMinute1Repository:
 def daily_repo(session: Session) -> CandleDailyRepository:
     """일봉 캔들 Repository fixture"""
     return CandleDailyRepository(session)
-
-
-@pytest.fixture
-def price_repo(session: Session) -> PriceRepository:
-    """가격 Repository fixture"""
-    return PriceRepository(session)

@@ -85,34 +85,3 @@ class CandleDaily(CandleBase):
     def __repr__(self) -> str:
         """문자열 표현"""
         return f"<CandleDaily(ticker={self.ticker}, date={self.date}, close={self.close})>"
-
-
-class PriceData(Base):
-    """가격 데이터 모델
-
-    Attributes:
-        id: 기본 키
-        timestamp: 가격 시각 (UTC)
-        symbol: 심볼 (예: USD-KRW, GOLD-KRW)
-        price: 가격
-        source: 데이터 소스 (yfinance, hantu, fdr 등)
-    """
-
-    __tablename__ = "price_data"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    symbol: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    price: Mapped[float] = mapped_column(Float, nullable=False)
-    source: Mapped[str] = mapped_column(String(50), nullable=False)
-
-    __table_args__ = (
-        # 중복 방지: 같은 시간, 같은 심볼, 같은 소스는 하나만
-        UniqueConstraint("timestamp", "symbol", "source", name="uix_timestamp_symbol_source"),
-        # 조회 성능 최적화를 위한 복합 인덱스
-        Index("idx_symbol_source_timestamp", "symbol", "source", "timestamp"),
-    )
-
-    def __repr__(self) -> str:
-        """문자열 표현"""
-        return f"<PriceData(symbol={self.symbol}, source={self.source}, timestamp={self.timestamp}, price={self.price})>"

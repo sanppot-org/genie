@@ -5,43 +5,26 @@ Revises:
 Create Date: 2025-12-03 14:40:00.000000
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '001_initial'
-down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Create price_data table
-    op.create_table(
-        'price_data',
-        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
-        sa.Column('symbol', sa.String(length=20), nullable=False),
-        sa.Column('price', sa.Float(), nullable=False),
-        sa.Column('source', sa.String(length=50), nullable=False),
-        sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('timestamp', 'symbol', 'source', name='uix_timestamp_symbol_source')
-    )
-
-    # Create indexes for price_data
-    op.create_index('idx_symbol_source_timestamp', 'price_data', ['symbol', 'source', 'timestamp'])
-    op.create_index(op.f('ix_price_data_symbol'), 'price_data', ['symbol'])
-    op.create_index(op.f('ix_price_data_timestamp'), 'price_data', ['timestamp'])
-
     # Create candle_minute_1 table (TimescaleDB hypertable)
     op.create_table(
         'candle_minute_1',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column('localtime', sa.DateTime(), nullable=False),
         sa.Column('ticker', sa.String(length=20), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
@@ -49,13 +32,13 @@ def upgrade() -> None:
         sa.Column('low', sa.Float(), nullable=False),
         sa.Column('close', sa.Float(), nullable=False),
         sa.Column('volume', sa.Float(), nullable=False),
-        sa.PrimaryKeyConstraint('timestamp', 'ticker'),  # TimescaleDB requirement
-        sa.UniqueConstraint('timestamp', 'ticker', name='uix_minute1_timestamp_ticker')
+        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
+        sa.PrimaryKeyConstraint('localtime', 'ticker'),  # TimescaleDB requirement
+        sa.UniqueConstraint('localtime', 'ticker', name='uix_minute1_localtime_ticker')
     )
-    op.create_index('idx_minute1_ticker_timestamp', 'candle_minute_1', ['ticker', 'timestamp'])
+    op.create_index('idx_minute1_ticker_timestamp', 'candle_minute_1', ['ticker', 'localtime'])
     op.create_index(op.f('ix_candle_minute_1_ticker'), 'candle_minute_1', ['ticker'])
     op.create_index(op.f('ix_candle_minute_1_timestamp'), 'candle_minute_1', ['timestamp'])
-    op.create_index(op.f('ix_candle_minute_1_localtime'), 'candle_minute_1', ['localtime'])
 
     # Create candle_daily table (TimescaleDB hypertable)
     op.create_table(
@@ -73,7 +56,6 @@ def upgrade() -> None:
     )
     op.create_index('idx_daily_ticker_date', 'candle_daily', ['ticker', 'date'])
     op.create_index(op.f('ix_candle_daily_ticker'), 'candle_daily', ['ticker'])
-    op.create_index(op.f('ix_candle_daily_date'), 'candle_daily', ['date'])
 
     # Create sequences for id columns
     op.execute("CREATE SEQUENCE IF NOT EXISTS candle_minute_1_id_seq;")
@@ -89,7 +71,7 @@ def upgrade() -> None:
 
     # Convert to TimescaleDB hypertables for time-series optimization
     op.execute(
-        "SELECT create_hypertable('candle_minute_1', 'timestamp', chunk_time_interval => INTERVAL '1 day', migrate_data => TRUE, if_not_exists => TRUE)")
+        "SELECT create_hypertable('candle_minute_1', 'localtime', chunk_time_interval => INTERVAL '1 day', migrate_data => TRUE, if_not_exists => TRUE)")
     op.execute(
         "SELECT create_hypertable('candle_daily', 'date', chunk_time_interval => INTERVAL '1 year', migrate_data => TRUE, if_not_exists => TRUE)")
 
@@ -111,9 +93,3 @@ def downgrade() -> None:
     # Drop sequences
     op.execute("DROP SEQUENCE IF EXISTS candle_minute_1_id_seq;")
     op.execute("DROP SEQUENCE IF EXISTS candle_daily_id_seq;")
-
-    # Drop price_data table
-    op.drop_index(op.f('ix_price_data_timestamp'), table_name='price_data')
-    op.drop_index(op.f('ix_price_data_symbol'), table_name='price_data')
-    op.drop_index('idx_symbol_source_timestamp', table_name='price_data')
-    op.drop_table('price_data')

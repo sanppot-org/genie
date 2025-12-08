@@ -18,7 +18,6 @@ def test_database_create_tables(db: Database) -> None:
     # Then
     assert "candle_minute_1" in tables
     assert "candle_daily" in tables
-    assert "price_data" in tables
 
 
 def test_database_get_session(db: Database) -> None:

@@ -51,15 +51,12 @@ def test_container_repositories() -> None:
     # When
     minute1_repo = container.candle_minute1_repository()
     daily_repo = container.candle_daily_repository()
-    price_repo = container.price_repository()
 
     # Then
     assert minute1_repo is not None
     assert daily_repo is not None
-    assert price_repo is not None
     assert minute1_repo.session is not None
     assert daily_repo.session is not None
-    assert price_repo.session is not None
 
 
 def test_container_database_singleton() -> None:

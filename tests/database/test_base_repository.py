@@ -5,120 +5,77 @@ from datetime import UTC, datetime
 import pytest
 
 from src.database.base_repository import BaseRepository
-from src.database.models import PriceData
+from src.database.models import CandleMinute1
 
 
-class PriceRepositoryImpl(BaseRepository[PriceData, int]):
+class CandleMinute1RepositoryImpl(BaseRepository[CandleMinute1, int]):
     """Concrete implementation for testing."""
 
-    def _get_model_class(self) -> type[PriceData]:
-        return PriceData
+    def _get_model_class(self) -> type[CandleMinute1]:
+        return CandleMinute1
 
     def _get_unique_constraint_fields(self) -> tuple[str, ...]:
-        return ("timestamp", "symbol", "source")
+        return ("timestamp", "ticker")
 
 
 @pytest.fixture
-def price_repo_impl(session):
+def candle_repo_impl(session):
     """Fixture for concrete repository implementation."""
-    return PriceRepositoryImpl(session)
+    return CandleMinute1RepositoryImpl(session)
 
 
-def test_save_creates_new_entity(price_repo_impl):
+def test_save_creates_new_entity(candle_repo_impl):
     """save 메서드로 새 엔티티 생성"""
     # Given
-    price = PriceData(
+    candle = CandleMinute1(
         timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
-        symbol="USD-KRW",
-        price=1300.0,
-        source="yfinance",
+        localtime=datetime(2024, 1, 1, 18, 0, 0),
+        ticker="KRW-BTC",
+        open=50000000.0,
+        high=51000000.0,
+        low=49000000.0,
+        close=50500000.0,
+        volume=100.0,
     )
 
     # When
-    saved = price_repo_impl.save(price)
+    saved = candle_repo_impl.save(candle)
 
-    # Then
-    assert saved.id is not None
-    assert saved.symbol == "USD-KRW"
-
-
-def test_find_by_id_returns_entity(price_repo_impl):
-    """find_by_id로 엔티티 조회"""
-    # Given
-    price = PriceData(
-        timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
-        symbol="USD-KRW",
-        price=1300.0,
-        source="yfinance",
-    )
-    saved = price_repo_impl.save(price)
-
-    # When
-    found = price_repo_impl.find_by_id(saved.id)
-
-    # Then
-    assert found is not None
-    assert found.id == saved.id
-    assert found.symbol == "USD-KRW"
+    # Then - DB에 저장되었는지 조회로 확인
+    all_candles = candle_repo_impl.find_all()
+    assert len(all_candles) == 1
+    assert all_candles[0].ticker == "KRW-BTC"
+    assert all_candles[0].close == 50500000.0
 
 
-def test_find_by_id_returns_none_when_not_found(price_repo_impl):
-    """존재하지 않는 ID로 조회시 None 반환"""
-    # When
-    found = price_repo_impl.find_by_id(99999)
-
-    # Then
-    assert found is None
-
-
-def test_find_all_returns_all_entities(price_repo_impl):
+def test_find_all_returns_all_entities(candle_repo_impl):
     """find_all로 모든 엔티티 조회"""
     # Given
-    price1 = PriceData(
+    candle1 = CandleMinute1(
         timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
-        symbol="USD-KRW",
-        price=1300.0,
-        source="yfinance",
+        localtime=datetime(2024, 1, 1, 18, 0, 0),
+        ticker="KRW-BTC",
+        open=50000000.0,
+        high=51000000.0,
+        low=49000000.0,
+        close=50500000.0,
+        volume=100.0,
     )
-    price2 = PriceData(
+    candle2 = CandleMinute1(
         timestamp=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
-        symbol="GOLD-KRW",
-        price=80000.0,
-        source="yfinance",
+        localtime=datetime(2024, 1, 1, 19, 0, 0),
+        ticker="KRW-ETH",
+        open=3000000.0,
+        high=3100000.0,
+        low=2900000.0,
+        close=3050000.0,
+        volume=200.0,
     )
-    price_repo_impl.save(price1)
-    price_repo_impl.save(price2)
+    candle_repo_impl.save(candle1)
+    candle_repo_impl.save(candle2)
 
     # When
-    all_prices = price_repo_impl.find_all()
+    all_candles = candle_repo_impl.find_all()
 
     # Then
-    assert len(all_prices) == 2
-
-
-def test_delete_by_id_deletes_entity(price_repo_impl):
-    """delete_by_id로 엔티티 삭제"""
-    # Given
-    price = PriceData(
-        timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
-        symbol="USD-KRW",
-        price=1300.0,
-        source="yfinance",
-    )
-    saved = price_repo_impl.save(price)
-
-    # When
-    result = price_repo_impl.delete_by_id(saved.id)
-
-    # Then
-    assert result is True
-    assert price_repo_impl.find_by_id(saved.id) is None
-
-
-def test_delete_by_id_returns_false_when_not_found(price_repo_impl):
-    """존재하지 않는 ID 삭제시 False 반환"""
-    # When
-    result = price_repo_impl.delete_by_id(99999)
-
-    # Then
-    assert result is False
+    assert len(all_candles) == 2

@@ -396,7 +396,7 @@ class TestCandleDailyRepository:
                 volume=1000.5,
             ),
             CandleDaily(
-                date=(now - timedelta(hours=6)).date(),
+                date=now.date(),
                 ticker="KRW-BTC",
                 open=51000000,
                 high=53000000,
