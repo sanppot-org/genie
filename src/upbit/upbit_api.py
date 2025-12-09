@@ -20,6 +20,7 @@ import pyupbit  # type: ignore
 from src import constants
 from src.common.http_client import HTTPMethod, make_api_request
 from src.config import UpbitConfig
+from src.constants import KRW_BTC, KST
 from src.upbit.model.balance import BalanceInfo
 from src.upbit.model.candle import CandleSchema
 from src.upbit.model.error import OrderTimeoutError, UpbitAPIError
@@ -529,6 +530,16 @@ class UpbitAPI:
 
         df = pd.DataFrame(response_data)
 
+        df = df[["opening_price",
+                 "high_price",
+                 "low_price",
+                 "trade_price",
+                 "candle_acc_trade_volume",
+                 "candle_acc_trade_price",
+                 "candle_date_time_utc",
+                 "candle_date_time_kst"
+                 ]]
+
         column_mapping = {
             "opening_price": "open",
             "high_price": "high",
@@ -536,26 +547,26 @@ class UpbitAPI:
             "trade_price": "close",
             "candle_acc_trade_volume": "volume",
             "candle_acc_trade_price": "value",
-            "candle_date_time_utc": "index",
-            "candle_date_time_kst": "localtime",
+            "candle_date_time_utc": "timestamp",
+            "candle_date_time_kst": "index",
         }
 
         # 컬럼명 변경
         df = df.rename(columns=column_mapping)
 
-        df["index"] = pd.to_datetime(df["index"], utc=True)
+        df["index"] = pd.to_datetime(df["index"]).dt.tz_localize(KST)
         df = df.set_index("index")
 
-        df["localtime"] = pd.to_datetime(df["localtime"])
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
 
         # 필요한 컬럼만 선택
-        df = df[["localtime", "open", "high", "low", "close", "volume", "value"]]
+        df = df[["open", "high", "low", "close", "volume", "value", "timestamp"]]
 
         return df
 
     def get_candles(
             self,
-            market: str,
+            market: str = KRW_BTC,
             interval: UpbitCandleInterval = UpbitCandleInterval.DAY,
             count: int = 1,
             to: datetime | None = None,

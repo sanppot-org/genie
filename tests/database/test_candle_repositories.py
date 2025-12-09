@@ -384,10 +384,10 @@ class TestCandleDailyRepository:
         """get_candles를 기본값(최근 하루)으로 호출."""
         # Given
         from datetime import timedelta
-        now = datetime.now(UTC)
+        now = datetime.now()
         candles = [
             CandleDaily(
-                date=(now - timedelta(hours=12)).date(),
+                date=(now - timedelta(days=1)).date(),
                 ticker="KRW-BTC",
                 open=50000000,
                 high=52000000,

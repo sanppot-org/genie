@@ -55,7 +55,7 @@ class TestGetCandles:
         # Then
         assert isinstance(result, pd.DataFrame)
         assert len(result) == 2
-        assert list(result.columns) == ["localtime", "open", "high", "low", "close", "volume", "value"]
+        assert list(result.columns) == ["open", "high", "low", "close", "volume", "value", "timestamp"]
         assert mock_request.call_count == 1
 
     @patch("src.upbit.upbit_api.make_api_request")

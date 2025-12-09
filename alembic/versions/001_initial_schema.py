@@ -36,7 +36,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('localtime', 'ticker'),  # TimescaleDB requirement
         sa.UniqueConstraint('localtime', 'ticker', name='uix_minute1_localtime_ticker')
     )
-    op.create_index('idx_minute1_ticker_timestamp', 'candle_minute_1', ['ticker', 'localtime'])
+    op.create_index('idx_minute1_ticker_localtime', 'candle_minute_1', ['ticker', 'localtime'])
     op.create_index(op.f('ix_candle_minute_1_ticker'), 'candle_minute_1', ['ticker'])
     op.create_index(op.f('ix_candle_minute_1_timestamp'), 'candle_minute_1', ['timestamp'])
 

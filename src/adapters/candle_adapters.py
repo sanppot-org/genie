@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 import pandas as pd
+import pytz
 
 from src.common.data_adapter import CandleDataAdapter
 from src.database.models import CandleBase, CandleDaily, CandleMinute1
@@ -61,18 +62,25 @@ class UpbitCandleAdapter(CandleDataAdapter):
 
         models = []
         for row in df.itertuples():
-            timestamp = row.Index  # type: ignore[union-attr]
-            if pd.isna(timestamp):
+            kst_index = row.Index  # type: ignore[union-attr]
+            if pd.isna(kst_index):
                 continue
 
-            utc_dt = timestamp.to_pydatetime()  # type: ignore[union-attr]
-            localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+            # 인덱스는 KST timezone-aware, DB는 naive datetime을 기대
+            localtime_dt = kst_index.to_pydatetime()  # type: ignore[union-attr]
+            if localtime_dt.tzinfo is not None:
+                localtime_dt = localtime_dt.replace(tzinfo=None)
+
+            # timestamp 컬럼은 UTC timezone-aware
+            utc_dt = row.timestamp.to_pydatetime()  # type: ignore[union-attr]
+            # pandas가 timezone 정보를 제거한 경우, UTC로 명시적으로 설정
+            if utc_dt.tzinfo is None:
+                utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
 
             # CandleMinute1과 CandleDaily를 구분하여 생성
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
-                        timestamp=utc_dt,
                         localtime=localtime_dt,
                         ticker=ticker,
                         open=float(row.open),  # type: ignore[arg-type]
@@ -80,6 +88,7 @@ class UpbitCandleAdapter(CandleDataAdapter):
                         low=float(row.low),  # type: ignore[arg-type]
                         close=float(row.close),  # type: ignore[arg-type]
                         volume=float(row.volume),  # type: ignore[arg-type]
+                        timestamp=utc_dt,
                     )
                 )
             elif model_class == CandleDaily:
@@ -155,6 +164,9 @@ class BinanceCandleAdapter(CandleDataAdapter):
 
             utc_dt = utc_timestamp.to_pydatetime()  # type: ignore[union-attr]
             localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+            # DB는 naive datetime을 기대하므로 timezone 정보 제거
+            if localtime_dt.tzinfo is not None:
+                localtime_dt = localtime_dt.replace(tzinfo=None)
 
             # CandleMinute1과 CandleDaily를 구분하여 생성
             if model_class == CandleMinute1:
@@ -263,6 +275,9 @@ class HantuCandleAdapter(CandleDataAdapter):
 
             utc_dt = utc_timestamp.to_pydatetime()  # type: ignore[union-attr]
             localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+            # DB는 naive datetime을 기대하므로 timezone 정보 제거
+            if localtime_dt.tzinfo is not None:
+                localtime_dt = localtime_dt.replace(tzinfo=None)
 
             # CandleMinute1과 CandleDaily를 구분하여 생성
             if model_class == CandleMinute1:

@@ -76,9 +76,9 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         """Unique constraint 필드 반환
 
         Returns:
-            (timestamp, ticker)
+            (localtime, ticker)
         """
-        return "timestamp", "ticker"
+        return "localtime", "ticker"
 
     @override
     def get_candles(
@@ -148,7 +148,6 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         # 딕셔너리 리스트로 변환 (SQLAlchemy 객체 → dict)
         values = [
             {
-                "timestamp": e.timestamp,
                 "localtime": e.localtime,
                 "ticker": e.ticker,
                 "open": e.open,
@@ -156,6 +155,7 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
                 "low": e.low,
                 "close": e.close,
                 "volume": e.volume,
+                "timestamp": e.timestamp,
             }
             for e in entities
         ]
@@ -163,14 +163,14 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         # INSERT ... ON CONFLICT DO UPDATE
         stmt = insert(CandleMinute1).values(values)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["timestamp", "ticker"],
+            index_elements=["localtime", "ticker"],
             set_={
-                "localtime": stmt.excluded.localtime,
                 "open": stmt.excluded.open,
                 "high": stmt.excluded.high,
                 "low": stmt.excluded.low,
                 "close": stmt.excluded.close,
                 "volume": stmt.excluded.volume,
+                "timestamp": stmt.excluded.timestamp,
             },
         )
 

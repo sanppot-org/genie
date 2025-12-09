@@ -1,3 +1,4 @@
+import pandas as pd
 import pandera.pandas as pa
 from pandera.typing import Series
 
@@ -15,19 +16,19 @@ class CandleSchema(pa.DataFrameModel):
         close: 종가
         volume: 누적 거래량
         value: 누적 거래 대금
-        localtime: 로컬 타임존 시각 (naive datetime)
+        timestamp: UTC 시각 (timezone-aware datetime)
 
     Index:
-        DatetimeIndex: 캔들 일시
+        DatetimeIndex: KST 캔들 일시 (timezone-aware datetime)
     """
 
-    localtime: Series[pa.DateTime]
     open: Series[float]
     high: Series[float]
     low: Series[float]
     close: Series[float]
     volume: Series[float]
     value: Series[float]
+    timestamp: Series[pd.DatetimeTZDtype] = pa.Field(dtype_kwargs={"unit": "ns", "tz": "UTC"})
 
     class Config:
         strict = True  # 정의되지 않은 컬럼 허용 안함

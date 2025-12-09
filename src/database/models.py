@@ -55,9 +55,9 @@ class CandleMinute1(CandleBase):
     localtime: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
     __table_args__ = (
-        PrimaryKeyConstraint("timestamp", "ticker"),
-        UniqueConstraint("timestamp", "ticker", name="uix_minute1_timestamp_ticker"),
-        Index("idx_minute1_ticker_timestamp", "ticker", "timestamp"),
+        PrimaryKeyConstraint("localtime", "ticker"),
+        UniqueConstraint("localtime", "ticker", name="uix_minute1_localtime_ticker"),
+        Index("idx_minute1_ticker_localtime", "ticker", "localtime"),
     )
 
     def __repr__(self) -> str:
