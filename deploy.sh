@@ -15,6 +15,30 @@ fi
 
 echo "✅ uv 위치: $(which uv)"
 
+# 슬랙 웹훅 URL 로드 (config/.env에서)
+if [ -f "config/genie/.env" ]; then
+    export $(grep -v '^#' config/genie/.env | grep SLACK_WEBHOOK_URL_GENIE_STATUS | xargs)
+fi
+
+# 슬랙 알림 전송 함수
+send_slack_notification() {
+    local message="$1"
+
+    if [ -z "$SLACK_WEBHOOK_URL_GENIE_STATUS" ]; then
+        echo "⚠️  슬랙 웹훅 URL이 설정되지 않아 알림을 전송하지 않습니다."
+        return 0
+    fi
+
+    # 슬랙 메시지 전송
+    curl -X POST "$SLACK_WEBHOOK_URL_GENIE_STATUS" \
+        -H 'Content-Type: application/json' \
+        -d "{\"text\":\"$message\"}" \
+        --silent --show-error || {
+            echo "⚠️  슬랙 알림 전송 실패 (배포는 계속 진행됩니다)"
+            return 0
+        }
+}
+
 echo "🚀 배포 시작..."
 
 # 작업 디렉토리로 이동
@@ -97,6 +121,7 @@ if ! sudo systemctl is-active --quiet genie; then
     echo "✅ 이전 버전으로 롤백 완료"
     echo "⚠️  배포는 실패했지만 서비스는 이전 버전으로 정상 실행 중입니다."
     sudo systemctl status genie --no-pager
+    send_slack_notification "배포 실패 (롤백 완료: $PREVIOUS_VERSION)"
     exit 1
 fi
 
@@ -104,4 +129,5 @@ echo "✅ 서비스가 정상적으로 실행 중입니다."
 sudo systemctl status genie --no-pager
 
 echo "✅ 배포 완료!"
+send_slack_notification "정상 배포 [$CURRENT_VERSION]"
 echo "📊 로그 확인: sudo journalctl -u genie -f"
