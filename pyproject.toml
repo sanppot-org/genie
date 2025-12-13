@@ -89,9 +89,6 @@ force-sort-within-sections = true
     "F841", # 사용되지 않는 변수 허용 (mock 등)
     "B017", # blind exception 허용 (테스트에서 Exception 사용)
 ]
-"main.py" = [
-    "E501", # 주석 처리된 코드의 줄 길이 무시
-]
 "src/backtest/**/*.py" = [
     "ANN401", # backtrader 타입 무시를 위해 Any 사용 허용
 ]

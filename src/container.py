@@ -33,6 +33,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(
         modules=[
             "src.scheduled_tasks.tasks",  # tasks.py를 가리킴
+            "src.api.lifespan",  # lifespan.py 추가
+            "src.api.routes.strategy",  # strategy 라우터 추가
+            "src.strategy.factory",  # factory.py 추가
         ],
     )
 

@@ -5,6 +5,7 @@ Genie 프로젝트의 VolatilityStrategy 수동 매도 API 사용 방법을 설�
 ## 개요
 
 이 API 서버는 다음 기능을 **하나의 프로세스**로 제공합니다:
+
 - ✅ **자동 스케줄링**: 5분마다 전략 실행, 1분마다 데이터 업데이트
 - ✅ **수동 매도 API**: 필요할 때 즉시 매도 실행
 - ✅ **헬스체크 및 모니터링**: API 상태 확인
@@ -15,24 +16,14 @@ Genie 프로젝트의 VolatilityStrategy 수동 매도 API 사용 방법을 설�
 
 ```bash
 # API 서버 + 스케줄러 통합 실행
-uv run uvicorn src.api:app --reload --port 8000
+uv run uvicorn app:app --reload --port 8000
 ```
 
 이 명령 하나로:
+
 - API 서버가 `http://localhost:8000`에서 실행됩니다
 - 백그라운드 스케줄러가 자동으로 시작됩니다
 - 즉시 전략이 한 번 실행됩니다
-
-### 레거시 방식 (선택사항)
-
-스케줄러만 실행하고 싶다면:
-
-```bash
-# API 없이 스케줄러만 실행 (레거시 방식)
-uv run python main.py
-```
-
-⚠️ **권장하지 않음**: 이 방식은 API 기능을 사용할 수 없으므로 통합 서버 사용을 권장합니다.
 
 ## API 엔드포인트
 
@@ -43,6 +34,7 @@ GET /
 ```
 
 **응답 예시:**
+
 ```json
 {
   "message": "Genie Trading Strategy API"
@@ -56,6 +48,7 @@ GET /health
 ```
 
 **응답 예시:**
+
 ```json
 {
   "status": "ok"
@@ -69,6 +62,7 @@ POST /api/strategy/sell
 ```
 
 **요청 바디 (선택사항):**
+
 ```json
 {
   "ticker": "KRW-BTC"
@@ -78,6 +72,7 @@ POST /api/strategy/sell
 - `ticker` (optional): 매도할 티커. 생략하면 기본 티커(`KRW-BTC`) 사용
 
 **응답 예시 - 성공 (전량 체결):**
+
 ```json
 {
   "success": true,
@@ -88,6 +83,7 @@ POST /api/strategy/sell
 ```
 
 **응답 예시 - 성공 (부분 체결):**
+
 ```json
 {
   "success": true,
@@ -98,6 +94,7 @@ POST /api/strategy/sell
 ```
 
 **응답 예시 - 실패 (캐시 없음):**
+
 ```json
 {
   "success": false,
@@ -108,6 +105,7 @@ POST /api/strategy/sell
 ```
 
 **응답 예시 - 실패 (포지션 없음):**
+
 ```json
 {
   "success": false,
@@ -118,11 +116,13 @@ POST /api/strategy/sell
 ```
 
 **에러 응답 (유효하지 않은 티커):**
+
 ```json
 {
   "detail": "유효하지 않은 ticker입니다. 사용 가능한 ticker: ['KRW-BTC', 'KRW-ETH', 'KRW-XRP']"
 }
 ```
+
 HTTP 상태 코드: `400 Bad Request`
 
 ## 사용 예시
@@ -182,6 +182,7 @@ FastAPI는 자동으로 대화형 API 문서를 제공합니다:
 ### 스케줄러 자동 실행
 
 API 서버 시작 시 스케줄러가 자동으로 시작됩니다:
+
 - **5분마다**: 자동 매매 전략 실행 (`run_strategies`)
 - **1분마다**: 구글 시트 데이터 업데이트 (`update_data`)
 - **매일 23:15**: Upbit, Bithumb KRW 잔고 업데이트
@@ -217,28 +218,28 @@ uv run pytest tests/ -v
 
 ```bash
 # 프로덕션 실행 (리로드 없음)
-uv run uvicorn src.api:app --host 0.0.0.0 --port 8000
+uv run uvicorn app:app --host 0.0.0.0 --port 8000
 
 # 또는 워커 수 지정
-uv run uvicorn src.api:app --host 0.0.0.0 --port 8000 --workers 4
+uv run uvicorn app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
 ### systemd 서비스 예시
 
 ```ini
 [Unit]
-Description=Genie Trading API
-After=network.target
+Description = Genie Trading API
+After = network.target
 
 [Service]
-Type=simple
-User=your_user
-WorkingDirectory=/path/to/genie
-ExecStart=/path/to/uv run uvicorn src.api:app --host 0.0.0.0 --port 8000
-Restart=always
+Type = simple
+User = your_user
+WorkingDirectory = /path/to/genie
+ExecStart = /path/to/uv run uvicorn app:app --host 0.0.0.0 --port 8000
+Restart = always
 
 [Install]
-WantedBy=multi-user.target
+WantedBy = multi-user.target
 ```
 
 ## 문제 해결
@@ -248,7 +249,7 @@ WantedBy=multi-user.target
 다른 프로세스가 8000 포트를 사용 중이라면 다른 포트로 실행:
 
 ```bash
-uv run uvicorn src.api:app --reload --port 8080
+uv run uvicorn app:app --reload --port 8080
 ```
 
 ### 의존성 문제

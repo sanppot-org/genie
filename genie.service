@@ -7,7 +7,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/genie
 Environment="PATH=/root/.local/bin:/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/bin/env bash -c 'cd /home/ubuntu/genie && uv run python main.py'
+ExecStart=/usr/bin/env bash -c 'cd /home/ubuntu/genie && uv run uvicorn app:app --host 0.0.0.0 --port 8000'
 Restart=always
 RestartSec=10
 StandardOutput=journal
