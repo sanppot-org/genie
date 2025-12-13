@@ -1,3 +1,19 @@
+"""
+⚠️ 주의: 이 파일은 스케줄러만 실행하는 레거시 방식입니다.
+
+✅ 권장: API 서버 + 스케줄러 통합 버전 사용
+   $ uv run uvicorn src.api:app --reload --port 8000
+
+이 파일은 다음과 같은 경우에만 사용하세요:
+- API 서버 없이 스케줄러만 실행하고 싶을 때
+- 백업/테스트 목적
+
+통합 API 서버는 다음을 모두 제공합니다:
+- 자동 스케줄링 (5분마다 전략 실행, 1분마다 데이터 업데이트)
+- 수동 매도 API (POST /api/strategy/sell)
+- 헬스체크 및 모니터링
+"""
+
 import logging
 
 from src.container import ApplicationContainer

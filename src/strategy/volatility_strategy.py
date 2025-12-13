@@ -63,6 +63,73 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
                 threshold=cache.threshold
             )
 
+    def manual_sell(self) -> dict[str, bool | str | float | None]:
+        """API용 수동 매도 메서드입니다.
+
+        Returns:
+            dict: 매도 결과를 담은 딕셔너리
+                - success: 매도 성공 여부
+                - message: 결과 메시지
+                - executed_volume: 체결된 수량 (optional)
+                - remaining_volume: 남은 수량 (optional)
+        """
+        cache = self._load_cache()
+
+        if not cache:
+            return {
+                "success": False,
+                "message": "캐시가 존재하지 않습니다.",
+                "executed_volume": None,
+                "remaining_volume": None,
+            }
+
+        if not cache.has_position(self._clock.today()):
+            return {
+                "success": False,
+                "message": "오늘 매수한 포지션이 없습니다.",
+                "executed_volume": None,
+                "remaining_volume": None,
+            }
+
+        result = self._order_executor.sell(
+            self._config.ticker,
+            cache.execution_volume,
+            strategy_name=self._strategy_name
+        )
+
+        if result.executed_volume <= 0:
+            return {
+                "success": False,
+                "message": "매도 주문이 체결되지 않았습니다.",
+                "executed_volume": 0.0,
+                "remaining_volume": cache.execution_volume,
+            }
+
+        remaining_volume = cache.execution_volume - result.executed_volume
+
+        if remaining_volume <= 0:
+            self._delete_strategy_cache()
+            return {
+                "success": True,
+                "message": "매도가 완전히 체결되었습니다.",
+                "executed_volume": result.executed_volume,
+                "remaining_volume": 0.0,
+            }
+
+        # 부분 체결: 남은 수량으로 캐시 업데이트
+        self._save_cache(
+            execution_volume=remaining_volume,
+            position_size=cache.position_size,
+            threshold=cache.threshold
+        )
+
+        return {
+            "success": True,
+            "message": "매도가 부분 체결되었습니다.",
+            "executed_volume": result.executed_volume,
+            "remaining_volume": remaining_volume,
+        }
+
     def _get_strategy_params(self) -> tuple[float, float, bool]:
         """전략 파라미터를 캐시에서 가져오거나 새로 계산합니다.
 

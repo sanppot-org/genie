@@ -36,6 +36,8 @@ dependencies = [
     "alembic>=1.17.2",
     "backtrader>=1.9.78.123",
     "matplotlib>=3.10.7",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
 ]
 
 [tool.setuptools]
