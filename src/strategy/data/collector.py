@@ -14,9 +14,8 @@ from src.common.slack.client import SlackClient
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.cache.cache_models import DataCache
 from src.strategy.data.models import HalfDayCandle, Period, Recent20DaysHalfDayCandles
-from src.upbit import upbit_api
 from src.upbit.model.candle import CandleSchema
-from src.upbit.upbit_api import UpbitAPI
+from src.upbit.upbit_api import UpbitAPI, UpbitCandleInterval
 
 
 class DataCollector:
@@ -76,7 +75,7 @@ class DataCollector:
             return file_cache.history
 
         # API 호출
-        df = UpbitAPI().get_candles(market=ticker, interval=upbit_api.UpbitCandleInterval.MINUTE_60, count=(days + 1) * 24)
+        df = UpbitAPI().get_candles(market=ticker, interval=UpbitCandleInterval.MINUTE_60, count=(days + 1) * 24)
 
         self._slack_client.send_log(f"{ticker} 데이터 업데이트 완료.")
 
@@ -142,7 +141,7 @@ class DataCollector:
             (오전 반일봉, 오후 반일봉) 튜플. 데이터가 없으면 해당 위치에 None
         """
         # 해당 날짜의 데이터만 필터링
-        date_df = df[df.index.normalize() == pd.Timestamp(target_date)]  # type: ignore
+        date_df = df[df.index.normalize() == pd.Timestamp(target_date).tz_localize(constants.KST)]  # type: ignore
 
         # 오전(0-11시) / 오후(12-23시) 분리
         morning_df = date_df[date_df.index.hour < 12]  # type: ignore
