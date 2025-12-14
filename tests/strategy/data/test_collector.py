@@ -290,3 +290,108 @@ class TestDataCollector:
 
         # 날짜가 바뀌어서 파일 캐시가 무시되고 다시 API 호출
         assert mock_get_candles.call_count == 2
+
+    def test_aggregate_with_empty_dataframe(self, collector):
+        """빈 DataFrame 전달 시 None 반환 테스트"""
+        empty_df = pd.DataFrame()
+        result = collector._aggregate(empty_df, datetime.date(2025, 10, 13), Period.MORNING)
+
+        assert result is None
+
+    def test_aggregate_day_with_missing_morning(self, collector):
+        """오전 데이터 누락 시 처리 테스트"""
+        # 오후 시간봉만 있는 DataFrame 생성 (12-23시)
+        base_time = datetime.datetime(2025, 10, 13, 12, 0, 0)
+        data = []
+        index = []
+        for i in range(12):
+            data.append(
+                {
+                    "open": 50000.0 + i * 100,
+                    "high": 51000.0 + i * 100,
+                    "low": 49000.0 + i * 100,
+                    "close": 50500.0 + i * 100,
+                    "volume": 100.0 + i,
+                }
+            )
+            index.append(base_time + timedelta(hours=i))
+
+        df = pd.DataFrame(data, index=index)
+        morning, afternoon = collector._aggregate_day(df, datetime.date(2025, 10, 13))
+
+        # 오전은 None, 오후는 정상 캔들
+        assert morning is None
+        assert afternoon is not None
+        assert afternoon.period == Period.AFTERNOON
+
+    def test_aggregate_day_with_missing_afternoon(self, collector):
+        """오후 데이터 누락 시 처리 테스트"""
+        # 오전 시간봉만 있는 DataFrame 생성 (0-11시)
+        base_time = datetime.datetime(2025, 10, 13, 0, 0, 0)
+        data = []
+        index = []
+        for i in range(12):
+            data.append(
+                {
+                    "open": 50000.0 + i * 100,
+                    "high": 51000.0 + i * 100,
+                    "low": 49000.0 + i * 100,
+                    "close": 50500.0 + i * 100,
+                    "volume": 100.0 + i,
+                }
+            )
+            index.append(base_time + timedelta(hours=i))
+
+        df = pd.DataFrame(data, index=index)
+        morning, afternoon = collector._aggregate_day(df, datetime.date(2025, 10, 13))
+
+        # 오전은 정상 캔들, 오후는 None
+        assert morning is not None
+        assert morning.period == Period.MORNING
+        assert afternoon is None
+
+    def test_aggregate_all_with_partial_data(self, collector):
+        """일부 날짜 데이터 누락 시 처리 테스트"""
+        # 하루는 완전한 데이터, 다른 하루는 오전만 있는 경우
+        data = []
+        index = []
+
+        # 첫째 날 (10/1): 완전한 24시간 데이터
+        base_time1 = datetime.datetime(2025, 10, 1, 0, 0, 0)
+        for hour in range(24):
+            data.append(
+                {
+                    "open": 50000.0,
+                    "high": 51000.0,
+                    "low": 49000.0,
+                    "close": 50500.0,
+                    "volume": 100.0,
+                }
+            )
+            index.append(base_time1 + timedelta(hours=hour))
+
+        # 둘째 날 (10/2): 오전만 있음 (0-11시)
+        base_time2 = datetime.datetime(2025, 10, 2, 0, 0, 0)
+        for hour in range(12):
+            data.append(
+                {
+                    "open": 51000.0,
+                    "high": 52000.0,
+                    "low": 50000.0,
+                    "close": 51500.0,
+                    "volume": 100.0,
+                }
+            )
+            index.append(base_time2 + timedelta(hours=hour))
+
+        df = pd.DataFrame(data, index=index)
+        result = collector._aggregate_all(df, days=2)
+
+        # 첫째 날 2개 + 둘째 날 1개(오전만) = 3개
+        assert len(result) == 3
+        assert result[0].date == datetime.date(2025, 10, 1)
+        assert result[0].period == Period.MORNING
+        assert result[1].date == datetime.date(2025, 10, 1)
+        assert result[1].period == Period.AFTERNOON
+        assert result[2].date == datetime.date(2025, 10, 2)
+        assert result[2].period == Period.MORNING

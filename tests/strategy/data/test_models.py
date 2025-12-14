@@ -689,3 +689,79 @@ class TestRecent20DaysHalfDayCandles:
         ma_score = history.calculate_ma_score()
 
         assert ma_score == pytest.approx(1.0, rel=1e-9)
+
+    def test_create_with_less_than_40_candles(self):
+        """40개 미만 캔들로 생성 가능"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        # 10일치만 생성 (20개 캔들)
+        for i in range(10):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
+
+        history = Recent20DaysHalfDayCandles(candles=candles)
+
+        assert len(history.candles) == 20
+
+    def test_create_with_empty_candles_raises_error(self):
+        """빈 캔들 리스트로 생성 시 에러 발생"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        with pytest.raises(ValueError, match="At least 1 candle is required"):
+            Recent20DaysHalfDayCandles(candles=[])
+
+    def test_create_with_more_than_40_candles_raises_error(self):
+        """40개 초과 캔들로 생성 시 에러 발생"""
+        from src.strategy.data.models import Recent20DaysHalfDayCandles
+
+        candles = []
+        # 25일치 생성 (50개 캔들)
+        for i in range(25):
+            date = datetime.date(2025, 10, 1) + datetime.timedelta(days=i)
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.MORNING,
+                    open=50000.0,
+                    high=51000.0,
+                    low=50000.0,
+                    close=50500.0,
+                    volume=1000.0,
+                )
+            )
+            candles.append(
+                HalfDayCandle(
+                    date=date,
+                    period=Period.AFTERNOON,
+                    open=50500.0,
+                    high=52000.0,
+                    low=50000.0,
+                    close=51500.0,
+                    volume=1500.0,
+                )
+            )
+
+        with pytest.raises(ValueError, match="Expected at most 40 candles"):
+            Recent20DaysHalfDayCandles(candles=candles)

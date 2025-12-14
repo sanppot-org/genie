@@ -6,7 +6,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from src.common.slack.client import SlackClient
-from src.config import UpbitConfig
 from src.constants import DEFAULT_CACHE_DIR, KST, UTF_8
 from src.upbit.upbit_api import UpbitAPI
 
@@ -25,18 +24,20 @@ class AllocatedBalanceProvider:
     def __init__(
             self,
             slack_client: SlackClient,
+            upbit_api: UpbitAPI,
             state_file_path: Path | None = None,
             allocation_hour: int | None = None,
     ) -> None:
         """
         Args:
             slack_client: Slack 알림 클라이언트
+            upbit_api: Upbit API 클라이언트
             state_file_path: 할당 상태를 저장할 JSON 파일 경로
             allocation_hour: 자금을 할당할 시간 (0-23)
         """
         self.state_file_path = state_file_path or Path(DEFAULT_CACHE_DIR) / "allocated_balance.json"
         self.allocation_hour = allocation_hour or 23  # 오후 11시에 자금 할당
-        self.upbit_api = UpbitAPI(UpbitConfig())
+        self.upbit_api = upbit_api
         self.slack_client = slack_client
 
     def get_allocated_amount(self) -> float:

@@ -67,7 +67,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     # Business Components
     clock = providers.Singleton(SystemClock, KST)
     cache_manager = providers.Singleton(CacheManager)
-    allocation_manager = providers.Singleton(AllocatedBalanceProvider, slack_client)
+    allocation_manager = providers.Singleton(AllocatedBalanceProvider, slack_client, upbit_api)
     data_collector = providers.Singleton(DataCollector, clock, slack_client)
     order_executor = providers.Singleton(
         OrderExecutor,

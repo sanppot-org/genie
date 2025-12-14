@@ -162,7 +162,7 @@ class Recent20DaysHalfDayCandles(BaseModel):
                 - 입력 순서와 무관하게 자동으로 시간순 정렬됨
     """
 
-    candles: list[HalfDayCandle] = Field(..., description="최근 20일의 반일봉 데이터 (40개)")
+    candles: list[HalfDayCandle] = Field(..., description="최근 20일의 반일봉 데이터 (최대 40개)")
 
     @model_validator(mode="after")
     def validate_and_sort(self) -> "Recent20DaysHalfDayCandles":
@@ -173,10 +173,12 @@ class Recent20DaysHalfDayCandles(BaseModel):
             검증 및 정렬된 인스턴스
 
         Raises:
-            ValueError: 캔들 개수가 40개가 아닐 때
+            ValueError: 캔들 개수가 0개이거나 40개 초과일 때
         """
-        if len(self.candles) != 40:
-            raise ValueError(f"Expected 40 candles, got {len(self.candles)}")
+        if len(self.candles) == 0:
+            raise ValueError("At least 1 candle is required")
+        if len(self.candles) > 40:
+            raise ValueError(f"Expected at most 40 candles, got {len(self.candles)}")
 
         # HalfDayCandle의 __lt__ 메서드를 사용하여 시간순 정렬
         self.candles = sorted(self.candles)

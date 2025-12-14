@@ -120,11 +120,17 @@ class DataCollector:
         for target_date in target_dates:
             # 집계
             morning, afternoon = self._aggregate_day(df, target_date)
-            result.extend([morning, afternoon])
+            # None이 아닌 캔들만 추가
+            if morning:
+                result.append(morning)
+            if afternoon:
+                result.append(afternoon)
 
         return result
 
-    def _aggregate_day(self, df: DataFrame[CandleSchema], target_date: dt.date) -> tuple[HalfDayCandle, HalfDayCandle]:
+    def _aggregate_day(
+            self, df: DataFrame[CandleSchema], target_date: dt.date
+    ) -> tuple[HalfDayCandle | None, HalfDayCandle | None]:
         """
         전체 시간봉에서 특정 날짜 데이터를 추출하여 오전/오후 반일봉으로 집계
 
@@ -133,7 +139,7 @@ class DataCollector:
             target_date: 집계할 날짜
 
         Returns:
-            (오전 반일봉, 오후 반일봉) 튜플
+            (오전 반일봉, 오후 반일봉) 튜플. 데이터가 없으면 해당 위치에 None
         """
         # 해당 날짜의 데이터만 필터링
         date_df = df[df.index.normalize() == pd.Timestamp(target_date)]  # type: ignore
@@ -149,7 +155,7 @@ class DataCollector:
         return morning, afternoon
 
     @staticmethod
-    def _aggregate(hourly_df: pd.DataFrame, target_date: dt.date, period: Period) -> HalfDayCandle:
+    def _aggregate(hourly_df: pd.DataFrame, target_date: dt.date, period: Period) -> HalfDayCandle | None:
         """
         12개 시간봉을 하나의 반일봉으로 집계
 
@@ -159,8 +165,11 @@ class DataCollector:
             period: 기간 ("morning" 또는 "afternoon")
 
         Returns:
-            집계된 반일봉
+            집계된 반일봉. 빈 DataFrame이면 None 반환
         """
+        if hourly_df.empty:
+            return None
+
         return HalfDayCandle(
             date=target_date,
             period=period,

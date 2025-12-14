@@ -1,8 +1,8 @@
 """FastAPI 앱 lifespan 이벤트"""
 
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI

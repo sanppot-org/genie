@@ -57,10 +57,10 @@ class TestAllocatedBalanceProvider:
         """캐시가 없으면 새로 할당"""
         provider = AllocatedBalanceProvider(
             slack_client=mock_slack_client,
+            upbit_api=mock_upbit_api,
             state_file_path=temp_state_file,
             allocation_hour=23
         )
-        provider.upbit_api = mock_upbit_api
 
         result = provider.get_allocated_amount()
 
@@ -83,10 +83,10 @@ class TestAllocatedBalanceProvider:
 
         provider = AllocatedBalanceProvider(
             slack_client=mock_slack_client,
+            upbit_api=mock_upbit_api,
             state_file_path=temp_state_file,
             allocation_hour=23
         )
-        provider.upbit_api = mock_upbit_api
 
         # 현재 시각을 18시로 설정
         with patch('src.allocation_manager.datetime') as mock_datetime:
@@ -111,10 +111,10 @@ class TestAllocatedBalanceProvider:
 
         provider = AllocatedBalanceProvider(
             slack_client=mock_slack_client,
+            upbit_api=mock_upbit_api,
             state_file_path=temp_state_file,
             allocation_hour=23
         )
-        provider.upbit_api = mock_upbit_api
 
         # 현재 시각을 23시로 설정
         with patch('src.allocation_manager.datetime') as mock_datetime:
@@ -139,10 +139,10 @@ class TestAllocatedBalanceProvider:
 
         provider = AllocatedBalanceProvider(
             slack_client=mock_slack_client,
+            upbit_api=mock_upbit_api,
             state_file_path=temp_state_file,
             allocation_hour=23
         )
-        provider.upbit_api = mock_upbit_api
 
         # 현재 시각을 23시 30분으로 설정
         with patch('src.allocation_manager.datetime') as mock_datetime:
@@ -167,10 +167,10 @@ class TestAllocatedBalanceProvider:
 
         provider = AllocatedBalanceProvider(
             slack_client=mock_slack_client,
+            upbit_api=mock_upbit_api,
             state_file_path=temp_state_file,
             allocation_hour=23
         )
-        provider.upbit_api = mock_upbit_api
 
         # 현재 시각을 오늘 15시로 설정
         with patch('src.allocation_manager.datetime') as mock_datetime:
@@ -195,10 +195,10 @@ class TestAllocatedBalanceProvider:
 
         provider = AllocatedBalanceProvider(
             slack_client=mock_slack_client,
+            upbit_api=mock_upbit_api,
             state_file_path=temp_state_file,
             allocation_hour=23
         )
-        provider.upbit_api = mock_upbit_api
 
         # 현재 시각을 오늘 23시로 설정
         with patch('src.allocation_manager.datetime') as mock_datetime:
