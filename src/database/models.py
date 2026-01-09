@@ -85,3 +85,21 @@ class CandleDaily(CandleBase):
     def __repr__(self) -> str:
         """문자열 표현"""
         return f"<CandleDaily(ticker={self.ticker}, date={self.date}, close={self.close})>"
+
+
+class Exchange(Base):
+    """거래소 마스터 테이블
+
+    Attributes:
+        id: 자동 증가 ID (primary key)
+        name: 거래소 이름 (예: Upbit, Binance)
+    """
+
+    __tablename__ = "exchanges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+
+    def __repr__(self) -> str:
+        """문자열 표현"""
+        return f"<Exchange(name={self.name})>"
