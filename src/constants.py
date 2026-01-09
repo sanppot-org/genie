@@ -99,3 +99,5 @@ FIELD_SIDE = "side"
 FIELD_MARKET = "market"
 
 UTF_8 = "utf-8"
+
+BAD_REQUESTS = 404

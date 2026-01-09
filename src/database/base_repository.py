@@ -65,6 +65,7 @@ class BaseRepository[T, ID](ABC):
 
         self.session.flush()
         self.session.commit()
+        self.session.refresh(result)
         return result
 
     def find_by_id(self, entity_id: ID) -> T | None:

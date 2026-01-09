@@ -169,3 +169,15 @@ class DatabaseConfig(BaseSettings):
     def database_url(self) -> str:
         """데이터베이스 연결 URL"""
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+
+
+class AppConfig(BaseSettings):
+    """앱 실행 설정"""
+
+    model_config = SettingsConfigDict(env_file=str(DEFAULT_ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
+
+    enable_scheduler: bool = Field(
+        default=True,
+        description="스케줄러 활성화 여부",
+        alias="ENABLE_SCHEDULER"
+    )

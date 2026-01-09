@@ -16,10 +16,12 @@ from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuCo
 from src.constants import KST
 from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleMinute1Repository
+from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_service import CandleService
+from src.service.ticker_service import TickerService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -35,6 +37,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.scheduled_tasks.tasks",  # tasks.py를 가리킴
             "src.api.lifespan",  # lifespan.py 추가
             "src.api.routes.strategy",  # strategy 라우터 추가
+            "src.api.routes.ticker",  # ticker 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
     )
@@ -59,6 +62,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     database = providers.Singleton(Database, database_config)
     candle_minute1_repository = providers.Factory(CandleMinute1Repository, session=database.provided.get_session.call())
     candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
+    ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -123,4 +127,8 @@ class ApplicationContainer(containers.DeclarativeContainer):
         minute1_repository=candle_minute1_repository,
         daily_repository=candle_daily_repository,
         adapter_factory=candle_adapter_factory,
+    )
+    ticker_service = providers.Factory(
+        TickerService,
+        repository=ticker_repository,
     )
