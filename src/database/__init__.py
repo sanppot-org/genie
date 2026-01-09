@@ -4,14 +4,18 @@ from src.database.candle_repositories import CandleDailyRepository, CandleMinute
 from src.database.database import Database
 from src.database.exchange_repository import ExchangeRepository
 from src.database.models import Base, CandleDaily, CandleMinute1, Exchange
+from src.database.models import Base, CandleDaily, CandleMinute1, Ticker
+from src.database.ticker_repository import TickerRepository
 
 __all__ = [
     "Database",
     "Base",
     "CandleMinute1",
     "CandleDaily",
+    "Ticker",
     "CandleMinute1Repository",
     "CandleDailyRepository",
+    "TickerRepository",
     "Exchange",
     "ExchangeRepository",
 ]

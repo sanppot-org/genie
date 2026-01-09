@@ -7,6 +7,7 @@ from src.config import DatabaseConfig
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
 from src.database.exchange_repository import ExchangeRepository
+from src.database.ticker_repository import TickerRepository
 
 
 @pytest.fixture
@@ -73,3 +74,9 @@ def daily_repo(session: Session) -> CandleDailyRepository:
 def exchange_repo(session: Session) -> ExchangeRepository:
     """거래소 Repository fixture"""
     return ExchangeRepository(session)
+
+
+@pytest.fixture
+def ticker_repo(session: Session) -> TickerRepository:
+    """Ticker Repository fixture"""
+    return TickerRepository(session)

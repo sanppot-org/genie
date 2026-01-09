@@ -103,3 +103,25 @@ class Exchange(Base):
     def __repr__(self) -> str:
         """문자열 표현"""
         return f"<Exchange(name={self.name})>"
+
+
+class Ticker(Base):
+    """티커 마스터 테이블
+
+    자산(암호화폐, 주식, ETF 등)의 티커 정보를 관리합니다.
+
+    Attributes:
+        id: 자동 증가 PK
+        ticker: 티커 코드 (예: KRW-BTC, AAPL, 005930)
+        asset_type: 자산 유형 (CRYPTO, STOCK, ETF)
+    """
+
+    __tablename__ = "tickers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ticker: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    asset_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+
+    def __repr__(self) -> str:
+        """문자열 표현"""
+        return f"<Ticker(ticker={self.ticker}, asset_type={self.asset_type})>"

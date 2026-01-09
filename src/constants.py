@@ -4,7 +4,17 @@
 모든 문자열 상수와 매직 넘버를 중앙에서 관리합니다.
 """
 
+from enum import StrEnum
 from zoneinfo import ZoneInfo
+
+
+class AssetType(StrEnum):
+    """자산 유형"""
+
+    CRYPTO = "CRYPTO"  # 암호화폐 (KRW-BTC, KRW-ETH)
+    STOCK = "STOCK"  # 주식 (005930, AAPL)
+    ETF = "ETF"  # ETF
+
 
 DEFAULT_CACHE_DIR = ".cache"
 
