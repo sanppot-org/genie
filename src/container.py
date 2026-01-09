@@ -38,6 +38,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.lifespan",  # lifespan.py 추가
             "src.api.routes.strategy",  # strategy 라우터 추가
             "src.api.routes.ticker",  # ticker 라우터 추가
+            "src.api.routes.candle",  # candle 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
     )

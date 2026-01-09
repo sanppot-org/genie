@@ -1,13 +1,13 @@
 """Candle data service for saving candle data to database."""
 
 from datetime import datetime
-from enum import Enum, auto
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from src.common.data_adapter import DataSource
 
 
-class CollectMode(Enum):
+class CollectMode(StrEnum):
     """캔들 데이터 수집 모드.
 
     Attributes:
@@ -16,9 +16,9 @@ class CollectMode(Enum):
         BACKFILL: DB 가장 오래된 이전만 수집
     """
 
-    INCREMENTAL = auto()
-    FULL = auto()
-    BACKFILL = auto()
+    INCREMENTAL = "INCREMENTAL"
+    FULL = "FULL"
+    BACKFILL = "BACKFILL"
 
 
 if TYPE_CHECKING:
