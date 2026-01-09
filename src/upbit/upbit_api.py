@@ -4,18 +4,18 @@
 업비트 거래소와 연동하여 잔고 조회, 시세 조회, 거래 등의 기능을 제공합니다.
 """
 
-from datetime import datetime
-from enum import Enum
 import hashlib
 import logging
 import time
-from urllib.parse import unquote, urlencode
 import uuid
+from datetime import datetime
+from enum import Enum
+from urllib.parse import unquote, urlencode
 
 import jwt
 import pandas as pd
-from pandera.typing import DataFrame
 import pyupbit  # type: ignore
+from pandera.typing import DataFrame
 
 from src import constants
 from src.common.http_client import HTTPMethod, make_api_request
@@ -509,8 +509,6 @@ class UpbitAPI:
         if result is None:
             raise UpbitAPIError.empty_response()
 
-        logger.info(f"api response: {result}")
-
         if isinstance(result, dict) and "error" in result:
             raise UpbitAPIError(result["error"])
 
@@ -671,7 +669,7 @@ class UpbitAPI:
         """
         params = {"market": market, "count": min(count, 200)}
         if to:
-            params["to"] = to.strftime("%Y-%m-%d %H:%M:%S")
+            params["to"] = to.strftime("%Y-%m-%dT%H:%M:%S%:z")
 
         response = make_api_request(
             url=f"{self.config.base_url}{interval.endpoint}",

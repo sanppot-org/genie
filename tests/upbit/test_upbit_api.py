@@ -154,6 +154,7 @@ class TestGetCandles:
             {
                 "market": "KRW-BTC",
                 "candle_date_time_utc": "2024-10-27T00:00:00",
+                "candle_date_time_kst": "2024-10-27T09:00:00",
                 "opening_price": 95000000.0,
                 "high_price": 96000000.0,
                 "low_price": 94000000.0,
@@ -177,7 +178,7 @@ class TestGetCandles:
 
         # Then
         call_args = mock_request.call_args
-        assert call_args[1]["params"]["to"] == "2024-10-27 12:00:00"
+        assert call_args[1]["params"]["to"] == "2024-10-27T12:00:00"
 
     @patch("src.upbit.upbit_api.make_api_request")
     def test_get_candles_API_에러_처리(self, mock_request):

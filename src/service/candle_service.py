@@ -1,9 +1,25 @@
 """Candle data service for saving candle data to database."""
 
 from datetime import datetime
+from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from src.common.data_adapter import DataSource
+
+
+class CollectMode(Enum):
+    """캔들 데이터 수집 모드.
+
+    Attributes:
+        INCREMENTAL: DB 최신 이후만 수집 (기본값)
+        FULL: 전체 수집
+        BACKFILL: DB 가장 오래된 이전만 수집
+    """
+
+    INCREMENTAL = auto()
+    FULL = auto()
+    BACKFILL = auto()
+
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -94,16 +110,22 @@ class CandleService:
             ticker: str,
             to: datetime | None = None,
             batch_size: int = 1000,
+            mode: CollectMode = CollectMode.INCREMENTAL,
     ) -> int:
         """1분봉 데이터를 수집하여 DB에 저장.
 
-        티커를 받아 데이터가 없을 때까지 계속 조회하여 DB에 저장합니다.
-        배치 크기만큼 누적되면 DB에 저장하여 메모리 효율성을 높입니다.
+        티커를 받아 데이터를 조회하여 DB에 저장합니다.
+
+        수집 모드:
+        - INCREMENTAL (기본): DB의 최신 데이터 이후만 수집
+        - FULL: API가 빈 데이터를 반환할 때까지 전체 수집
+        - BACKFILL: DB의 가장 오래된 데이터 이전만 수집 (과거 데이터 채우기)
 
         Args:
             ticker: 종목 코드 (예: "KRW-BTC")
             to: 마지막으로 캔들을 마감한 시각 (해당 시각 이전 데이터 수집, None이면 현재 시각)
             batch_size: DB 저장 배치 크기 (기본값: 1000)
+            mode: 수집 모드 (기본값: CollectMode.INCREMENTAL)
 
         Returns:
             저장된 총 캔들 개수
@@ -113,12 +135,14 @@ class CandleService:
             Exception: API 호출 또는 DB 저장 실패
 
         Example:
+            >>> from src.service.candle_service import CollectMode
             >>> service = CandleService(minute1_repo, daily_repo, factory)
-            >>> # 모든 데이터 수집
+            >>> # 증분 수집 (DB 최신 이후 데이터만)
             >>> total = service.collect_minute1_candles("KRW-BTC")
-            >>> # 특정 시점 이전 데이터만 수집
-            >>> from datetime import datetime
-            >>> total = service.collect_minute1_candles("KRW-BTC", to=datetime(2024, 1, 1))
+            >>> # 전체 데이터 재수집
+            >>> total = service.collect_minute1_candles("KRW-BTC", mode=CollectMode.FULL)
+            >>> # 과거 데이터 채우기
+            >>> total = service.collect_minute1_candles("KRW-BTC", mode=CollectMode.BACKFILL)
             >>> print(f"총 {total}개 캔들 저장 완료")
         """
         import logging
@@ -133,9 +157,25 @@ class CandleService:
         if batch_size <= 0:
             raise ValueError("batch_size는 0보다 커야 합니다")
 
-        latest = self._minute1_repo.get_latest_candle(ticker)
-        if latest:
-            logger.info(f"마지막 저장 데이터: {latest.timestamp} (ticker={ticker})")
+        # 모드별 경계 timestamp 조회
+        boundary_timestamp: datetime | None = None
+
+        if mode == CollectMode.INCREMENTAL:
+            latest = self._minute1_repo.get_latest_candle(ticker)
+            boundary_timestamp = latest.timestamp if latest else None
+            if boundary_timestamp:
+                logger.info(f"Incremental 모드: {boundary_timestamp} 이후 데이터만 수집 (ticker={ticker})")
+            else:
+                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (ticker={ticker})")
+        elif mode == CollectMode.BACKFILL:
+            oldest = self._minute1_repo.get_oldest_candle(ticker)
+            if oldest:
+                to = oldest.timestamp  # BACKFILL: oldest timestamp부터 시작
+                logger.info(f"Backfill 모드: {oldest.timestamp} 이전 데이터만 수집 (ticker={ticker})")
+            else:
+                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (ticker={ticker})")
+        else:  # FULL
+            logger.info(f"Full 모드: 전체 데이터 수집 (ticker={ticker})")
 
         accumulated_candles: list[CandleMinute1] = []
         total_saved = 0
@@ -157,6 +197,20 @@ class CandleService:
             if df.empty:
                 logger.info(f"더 이상 수집할 데이터가 없습니다 (ticker={ticker})")
                 break
+
+            # INCREMENTAL 모드: DB 최신보다 오래된 데이터 필터링
+            if mode == CollectMode.INCREMENTAL and boundary_timestamp:
+                # SQLite는 timezone 정보를 저장하지 않으므로 UTC aware로 변환
+                from datetime import UTC as UTC_TZ
+                boundary_ts_aware = (
+                    boundary_timestamp.replace(tzinfo=UTC_TZ)
+                    if boundary_timestamp.tzinfo is None
+                    else boundary_timestamp
+                )
+                df = df[df["timestamp"] > boundary_ts_aware]
+                if df.empty:
+                    logger.info(f"DB 최신 데이터까지 수집 완료 (ticker={ticker})")
+                    break
 
             candle_models = self._factory.get_adapter(DataSource.UPBIT).to_candle_models(df, ticker, UpbitCandleInterval.MINUTE_1)
 

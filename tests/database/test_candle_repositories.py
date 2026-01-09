@@ -103,6 +103,49 @@ class TestCandleMinute1Repository:
         # Then
         assert result is None
 
+    def test_get_oldest_candle_returns_oldest_by_timestamp(self, minute1_repo: CandleMinute1Repository):
+        """get_oldest_candle로 가장 오래된 캔들 조회."""
+        # Given
+        candles = [
+            CandleMinute1(
+                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),
+                ticker="KRW-BTC",
+                open=50000000,
+                high=51000000,
+                low=49000000,
+                close=50500000,
+                volume=10.5,
+            ),
+            CandleMinute1(
+                timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 1),
+                ticker="KRW-BTC",
+                open=50500000,
+                high=51500000,
+                low=50000000,
+                close=51000000,
+                volume=12.3,
+            ),
+        ]
+        minute1_repo.bulk_upsert(candles)
+
+        # When
+        result = minute1_repo.get_oldest_candle("KRW-BTC")
+
+        # Then
+        assert result is not None
+        assert result.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 0, tzinfo=UTC)
+        assert result.close == 50500000
+
+    def test_get_oldest_candle_returns_none_when_no_data(self, minute1_repo: CandleMinute1Repository):
+        """데이터 없을 때 get_oldest_candle은 None 반환."""
+        # When
+        result = minute1_repo.get_oldest_candle("KRW-BTC")
+
+        # Then
+        assert result is None
+
     def test_bulk_upsert_inserts_new_candles(self, minute1_repo: CandleMinute1Repository):
         """bulk_upsert로 새 캔들 삽입."""
         # Given
@@ -218,6 +261,42 @@ class TestCandleMinute1Repository:
         assert result[0].ticker == "KRW-BTC"
         assert result[1].ticker == "KRW-BTC"
 
+    def test_bulk_upsert_handles_duplicate_entries(self, minute1_repo: CandleMinute1Repository):
+        """bulk_upsert로 중복 데이터 처리 (마지막 값 사용)."""
+        # Given - 동일한 (localtime, ticker) 조합의 중복 데이터
+        candles = [
+            CandleMinute1(
+                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),
+                ticker="KRW-BTC",
+                open=50000000,
+                high=51000000,
+                low=49000000,
+                close=50500000,
+                volume=10.5,
+            ),
+            CandleMinute1(
+                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                localtime=datetime(2024, 1, 1, 18, 0),  # 중복!
+                ticker="KRW-BTC",
+                open=50000000,
+                high=52000000,  # 다른 값
+                low=49000000,
+                close=51500000,  # 다른 값
+                volume=15.0,  # 다른 값
+            ),
+        ]
+
+        # When - 오류 없이 처리됨
+        minute1_repo.bulk_upsert(candles)
+
+        # Then - 마지막 값이 저장됨
+        result = minute1_repo.get_latest_candle("KRW-BTC")
+        assert result is not None
+        assert result.high == 52000000
+        assert result.close == 51500000
+        assert result.volume == 15.0
+
 
 class TestCandleDailyRepository:
     """CandleDailyRepository 테스트."""
@@ -305,6 +384,47 @@ class TestCandleDailyRepository:
         """데이터 없을 때 get_latest_candle은 None 반환."""
         # When
         result = daily_repo.get_latest_candle("KRW-BTC")
+
+        # Then
+        assert result is None
+
+    def test_get_oldest_candle_returns_oldest_by_date(self, daily_repo: CandleDailyRepository):
+        """get_oldest_candle로 가장 오래된 캔들 조회."""
+        # Given
+        candles = [
+            CandleDaily(
+                date=datetime(2024, 1, 1).date(),
+                ticker="KRW-BTC",
+                open=50000000,
+                high=52000000,
+                low=49000000,
+                close=51000000,
+                volume=1000.5,
+            ),
+            CandleDaily(
+                date=datetime(2024, 1, 2).date(),
+                ticker="KRW-BTC",
+                open=51000000,
+                high=53000000,
+                low=50000000,
+                close=52000000,
+                volume=1200.3,
+            ),
+        ]
+        daily_repo.bulk_upsert(candles)
+
+        # When
+        result = daily_repo.get_oldest_candle("KRW-BTC")
+
+        # Then
+        assert result is not None
+        assert result.date == datetime(2024, 1, 1).date()
+        assert result.close == 51000000
+
+    def test_get_oldest_candle_returns_none_when_no_data(self, daily_repo: CandleDailyRepository):
+        """데이터 없을 때 get_oldest_candle은 None 반환."""
+        # When
+        result = daily_repo.get_oldest_candle("KRW-BTC")
 
         # Then
         assert result is None
@@ -414,3 +534,37 @@ class TestCandleDailyRepository:
         assert len(result) == 2
         assert result[0].ticker == "KRW-BTC"
         assert result[1].ticker == "KRW-BTC"
+
+    def test_bulk_upsert_handles_duplicate_entries(self, daily_repo: CandleDailyRepository):
+        """bulk_upsert로 중복 데이터 처리 (마지막 값 사용)."""
+        # Given - 동일한 (date, ticker) 조합의 중복 데이터
+        candles = [
+            CandleDaily(
+                date=datetime(2024, 1, 1).date(),
+                ticker="KRW-BTC",
+                open=50000000,
+                high=52000000,
+                low=49000000,
+                close=51000000,
+                volume=1000.5,
+            ),
+            CandleDaily(
+                date=datetime(2024, 1, 1).date(),  # 중복!
+                ticker="KRW-BTC",
+                open=50000000,
+                high=54000000,  # 다른 값
+                low=49000000,
+                close=53000000,  # 다른 값
+                volume=1500.0,  # 다른 값
+            ),
+        ]
+
+        # When - 오류 없이 처리됨
+        daily_repo.bulk_upsert(candles)
+
+        # Then - 마지막 값이 저장됨
+        result = daily_repo.get_latest_candle("KRW-BTC")
+        assert result is not None
+        assert result.high == 54000000
+        assert result.close == 53000000
+        assert result.volume == 1500.0

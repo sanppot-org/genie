@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from src import constants
 from src.common.clock import FixedClock, SystemClock
 from src.strategy.data.collector import DataCollector
 from src.strategy.data.models import Period
@@ -46,7 +47,9 @@ class TestDataCollector:
             )
             index.append(base_time + timedelta(hours=i))
 
-        return pd.DataFrame(data, index=index)
+        df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
+        return df
 
     def test_aggregate_morning_candles(self, collector, mock_hourly_df):
         """오전 12시간 집계 테스트"""
@@ -92,7 +95,9 @@ class TestDataCollector:
                 )
                 index.append(base_time + timedelta(hours=hour))
 
-        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+        df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
+        mock_get_candles.return_value = df
 
         # 실행
         result = collector.collect_data("KRW-BTC", days=20)
@@ -126,7 +131,9 @@ class TestDataCollector:
                 data.append({"open": 50000.0, "high": 51000.0, "low": 49000.0, "close": 50500.0, "volume": 100.0})
                 index.append(base_time + timedelta(hours=hour))
 
-        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+        df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
+        mock_get_candles.return_value = df
 
         # 실행
         result = collector.collect_data("KRW-BTC", days=20)
@@ -154,6 +161,7 @@ class TestDataCollector:
                 index.append(base_time + timedelta(days=day, hours=hour))
 
         df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
         result = collector._aggregate_all(df, days=2)
 
         # 2일 * 2(오전/오후) = 4개
@@ -185,6 +193,7 @@ class TestDataCollector:
                 index.append(base_time + timedelta(hours=hour))
 
         df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
 
         # 2일치 요청 (어제, 그제만 포함되어야 함)
         result = collector._aggregate_all(df, days=2)
@@ -217,7 +226,9 @@ class TestDataCollector:
                 data.append({"open": 50000.0, "high": 51000.0, "low": 49000.0, "close": 50500.0, "volume": 100.0})
                 index.append(base_time + timedelta(hours=hour))
 
-        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+        df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
+        mock_get_candles.return_value = df
 
         # 첫 번째 호출
         result1 = collector.collect_data("KRW-BTC", days=20)
@@ -244,7 +255,9 @@ class TestDataCollector:
                 data.append({"open": 50000.0, "high": 51000.0, "low": 49000.0, "close": 50500.0, "volume": 100.0})
                 index.append(base_time + timedelta(hours=hour))
 
-        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+        df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
+        mock_get_candles.return_value = df
 
         # 서로 다른 티커로 호출
         collector.collect_data("KRW-BTC", days=20)
@@ -266,7 +279,9 @@ class TestDataCollector:
                 data.append({"open": 50000.0, "high": 51000.0, "low": 49000.0, "close": 50500.0, "volume": 100.0})
                 index.append(base_time + timedelta(hours=hour))
 
-        mock_get_candles.return_value = pd.DataFrame(data, index=index)
+        df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
+        mock_get_candles.return_value = df
 
         # 10월 15일에 첫 호출
         clock = FixedClock(datetime.datetime(2025, 10, 15, 10, 0, 0))
@@ -317,6 +332,7 @@ class TestDataCollector:
             index.append(base_time + timedelta(hours=i))
 
         df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
         morning, afternoon = collector._aggregate_day(df, datetime.date(2025, 10, 13))
 
         # 오전은 None, 오후는 정상 캔들
@@ -343,6 +359,7 @@ class TestDataCollector:
             index.append(base_time + timedelta(hours=i))
 
         df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
         morning, afternoon = collector._aggregate_day(df, datetime.date(2025, 10, 13))
 
         # 오전은 정상 캔들, 오후는 None
@@ -385,6 +402,7 @@ class TestDataCollector:
             index.append(base_time2 + timedelta(hours=hour))
 
         df = pd.DataFrame(data, index=index)
+        df.index = pd.to_datetime(df.index).tz_localize(constants.KST)
         result = collector._aggregate_all(df, days=2)
 
         # 첫째 날 2개 + 둘째 날 1개(오전만) = 3개

@@ -47,6 +47,18 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
         pass
 
     @abstractmethod
+    def get_oldest_candle(self, ticker: str) -> T | None:
+        """가장 오래된 캔들 데이터 조회
+
+        Args:
+            ticker: 티커
+
+        Returns:
+            가장 오래된 캔들 또는 None
+        """
+        pass
+
+    @abstractmethod
     def bulk_upsert(self, entities: list[T]) -> None:
         """캔들 데이터 벌크 upsert
 
@@ -131,11 +143,31 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         )
 
     @override
+    def get_oldest_candle(self, ticker: str) -> CandleMinute1 | None:
+        """가장 오래된 캔들 데이터 조회
+
+        Args:
+            ticker: 티커
+
+        Returns:
+            가장 오래된 캔들 또는 None
+        """
+        return (
+            self.session.query(CandleMinute1)
+            .filter(CandleMinute1.ticker == ticker)
+            .order_by(CandleMinute1.timestamp.asc())
+            .first()
+        )
+
+    @override
     def bulk_upsert(self, entities: list[CandleMinute1]) -> None:
         """캔들 데이터 벌크 upsert
 
         PostgreSQL의 ON CONFLICT를 사용하여 한 번의 쿼리로
         여러 레코드를 삽입하거나 업데이트합니다.
+
+        Note:
+            동일한 (localtime, ticker) 조합의 중복 데이터는 마지막 값만 사용됩니다.
 
         Args:
             entities: 저장할 캔들 리스트
@@ -145,9 +177,11 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         if not entities:
             return
 
-        # 딕셔너리 리스트로 변환 (SQLAlchemy 객체 → dict)
-        values = [
-            {
+        # 딕셔너리로 중복 제거 (동일 키는 마지막 값으로 덮어씀)
+        unique_map: dict[tuple[datetime, str], dict] = {}
+        for e in entities:
+            key = (e.localtime, e.ticker)
+            unique_map[key] = {
                 "localtime": e.localtime,
                 "ticker": e.ticker,
                 "open": e.open,
@@ -157,8 +191,8 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
                 "volume": e.volume,
                 "timestamp": e.timestamp,
             }
-            for e in entities
-        ]
+
+        values = list(unique_map.values())
 
         # INSERT ... ON CONFLICT DO UPDATE
         stmt = insert(CandleMinute1).values(values)
@@ -256,11 +290,31 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         )
 
     @override
+    def get_oldest_candle(self, ticker: str) -> CandleDaily | None:
+        """가장 오래된 캔들 데이터 조회 (일봉은 date 필드 사용)
+
+        Args:
+            ticker: 티커
+
+        Returns:
+            가장 오래된 캔들 또는 None
+        """
+        return (
+            self.session.query(CandleDaily)
+            .filter(CandleDaily.ticker == ticker)
+            .order_by(CandleDaily.date.asc())
+            .first()
+        )
+
+    @override
     def bulk_upsert(self, entities: list[CandleDaily]) -> None:
         """캔들 데이터 벌크 upsert (일봉은 date 필드 사용)
 
         PostgreSQL의 ON CONFLICT를 사용하여 한 번의 쿼리로
         여러 레코드를 삽입하거나 업데이트합니다.
+
+        Note:
+            동일한 (date, ticker) 조합의 중복 데이터는 마지막 값만 사용됩니다.
 
         Args:
             entities: 저장할 캔들 리스트
@@ -270,9 +324,12 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         if not entities:
             return
 
-        # 딕셔너리 리스트로 변환 (SQLAlchemy 객체 → dict)
-        values = [
-            {
+        # 딕셔너리로 중복 제거 (동일 키는 마지막 값으로 덮어씀)
+        from datetime import date
+        unique_map: dict[tuple[date, str], dict] = {}
+        for e in entities:
+            key = (e.date, e.ticker)
+            unique_map[key] = {
                 "date": e.date,
                 "ticker": e.ticker,
                 "open": e.open,
@@ -281,8 +338,8 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
                 "close": e.close,
                 "volume": e.volume,
             }
-            for e in entities
-        ]
+
+        values = list(unique_map.values())
 
         # INSERT ... ON CONFLICT DO UPDATE
         stmt = insert(CandleDaily).values(values)
