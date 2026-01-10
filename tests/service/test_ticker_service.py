@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.constants import AssetType
 from src.database.models import Base
 from src.database.ticker_repository import TickerRepository
 from src.service.exceptions import GenieError
@@ -41,34 +42,34 @@ def service(test_session: Session) -> TickerService:
 def test_upsert_creates_new_ticker(service: TickerService) -> None:
     """새 ticker 생성"""
     # When
-    ticker = service.upsert(ticker="KRW-BTC", asset_type="CRYPTO")
+    ticker = service.upsert(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
 
     # Then
     assert ticker.id is not None
     assert ticker.ticker == "KRW-BTC"
-    assert ticker.asset_type == "CRYPTO"
+    assert ticker.asset_type == AssetType.CRYPTO
 
 
 def test_upsert_updates_existing_ticker(service: TickerService) -> None:
     """기존 ticker 업데이트 (upsert)"""
     # Given
-    original = service.upsert(ticker="KRW-BTC", asset_type="CRYPTO")
+    original = service.upsert(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
 
     # When
-    updated = service.upsert(ticker="KRW-BTC", asset_type="ETF")
+    updated = service.upsert(ticker="KRW-BTC", asset_type=AssetType.ETF)
 
     # Then
     assert updated.id == original.id
     assert updated.ticker == "KRW-BTC"
-    assert updated.asset_type == "ETF"
+    assert updated.asset_type == AssetType.ETF
     assert len(service.get_all()) == 1
 
 
 def test_get_all_tickers(service: TickerService) -> None:
     """전체 ticker 조회"""
     # Given
-    service.upsert(ticker="KRW-BTC", asset_type="CRYPTO")
-    service.upsert(ticker="KRW-ETH", asset_type="CRYPTO")
+    service.upsert(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
+    service.upsert(ticker="KRW-ETH", asset_type=AssetType.CRYPTO)
 
     # When
     tickers = service.get_all()
@@ -82,7 +83,7 @@ def test_get_all_tickers(service: TickerService) -> None:
 def test_get_ticker_by_id(service: TickerService) -> None:
     """ID로 ticker 조회"""
     # Given
-    created = service.upsert(ticker="KRW-BTC", asset_type="CRYPTO")
+    created = service.upsert(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
 
     # When
     ticker = service.get_by_id(created.id)
@@ -102,7 +103,7 @@ def test_get_ticker_raises_when_not_found(service: TickerService) -> None:
 def test_delete_ticker_success(service: TickerService) -> None:
     """ticker 삭제 성공"""
     # Given
-    created = service.upsert(ticker="KRW-BTC", asset_type="CRYPTO")
+    created = service.upsert(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
 
     # When
     service.delete(created.id)

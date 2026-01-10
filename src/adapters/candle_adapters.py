@@ -26,7 +26,7 @@ class UpbitCandleAdapter(CandleDataAdapter):
     """
 
     def to_candle_models(
-            self, df: pd.DataFrame, ticker: str, interval: object
+            self, df: pd.DataFrame, ticker_id: int, interval: object
     ) -> Sequence[CandleBase]:
         """Upbit DataFrame → 캔들 모델 리스트.
 
@@ -39,19 +39,19 @@ class UpbitCandleAdapter(CandleDataAdapter):
             raise TypeError(f"Expected UpbitCandleInterval, got {type(interval)}")
 
         if interval == UpbitCandleInterval.MINUTE_1:
-            return self._df_to_models(df, ticker, CandleMinute1)
+            return self._df_to_models(df, ticker_id, CandleMinute1)
         elif interval == UpbitCandleInterval.DAY:
-            return self._df_to_models(df, ticker, CandleDaily)
+            return self._df_to_models(df, ticker_id, CandleDaily)
         else:
             raise ValueError(f"Unsupported interval: {interval}. Only MINUTE_1 and DAY are supported.")
 
     @staticmethod
-    def _df_to_models(df: pd.DataFrame, ticker: str, model_class: type[T]) -> list[T]:
+    def _df_to_models(df: pd.DataFrame, ticker_id: int, model_class: type[T]) -> list[T]:
         """Upbit DataFrame → 캔들 모델 리스트 (공통 로직).
 
         Args:
             df: Upbit DataFrame
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             model_class: CandleMinute1 또는 CandleDaily 클래스
 
         Returns:
@@ -67,9 +67,9 @@ class UpbitCandleAdapter(CandleDataAdapter):
                 continue
 
             # 인덱스는 KST timezone-aware, DB는 naive datetime을 기대
-            localtime_dt = kst_index.to_pydatetime()  # type: ignore[union-attr]
-            if localtime_dt.tzinfo is not None:
-                localtime_dt = localtime_dt.replace(tzinfo=None)
+            kst_time_dt = kst_index.to_pydatetime()  # type: ignore[union-attr]
+            if kst_time_dt.tzinfo is not None:
+                kst_time_dt = kst_time_dt.replace(tzinfo=None)
 
             # timestamp 컬럼은 UTC timezone-aware
             utc_dt = row.timestamp.to_pydatetime()  # type: ignore[union-attr]
@@ -81,8 +81,8 @@ class UpbitCandleAdapter(CandleDataAdapter):
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
-                        localtime=localtime_dt,
-                        ticker=ticker,
+                        kst_time=kst_time_dt,
+                        ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
                         high=float(row.high),  # type: ignore[arg-type]
                         low=float(row.low),  # type: ignore[arg-type]
@@ -94,8 +94,8 @@ class UpbitCandleAdapter(CandleDataAdapter):
             elif model_class == CandleDaily:
                 models.append(
                     model_class(
-                        date=localtime_dt.date(),
-                        ticker=ticker,
+                        date=kst_time_dt.date(),
+                        ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
                         high=float(row.high),  # type: ignore[arg-type]
                         low=float(row.low),  # type: ignore[arg-type]
@@ -117,7 +117,7 @@ class BinanceCandleAdapter(CandleDataAdapter):
     """
 
     def to_candle_models(
-            self, df: "pd.DataFrame", ticker: str, interval: object
+            self, df: "pd.DataFrame", ticker_id: int, interval: object
     ) -> Sequence[CandleBase]:
         """Binance DataFrame → 캔들 모델 리스트.
 
@@ -130,19 +130,19 @@ class BinanceCandleAdapter(CandleDataAdapter):
             raise TypeError(f"Expected BinanceCandleInterval, got {type(interval)}")
 
         if interval == BinanceInterval.MINUTE_1:
-            return self._to_minute1_models(df, ticker)
+            return self._to_minute1_models(df, ticker_id)
         elif interval == BinanceInterval.DAY_1:
-            return self._to_daily_models(df, ticker)
+            return self._to_daily_models(df, ticker_id)
         else:
             raise ValueError(f"Unsupported interval: {interval}. Only MINUTE_1 and DAY_1 are supported.")
 
     @staticmethod
-    def _df_to_models(df: pd.DataFrame, ticker: str, model_class: type[T]) -> list[T]:
+    def _df_to_models(df: pd.DataFrame, ticker_id: int, model_class: type[T]) -> list[T]:
         """Binance DataFrame → 캔들 모델 리스트 (공통 로직).
 
         Args:
-            df: Binance DataFrame (컬럼: Open, High, Low, Close, Volume, localtime)
-            ticker: 티커
+            df: Binance DataFrame (컬럼: Open, High, Low, Close, Volume, kst_time)
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             model_class: CandleMinute1 또는 CandleDaily 클래스
 
         Returns:
@@ -163,18 +163,18 @@ class BinanceCandleAdapter(CandleDataAdapter):
                 utc_timestamp = timestamp.tz_convert("UTC")  # type: ignore[union-attr]
 
             utc_dt = utc_timestamp.to_pydatetime()  # type: ignore[union-attr]
-            localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+            kst_time_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
             # DB는 naive datetime을 기대하므로 timezone 정보 제거
-            if localtime_dt.tzinfo is not None:
-                localtime_dt = localtime_dt.replace(tzinfo=None)
+            if kst_time_dt.tzinfo is not None:
+                kst_time_dt = kst_time_dt.replace(tzinfo=None)
 
             # CandleMinute1과 CandleDaily를 구분하여 생성
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
                         timestamp=utc_dt,
-                        localtime=localtime_dt,
-                        ticker=ticker,
+                        kst_time=kst_time_dt,
+                        ticker_id=ticker_id,
                         open=float(row.Open),  # type: ignore[arg-type]
                         high=float(row.High),  # type: ignore[arg-type]
                         low=float(row.Low),  # type: ignore[arg-type]
@@ -185,8 +185,8 @@ class BinanceCandleAdapter(CandleDataAdapter):
             elif model_class == CandleDaily:
                 models.append(
                     model_class(
-                        date=localtime_dt.date(),
-                        ticker=ticker,
+                        date=kst_time_dt.date(),
+                        ticker_id=ticker_id,
                         open=float(row.Open),  # type: ignore[arg-type]
                         high=float(row.High),  # type: ignore[arg-type]
                         low=float(row.Low),  # type: ignore[arg-type]
@@ -197,13 +197,13 @@ class BinanceCandleAdapter(CandleDataAdapter):
 
         return models
 
-    def _to_minute1_models(self, df: pd.DataFrame, ticker: str) -> list[CandleMinute1]:
+    def _to_minute1_models(self, df: pd.DataFrame, ticker_id: int) -> list[CandleMinute1]:
         """Binance DataFrame → list[CandleMinute1]."""
-        return self._df_to_models(df, ticker, CandleMinute1)
+        return self._df_to_models(df, ticker_id, CandleMinute1)
 
-    def _to_daily_models(self, df: pd.DataFrame, ticker: str) -> list[CandleDaily]:
+    def _to_daily_models(self, df: pd.DataFrame, ticker_id: int) -> list[CandleDaily]:
         """Binance DataFrame → list[CandleDaily]."""
-        return self._df_to_models(df, ticker, CandleDaily)
+        return self._df_to_models(df, ticker_id, CandleDaily)
 
 
 class HantuCandleAdapter(CandleDataAdapter):
@@ -218,7 +218,7 @@ class HantuCandleAdapter(CandleDataAdapter):
     def to_candle_models(
             self,
             df: "pd.DataFrame",
-            ticker: str,
+            ticker_id: int,
             interval: object,
     ) -> Sequence[CandleBase]:
         """Hantu DataFrame → 캔들 모델 리스트.
@@ -243,20 +243,20 @@ class HantuCandleAdapter(CandleDataAdapter):
 
         # Interval 체크: MIN_1 또는 DAILY만 지원
         if isinstance(interval, OverseasMinuteInterval) and interval == OverseasMinuteInterval.MIN_1:
-            return self._to_minute1_models(df_renamed, ticker)
+            return self._to_minute1_models(df_renamed, ticker_id)
         elif isinstance(interval, OverseasCandlePeriod) and interval == OverseasCandlePeriod.DAILY:
-            return self._to_daily_models(df_renamed, ticker)
+            return self._to_daily_models(df_renamed, ticker_id)
         else:
             raise ValueError(
                 f"Unsupported interval: {interval}. Only OverseasMinuteInterval.MIN_1 and OverseasCandlePeriod.DAILY are supported.")
 
     @staticmethod
-    def _df_to_models(df: pd.DataFrame, ticker: str, model_class: type[T]) -> list[T]:
+    def _df_to_models(df: pd.DataFrame, ticker_id: int, model_class: type[T]) -> list[T]:
         """Hantu DataFrame → 캔들 모델 리스트 (공통 로직).
 
         Args:
-            df: Hantu DataFrame (컬럼: open, high, low, close, volume, localtime - 이미 영어로 rename됨)
-            ticker: 티커
+            df: Hantu DataFrame (컬럼: open, high, low, close, volume, kst_time - 이미 영어로 rename됨)
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             model_class: CandleMinute1 또는 CandleDaily 클래스
 
         Returns:
@@ -274,18 +274,18 @@ class HantuCandleAdapter(CandleDataAdapter):
             utc_timestamp = timestamp.tz_localize("Asia/Seoul").tz_convert("UTC")  # type: ignore[union-attr]
 
             utc_dt = utc_timestamp.to_pydatetime()  # type: ignore[union-attr]
-            localtime_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
+            kst_time_dt = row.localtime.to_pydatetime()  # type: ignore[union-attr]
             # DB는 naive datetime을 기대하므로 timezone 정보 제거
-            if localtime_dt.tzinfo is not None:
-                localtime_dt = localtime_dt.replace(tzinfo=None)
+            if kst_time_dt.tzinfo is not None:
+                kst_time_dt = kst_time_dt.replace(tzinfo=None)
 
             # CandleMinute1과 CandleDaily를 구분하여 생성
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
                         timestamp=utc_dt,
-                        localtime=localtime_dt,
-                        ticker=ticker,
+                        kst_time=kst_time_dt,
+                        ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
                         high=float(row.high),  # type: ignore[arg-type]
                         low=float(row.low),  # type: ignore[arg-type]
@@ -296,8 +296,8 @@ class HantuCandleAdapter(CandleDataAdapter):
             elif model_class == CandleDaily:
                 models.append(
                     model_class(
-                        date=localtime_dt.date(),
-                        ticker=ticker,
+                        date=kst_time_dt.date(),
+                        ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
                         high=float(row.high),  # type: ignore[arg-type]
                         low=float(row.low),  # type: ignore[arg-type]
@@ -308,10 +308,10 @@ class HantuCandleAdapter(CandleDataAdapter):
 
         return models
 
-    def _to_minute1_models(self, df: pd.DataFrame, ticker: str) -> list[CandleMinute1]:
+    def _to_minute1_models(self, df: pd.DataFrame, ticker_id: int) -> list[CandleMinute1]:
         """Hantu DataFrame → list[CandleMinute1]."""
-        return self._df_to_models(df, ticker, CandleMinute1)
+        return self._df_to_models(df, ticker_id, CandleMinute1)
 
-    def _to_daily_models(self, df: pd.DataFrame, ticker: str) -> list[CandleDaily]:
+    def _to_daily_models(self, df: pd.DataFrame, ticker_id: int) -> list[CandleDaily]:
         """Hantu DataFrame → list[CandleDaily]."""
-        return self._df_to_models(df, ticker, CandleDaily)
+        return self._df_to_models(df, ticker_id, CandleDaily)

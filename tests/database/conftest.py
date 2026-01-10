@@ -4,9 +4,11 @@ import pytest
 from sqlalchemy.orm import Session
 
 from src.config import DatabaseConfig
+from src.constants import AssetType
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
 from src.database.exchange_repository import ExchangeRepository
+from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
 
 
@@ -80,3 +82,15 @@ def exchange_repo(session: Session) -> ExchangeRepository:
 def ticker_repo(session: Session) -> TickerRepository:
     """Ticker Repository fixture"""
     return TickerRepository(session)
+
+
+@pytest.fixture
+def sample_ticker(ticker_repo: TickerRepository) -> Ticker:
+    """테스트용 Ticker 엔티티 생성 fixture
+
+    Returns:
+        Ticker: id가 할당된 Ticker 엔티티
+    """
+    ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
+    ticker_repo.save(ticker)
+    return ticker

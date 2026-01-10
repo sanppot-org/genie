@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from src.database.candle_repositories import CandleMinute1Repository
-from src.database.models import CandleMinute1
+from src.database.models import CandleMinute1, Ticker
 from src.service.candle_service import CandleService, CollectMode
 
 
@@ -17,13 +17,14 @@ class TestCollectMinute1CandlesIncrementalMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """DB에 최신 데이터가 있으면 그 이후 데이터만 수집하고 중단한다."""
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            localtime=datetime(2024, 1, 1, 19, 0),
-            ticker="KRW-BTC",
+            kst_time=datetime(2024, 1, 1, 19, 0),
+            ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
             low=49000000,
@@ -51,7 +52,7 @@ class TestCollectMinute1CandlesIncrementalMode:
             mock_api_class.return_value = mock_api
 
             # When: incremental 모드 (기본값)
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC")
+            total_saved = candle_service.collect_minute1_candles(sample_ticker)
 
             # Then: 아무것도 저장하지 않음
             assert total_saved == 0
@@ -62,13 +63,14 @@ class TestCollectMinute1CandlesIncrementalMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """DB 최신보다 새로운 데이터만 수집한다."""
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            localtime=datetime(2024, 1, 1, 19, 0),
-            ticker="KRW-BTC",
+            kst_time=datetime(2024, 1, 1, 19, 0),
+            ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
             low=49000000,
@@ -113,13 +115,13 @@ class TestCollectMinute1CandlesIncrementalMode:
             mock_api_class.return_value = mock_api
 
             # When
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10)
 
             # Then: 새 데이터 1개만 저장됨
             assert total_saved == 1
 
             # DB에 새 캔들이 저장됨
-            latest = minute1_repo.get_latest_candle("KRW-BTC")
+            latest = minute1_repo.get_latest_candle(sample_ticker.id)
             assert latest is not None
             assert latest.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 11, 0, tzinfo=UTC)
 
@@ -127,10 +129,11 @@ class TestCollectMinute1CandlesIncrementalMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """DB에 데이터가 없으면 전체 수집한다."""
         # Given: DB가 비어있음
-        assert minute1_repo.get_latest_candle("KRW-BTC") is None
+        assert minute1_repo.get_latest_candle(sample_ticker.id) is None
 
         # Mock API 응답
         first_batch = pd.DataFrame({
@@ -157,7 +160,7 @@ class TestCollectMinute1CandlesIncrementalMode:
             mock_api_class.return_value = mock_api
 
             # When: incremental 모드 (기본값)
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10)
 
             # Then: 전체 데이터 저장
             assert total_saved == 2
@@ -170,13 +173,14 @@ class TestCollectMinute1CandlesFullSyncMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """mode=CollectMode.FULL일 때 DB 최신 데이터를 무시하고 전체 수집한다."""
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            localtime=datetime(2024, 1, 1, 19, 0),
-            ticker="KRW-BTC",
+            kst_time=datetime(2024, 1, 1, 19, 0),
+            ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
             low=49000000,
@@ -210,7 +214,7 @@ class TestCollectMinute1CandlesFullSyncMode:
             mock_api_class.return_value = mock_api
 
             # When: mode=CollectMode.FULL
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", mode=CollectMode.FULL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.FULL, batch_size=10)
 
             # Then: 오래된 데이터 포함 전체 저장
             assert total_saved == 2
@@ -219,13 +223,14 @@ class TestCollectMinute1CandlesFullSyncMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """FULL 모드는 API가 빈 데이터를 반환할 때까지 계속 수집한다."""
         # Given: DB에 데이터가 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            localtime=datetime(2024, 1, 1, 19, 0),
-            ticker="KRW-BTC",
+            kst_time=datetime(2024, 1, 1, 19, 0),
+            ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
             low=49000000,
@@ -267,7 +272,7 @@ class TestCollectMinute1CandlesFullSyncMode:
             mock_api_class.return_value = mock_api
 
             # When: mode=CollectMode.FULL
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", mode=CollectMode.FULL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.FULL, batch_size=10)
 
             # Then: 모든 배치 수집
             assert total_saved == 2
@@ -282,14 +287,15 @@ class TestCollectMinute1CandlesBackfillMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """BACKFILL 모드는 DB의 가장 오래된 timestamp부터 시작한다."""
         # Given: DB에 캔들이 있음 (10:00, 11:00)
         existing_candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-                localtime=datetime(2024, 1, 1, 19, 0),
-                ticker="KRW-BTC",
+                kst_time=datetime(2024, 1, 1, 19, 0),
+                ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
                 low=49000000,
@@ -298,8 +304,8 @@ class TestCollectMinute1CandlesBackfillMode:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 11, 0, tzinfo=UTC),
-                localtime=datetime(2024, 1, 1, 20, 0),
-                ticker="KRW-BTC",
+                kst_time=datetime(2024, 1, 1, 20, 0),
+                ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
                 low=50000000,
@@ -330,7 +336,7 @@ class TestCollectMinute1CandlesBackfillMode:
             mock_api_class.return_value = mock_api
 
             # When: BACKFILL 모드로 수집
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", mode=CollectMode.BACKFILL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.BACKFILL, batch_size=10)
 
             # Then: 과거 데이터 1개 저장
             assert total_saved == 1
@@ -349,13 +355,14 @@ class TestCollectMinute1CandlesBackfillMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """BACKFILL 모드는 API가 빈 데이터를 반환할 때까지 수집한다."""
         # Given: DB에 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            localtime=datetime(2024, 1, 1, 19, 0),
-            ticker="KRW-BTC",
+            kst_time=datetime(2024, 1, 1, 19, 0),
+            ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
             low=49000000,
@@ -397,7 +404,7 @@ class TestCollectMinute1CandlesBackfillMode:
             mock_api_class.return_value = mock_api
 
             # When: BACKFILL 모드
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", mode=CollectMode.BACKFILL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.BACKFILL, batch_size=10)
 
             # Then: 2개의 과거 데이터 저장
             assert total_saved == 2
@@ -408,10 +415,11 @@ class TestCollectMinute1CandlesBackfillMode:
             self,
             candle_service: CandleService,
             minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
     ):
         """DB가 비어있으면 FULL 모드처럼 동작한다."""
         # Given: DB가 비어있음
-        assert minute1_repo.get_oldest_candle("KRW-BTC") is None
+        assert minute1_repo.get_oldest_candle(sample_ticker.id) is None
 
         # Mock API 응답
         first_batch = pd.DataFrame({
@@ -434,7 +442,7 @@ class TestCollectMinute1CandlesBackfillMode:
             mock_api_class.return_value = mock_api
 
             # When: BACKFILL 모드 (DB 비어있음)
-            total_saved = candle_service.collect_minute1_candles("KRW-BTC", mode=CollectMode.BACKFILL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.BACKFILL, batch_size=10)
 
             # Then: 전체 데이터 저장
             assert total_saved == 1

@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from src.common.data_adapter import DataSource
+from src.database import Ticker
 
 
 class CollectMode(StrEnum):
@@ -62,7 +63,7 @@ class CandleService:
             self,
             df: "pd.DataFrame",
             source: DataSource,
-            ticker: str,
+            ticker_id: int,
             interval: object,
     ) -> None:
         """Raw DataFrame을 정규화하여 DB에 저장.
@@ -70,7 +71,7 @@ class CandleService:
         Args:
             df: 출처의 원본 DataFrame (컬럼명, 타임존 등이 출처마다 다를 수 있음)
             source: 데이터 출처 (DataSource enum)
-            ticker: 종목 코드 (예: "KRW-BTC", "BTCUSDT", "005930")
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             interval: 출처별 interval 타입
                 - Upbit: UpbitCandleInterval
                 - Binance: BinanceCandleInterval
@@ -87,7 +88,7 @@ class CandleService:
             >>> service.save_candles(
             ...     df=df,
             ...     source=DataSource.UPBIT,
-            ...     ticker="KRW-BTC",
+            ...     ticker_id=1,  # Ticker.id
             ...     interval=UpbitCandleInterval.MINUTE_1
             ... )
             >>> print("캔들 저장 완료")
@@ -95,7 +96,7 @@ class CandleService:
         from src.database.models import CandleMinute1
 
         adapter = self._factory.get_adapter(source)
-        candle_models = adapter.to_candle_models(df, ticker, interval)
+        candle_models = adapter.to_candle_models(df, ticker_id, interval)
 
         if not candle_models:
             return
@@ -107,14 +108,14 @@ class CandleService:
 
     def collect_minute1_candles(
             self,
-            ticker: str,
+            ticker: Ticker,
             to: datetime | None = None,
             batch_size: int = 1000,
             mode: CollectMode = CollectMode.INCREMENTAL,
     ) -> int:
         """1분봉 데이터를 수집하여 DB에 저장.
 
-        티커를 받아 데이터를 조회하여 DB에 저장합니다.
+        market과 ticker_id를 받아 데이터를 조회하여 DB에 저장합니다.
 
         수집 모드:
         - INCREMENTAL (기본): DB의 최신 데이터 이후만 수집
@@ -122,7 +123,7 @@ class CandleService:
         - BACKFILL: DB의 가장 오래된 데이터 이전만 수집 (과거 데이터 채우기)
 
         Args:
-            ticker: 종목 코드 (예: "KRW-BTC")
+            ticker: 종목
             to: 마지막으로 캔들을 마감한 시각 (해당 시각 이전 데이터 수집, None이면 현재 시각)
             batch_size: DB 저장 배치 크기 (기본값: 1000)
             mode: 수집 모드 (기본값: CollectMode.INCREMENTAL)
@@ -131,18 +132,18 @@ class CandleService:
             저장된 총 캔들 개수
 
         Raises:
-            ValueError: 잘못된 ticker 또는 batch_size
+            ValueError: 잘못된 market 또는 batch_size
             Exception: API 호출 또는 DB 저장 실패
 
         Example:
             >>> from src.service.candle_service import CollectMode
             >>> service = CandleService(minute1_repo, daily_repo, factory)
             >>> # 증분 수집 (DB 최신 이후 데이터만)
-            >>> total = service.collect_minute1_candles("KRW-BTC")
+            >>> total = service.collect_minute1_candles("KRW-BTC", ticker_id=1)
             >>> # 전체 데이터 재수집
-            >>> total = service.collect_minute1_candles("KRW-BTC", mode=CollectMode.FULL)
+            >>> total = service.collect_minute1_candles("KRW-BTC", ticker_id=1, mode=CollectMode.FULL)
             >>> # 과거 데이터 채우기
-            >>> total = service.collect_minute1_candles("KRW-BTC", mode=CollectMode.BACKFILL)
+            >>> total = service.collect_minute1_candles("KRW-BTC", ticker_id=1, mode=CollectMode.BACKFILL)
             >>> print(f"총 {total}개 캔들 저장 완료")
         """
         import logging
@@ -161,21 +162,21 @@ class CandleService:
         boundary_timestamp: datetime | None = None
 
         if mode == CollectMode.INCREMENTAL:
-            latest = self._minute1_repo.get_latest_candle(ticker)
+            latest = self._minute1_repo.get_latest_candle(ticker.id)
             boundary_timestamp = latest.timestamp if latest else None
             if boundary_timestamp:
-                logger.info(f"Incremental 모드: {boundary_timestamp} 이후 데이터만 수집 (ticker={ticker})")
+                logger.info(f"Incremental 모드: {boundary_timestamp} 이후 데이터만 수집 (market={ticker.ticker})")
             else:
-                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (ticker={ticker})")
+                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
         elif mode == CollectMode.BACKFILL:
-            oldest = self._minute1_repo.get_oldest_candle(ticker)
+            oldest = self._minute1_repo.get_oldest_candle(ticker.id)
             if oldest:
                 to = oldest.timestamp  # BACKFILL: oldest timestamp부터 시작
-                logger.info(f"Backfill 모드: {oldest.timestamp} 이전 데이터만 수집 (ticker={ticker})")
+                logger.info(f"Backfill 모드: {oldest.timestamp} 이전 데이터만 수집 (market={ticker.ticker})")
             else:
-                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (ticker={ticker})")
+                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
         else:  # FULL
-            logger.info(f"Full 모드: 전체 데이터 수집 (ticker={ticker})")
+            logger.info(f"Full 모드: 전체 데이터 수집 (market={ticker.ticker})")
 
         accumulated_candles: list[CandleMinute1] = []
         total_saved = 0
@@ -185,7 +186,7 @@ class CandleService:
         while True:
             try:
                 df = upbit_api.get_candles(
-                    market=ticker,
+                    market=ticker.ticker,
                     interval=UpbitCandleInterval.MINUTE_1,
                     count=batch_size,
                     to=to_date,
@@ -195,7 +196,7 @@ class CandleService:
                 raise
 
             if df.empty:
-                logger.info(f"더 이상 수집할 데이터가 없습니다 (ticker={ticker})")
+                logger.info(f"더 이상 수집할 데이터가 없습니다 (market={ticker.ticker})")
                 break
 
             # INCREMENTAL 모드: DB 최신보다 오래된 데이터 필터링
@@ -209,13 +210,13 @@ class CandleService:
                 )
                 df = df[df["timestamp"] > boundary_ts_aware]
                 if df.empty:
-                    logger.info(f"DB 최신 데이터까지 수집 완료 (ticker={ticker})")
+                    logger.info(f"DB 최신 데이터까지 수집 완료 (market={ticker.ticker})")
                     break
 
-            candle_models = self._factory.get_adapter(DataSource.UPBIT).to_candle_models(df, ticker, UpbitCandleInterval.MINUTE_1)
+            candle_models = self._factory.get_adapter(DataSource.UPBIT).to_candle_models(df, ticker.id, UpbitCandleInterval.MINUTE_1)
 
             if not candle_models:
-                logger.warning(f"변환된 캔들 데이터가 없습니다 (ticker={ticker})")
+                logger.warning(f"변환된 캔들 데이터가 없습니다 (market={ticker.ticker})")
                 break
 
             # 타입 캐스팅: UpbitCandleInterval.MINUTE_1이므로 CandleMinute1 반환 보장
@@ -226,7 +227,7 @@ class CandleService:
             logger.info(
                 f"수집: {len(candle_models)}개, "
                 f"누적: {len(accumulated_candles)}개, "
-                f"다음 기준: {to_date} (ticker={ticker})"
+                f"다음 기준: {to_date} (market={ticker.ticker})"
             )
 
             # 배치 저장
@@ -250,5 +251,5 @@ class CandleService:
                 logger.error(f"최종 DB 저장 실패: {e}")
                 raise
 
-        logger.info(f"1분봉 데이터 수집 완료: 총 {total_saved}개 (ticker={ticker})")
+        logger.info(f"1분봉 데이터 수집 완료: 총 {total_saved}개 (market={ticker.ticker})")
         return total_saved

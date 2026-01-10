@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from src.api.schemas import CollectCandlesRequest, CollectCandlesResponse, GenieResponse
 from src.container import ApplicationContainer
 from src.service.candle_service import CandleService
+from src.service.ticker_service import TickerService
 
 router = APIRouter(tags=["candles"])
 
@@ -15,7 +16,8 @@ router = APIRouter(tags=["candles"])
 @inject
 def collect_minute1_candles(
         request: CollectCandlesRequest,
-        service: CandleService = Depends(Provide[ApplicationContainer.candle_service]),
+        candle_service: CandleService = Depends(Provide[ApplicationContainer.candle_service]),
+        ticker_service: TickerService = Depends(Provide[ApplicationContainer.ticker_service]),
 ) -> GenieResponse[CollectCandlesResponse]:
     """1분봉 데이터 수집
 
@@ -24,16 +26,21 @@ def collect_minute1_candles(
     - FULL: 전체 수집
     - BACKFILL: DB 가장 오래된 이전만 수집
     """
-    total_saved = service.collect_minute1_candles(
-        ticker=request.ticker,
+    # ticker_id로 DB 검증 (없으면 GenieError.not_found 발생)
+    ticker = ticker_service.get_by_id(request.ticker_id)
+
+    total_saved = candle_service.collect_minute1_candles(
+        ticker=ticker,
         to=request.to,
         batch_size=request.batch_size,
         mode=request.mode,
     )
+
     return GenieResponse(
         data=CollectCandlesResponse(
             total_saved=total_saved,
-            ticker=request.ticker,
+            ticker_id=request.ticker_id,
+            ticker=ticker.ticker,
             mode=request.mode,
         )
     )

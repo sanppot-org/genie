@@ -2,8 +2,10 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, Index, Integer, PrimaryKeyConstraint, String, UniqueConstraint
+from sqlalchemy import BigInteger, Date, DateTime, Float, Integer, PrimaryKeyConstraint, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from src.constants import AssetType
 
 
 class Base(DeclarativeBase):
@@ -17,7 +19,7 @@ class CandleBase(Base):
 
     Attributes:
         id: 자동 증가 ID (primary key 아님)
-        ticker: 티커 (예: KRW-BTC)
+        ticker_id: 티커 (예: KRW-BTC)
         open: 시가
         high: 고가
         low: 저가
@@ -32,8 +34,8 @@ class CandleBase(Base):
 
     __abstract__ = True  # 추상 클래스로 설정 (테이블 생성 안 함)
 
-    id: Mapped[int | None] = mapped_column(Integer, autoincrement=True, nullable=True)
-    ticker: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    id: Mapped[int | None] = mapped_column(BigInteger, autoincrement=True, nullable=True)
+    ticker_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     open: Mapped[float] = mapped_column(Float, nullable=False)
     high: Mapped[float] = mapped_column(Float, nullable=False)
     low: Mapped[float] = mapped_column(Float, nullable=False)
@@ -46,27 +48,45 @@ class CandleMinute1(CandleBase):
 
     Attributes:
         timestamp: 캔들 시각 (UTC, timezone-aware)
-        localtime: 캔들 시각 (KST, naive datetime)
+        kst_time: 캔들 시각 (KST, naive datetime)
     """
 
     __tablename__ = "candle_minute_1"
 
+    kst_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    localtime: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
     __table_args__ = (
-        PrimaryKeyConstraint("localtime", "ticker"),
-        UniqueConstraint("localtime", "ticker", name="uix_minute1_localtime_ticker"),
-        Index("idx_minute1_ticker_localtime", "ticker", "localtime"),
+        PrimaryKeyConstraint("kst_time", "ticker_id"),
     )
 
     def __repr__(self) -> str:
         """문자열 표현"""
-        return f"<CandleMinute1(ticker={self.ticker}, timestamp={self.timestamp}, close={self.close})>"
+        return f"<CandleMinute1(ticker_id={self.ticker_id}, timestamp={self.timestamp}, close={self.close})>"
+
+
+class CandleHour1(CandleBase):
+    """1시간봉 캔들 데이터 모델 (MATERIALIZED VIEW - 읽기 전용)
+
+    Attributes:
+        kst_time: 캔들 시각 (KST, naive datetime)
+    """
+
+    __tablename__ = "candle_hour_1"
+
+    kst_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+
+    __table_args__ = (
+        PrimaryKeyConstraint("kst_time", "ticker_id"),
+    )
+
+    def __repr__(self) -> str:
+        """문자열 표현"""
+        return f"<CandleHour1(ticker_id={self.ticker_id}, kst_time={self.kst_time}, close={self.close})>"
 
 
 class CandleDaily(CandleBase):
-    """일봉 캔들 데이터 모델
+    """일봉 캔들 데이터 모델 (MATERIALIZED VIEW - 읽기 전용)
 
     Attributes:
         date: 캔들 날짜 (timezone 없음)
@@ -77,14 +97,12 @@ class CandleDaily(CandleBase):
     date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
 
     __table_args__ = (
-        PrimaryKeyConstraint("date", "ticker"),
-        UniqueConstraint("date", "ticker", name="uix_daily_date_ticker"),
-        Index("idx_daily_ticker_date", "ticker", "date"),
+        PrimaryKeyConstraint("date", "ticker_id"),
     )
 
     def __repr__(self) -> str:
         """문자열 표현"""
-        return f"<CandleDaily(ticker={self.ticker}, date={self.date}, close={self.close})>"
+        return f"<CandleDaily(ticker_id={self.ticker_id}, date={self.date}, close={self.close})>"
 
 
 class Exchange(Base):
@@ -120,7 +138,7 @@ class Ticker(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
-    asset_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    asset_type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
 
     def __repr__(self) -> str:
         """문자열 표현"""

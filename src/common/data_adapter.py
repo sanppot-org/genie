@@ -38,7 +38,7 @@ class CandleDataAdapter(ABC):
 
     @abstractmethod
     def to_candle_models(
-            self, df: "pd.DataFrame", ticker: str, interval: object
+            self, df: "pd.DataFrame", ticker_id: int, interval: object
     ) -> Sequence["CandleBase"]:
         """Raw DataFrame을 캔들 모델 리스트로 변환.
 
@@ -48,7 +48,7 @@ class CandleDataAdapter(ABC):
 
         Args:
             df: 출처에서 받은 원본 DataFrame
-            ticker: 종목 코드 (예: "KRW-BTC", "BTCUSDT")
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             interval: 출처별 interval 타입
                 - Upbit: UpbitCandleInterval
                 - Binance: BinanceCandleInterval

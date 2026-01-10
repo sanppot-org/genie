@@ -44,7 +44,7 @@ class GenieResponse[T](BaseModel):
 class CollectCandlesRequest(BaseModel):
     """1분봉 수집 요청"""
 
-    ticker: str
+    ticker_id: int
     to: datetime | None = None
     batch_size: int = 1000
     mode: CollectMode = CollectMode.INCREMENTAL
@@ -54,5 +54,6 @@ class CollectCandlesResponse(BaseModel):
     """1분봉 수집 응답"""
 
     total_saved: int
+    ticker_id: int
     ticker: str
     mode: CollectMode

@@ -8,7 +8,6 @@ Create Date: 2025-01-09 00:00:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -28,10 +27,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('name', name='uix_exchange_name'),
     )
-    op.create_index(op.f('ix_exchanges_name'), 'exchanges', ['name'])
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_index(op.f('ix_exchanges_name'), table_name='exchanges')
     op.drop_table('exchanges')

@@ -1,18 +1,22 @@
 """Pytest fixtures for service tests."""
-
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy.orm import Session
 
 from src.adapters.adapter_factory import CandleAdapterFactory
+from src.constants import AssetType
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
+from src.database.models import Ticker
+from src.database.ticker_repository import TickerRepository
 from src.service.candle_service import CandleService
 
 
 @pytest.fixture
-def db() -> Database:
+def db() -> Generator[Database, Any, None]:
     """테스트용 데이터베이스 (SQLite 인메모리)"""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -33,7 +37,7 @@ def db() -> Database:
 
 
 @pytest.fixture
-def session(db: Database) -> Session:
+def session(db: Database) -> Generator[Session, Any, None]:
     """테스트용 세션"""
     session = db.get_session()
     yield session
@@ -72,3 +76,21 @@ def candle_service(
 def mock_upbit_api() -> MagicMock:
     """Mock UpbitAPI fixture"""
     return MagicMock()
+
+
+@pytest.fixture
+def ticker_repo(session: Session) -> TickerRepository:
+    """Ticker Repository fixture"""
+    return TickerRepository(session)
+
+
+@pytest.fixture
+def sample_ticker(ticker_repo: TickerRepository) -> Ticker:
+    """테스트용 Ticker 엔티티 생성 fixture
+
+    Returns:
+        Ticker: id가 할당된 Ticker 엔티티
+    """
+    ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
+    ticker_repo.save(ticker)
+    return ticker

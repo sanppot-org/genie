@@ -18,14 +18,14 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
     @abstractmethod
     def get_candles(
             self,
-            ticker: str,
+            ticker_id: int,
             start_datetime: datetime | None = None,
             end_datetime: datetime | None = None,
     ) -> list[T]:
         """캔들 데이터 조회
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             start_datetime: 시작 시각
             end_datetime: 종료 시각
 
@@ -35,11 +35,11 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
         pass
 
     @abstractmethod
-    def get_latest_candle(self, ticker: str) -> T | None:
+    def get_latest_candle(self, ticker_id: int) -> T | None:
         """최신 캔들 데이터 조회
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
 
         Returns:
             최신 캔들 또는 None
@@ -47,11 +47,11 @@ class BaseCandleRepository[T](BaseRepository[T, int], ABC):
         pass
 
     @abstractmethod
-    def get_oldest_candle(self, ticker: str) -> T | None:
+    def get_oldest_candle(self, ticker_id: int) -> T | None:
         """가장 오래된 캔들 데이터 조회
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
 
         Returns:
             가장 오래된 캔들 또는 None
@@ -88,21 +88,21 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         """Unique constraint 필드 반환
 
         Returns:
-            (localtime, ticker)
+            (kst_time, ticker_id)
         """
-        return "localtime", "ticker"
+        return "kst_time", "ticker_id"
 
     @override
     def get_candles(
             self,
-            ticker: str,
+            ticker_id: int,
             start_datetime: datetime | None = None,
             end_datetime: datetime | None = None,
     ) -> list[CandleMinute1]:
         """캔들 데이터 조회
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             start_datetime: 시작 시각 (기본값: 현재로부터 1일 전)
             end_datetime: 종료 시각 (기본값: 현재 시각)
 
@@ -117,7 +117,7 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         return (
             self.session.query(CandleMinute1)
             .filter(
-                CandleMinute1.ticker == ticker,
+                CandleMinute1.ticker_id == ticker_id,
                 CandleMinute1.timestamp >= start_datetime,
                 CandleMinute1.timestamp <= end_datetime,
             )
@@ -126,35 +126,35 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         )
 
     @override
-    def get_latest_candle(self, ticker: str) -> CandleMinute1 | None:
+    def get_latest_candle(self, ticker_id: int) -> CandleMinute1 | None:
         """최신 캔들 데이터 조회
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
 
         Returns:
             최신 캔들 또는 None
         """
         return (
             self.session.query(CandleMinute1)
-            .filter(CandleMinute1.ticker == ticker)
+            .filter(CandleMinute1.ticker_id == ticker_id)
             .order_by(CandleMinute1.timestamp.desc())
             .first()
         )
 
     @override
-    def get_oldest_candle(self, ticker: str) -> CandleMinute1 | None:
+    def get_oldest_candle(self, ticker_id: int) -> CandleMinute1 | None:
         """가장 오래된 캔들 데이터 조회
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
 
         Returns:
             가장 오래된 캔들 또는 None
         """
         return (
             self.session.query(CandleMinute1)
-            .filter(CandleMinute1.ticker == ticker)
+            .filter(CandleMinute1.ticker_id == ticker_id)
             .order_by(CandleMinute1.timestamp.asc())
             .first()
         )
@@ -167,7 +167,7 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         여러 레코드를 삽입하거나 업데이트합니다.
 
         Note:
-            동일한 (localtime, ticker) 조합의 중복 데이터는 마지막 값만 사용됩니다.
+            동일한 (kst_time, ticker_id) 조합의 중복 데이터는 마지막 값만 사용됩니다.
 
         Args:
             entities: 저장할 캔들 리스트
@@ -178,12 +178,12 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
             return
 
         # 딕셔너리로 중복 제거 (동일 키는 마지막 값으로 덮어씀)
-        unique_map: dict[tuple[datetime, str], dict] = {}
+        unique_map: dict[tuple[datetime, int], dict] = {}
         for e in entities:
-            key = (e.localtime, e.ticker)
+            key = (e.kst_time, e.ticker_id)
             unique_map[key] = {
-                "localtime": e.localtime,
-                "ticker": e.ticker,
+                "kst_time": e.kst_time,
+                "ticker_id": e.ticker_id,
                 "open": e.open,
                 "high": e.high,
                 "low": e.low,
@@ -197,7 +197,7 @@ class CandleMinute1Repository(BaseCandleRepository[CandleMinute1]):
         # INSERT ... ON CONFLICT DO UPDATE
         stmt = insert(CandleMinute1).values(values)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["localtime", "ticker"],
+            index_elements=["kst_time", "ticker_id"],
             set_={
                 "open": stmt.excluded.open,
                 "high": stmt.excluded.high,
@@ -232,21 +232,21 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         """Unique constraint 필드 반환
 
         Returns:
-            (date, ticker)
+            (date, ticker_id)
         """
-        return "date", "ticker"
+        return "date", "ticker_id"
 
     @override
     def get_candles(
             self,
-            ticker: str,
+            ticker_id: int,
             start_datetime: datetime | None = None,
             end_datetime: datetime | None = None,
     ) -> list[CandleDaily]:
         """캔들 데이터 조회 (일봉은 date 필드 사용)
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
             start_datetime: 시작 시각 (날짜로 변환됨, 기본값: 현재로부터 1일 전)
             end_datetime: 종료 시각 (날짜로 변환됨, 기본값: 현재 시각)
 
@@ -264,7 +264,7 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         return (
             self.session.query(CandleDaily)
             .filter(
-                CandleDaily.ticker == ticker,
+                CandleDaily.ticker_id == ticker_id,
                 CandleDaily.date >= start_date,
                 CandleDaily.date <= end_date,
             )
@@ -273,35 +273,35 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         )
 
     @override
-    def get_latest_candle(self, ticker: str) -> CandleDaily | None:
+    def get_latest_candle(self, ticker_id: int) -> CandleDaily | None:
         """최신 캔들 데이터 조회 (일봉은 date 필드 사용)
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
 
         Returns:
             최신 캔들 또는 None
         """
         return (
             self.session.query(CandleDaily)
-            .filter(CandleDaily.ticker == ticker)
+            .filter(CandleDaily.ticker_id == ticker_id)
             .order_by(CandleDaily.date.desc())
             .first()
         )
 
     @override
-    def get_oldest_candle(self, ticker: str) -> CandleDaily | None:
+    def get_oldest_candle(self, ticker_id: int) -> CandleDaily | None:
         """가장 오래된 캔들 데이터 조회 (일봉은 date 필드 사용)
 
         Args:
-            ticker: 티커
+            ticker_id: 티커 ID (Ticker 테이블의 PK)
 
         Returns:
             가장 오래된 캔들 또는 None
         """
         return (
             self.session.query(CandleDaily)
-            .filter(CandleDaily.ticker == ticker)
+            .filter(CandleDaily.ticker_id == ticker_id)
             .order_by(CandleDaily.date.asc())
             .first()
         )
@@ -314,7 +314,7 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         여러 레코드를 삽입하거나 업데이트합니다.
 
         Note:
-            동일한 (date, ticker) 조합의 중복 데이터는 마지막 값만 사용됩니다.
+            동일한 (date, ticker_id) 조합의 중복 데이터는 마지막 값만 사용됩니다.
 
         Args:
             entities: 저장할 캔들 리스트
@@ -326,12 +326,12 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
 
         # 딕셔너리로 중복 제거 (동일 키는 마지막 값으로 덮어씀)
         from datetime import date
-        unique_map: dict[tuple[date, str], dict] = {}
+        unique_map: dict[tuple[date, int], dict] = {}
         for e in entities:
-            key = (e.date, e.ticker)
+            key = (e.date, e.ticker_id)
             unique_map[key] = {
                 "date": e.date,
-                "ticker": e.ticker,
+                "ticker_id": e.ticker_id,
                 "open": e.open,
                 "high": e.high,
                 "low": e.low,
@@ -344,7 +344,7 @@ class CandleDailyRepository(BaseCandleRepository[CandleDaily]):
         # INSERT ... ON CONFLICT DO UPDATE
         stmt = insert(CandleDaily).values(values)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["date", "ticker"],
+            index_elements=["date", "ticker_id"],
             set_={
                 "open": stmt.excluded.open,
                 "high": stmt.excluded.high,

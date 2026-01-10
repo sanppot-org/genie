@@ -3,9 +3,9 @@
 from datetime import datetime
 
 import pandas as pd
-from pandera.typing import DataFrame
 import pytest
 import pytz
+from pandera.typing import DataFrame
 
 from src.adapters.candle_adapters import UpbitCandleAdapter
 from src.database.models import CandleDaily, CandleMinute1
@@ -101,11 +101,11 @@ def test_to_candle_models_with_valid_data(
 ) -> None:
     """유효한 DataFrame을 CandleMinute1 또는 CandleDaily로 정상 변환하는지 테스트합니다."""
     # Given
-    ticker = "KRW-BTC"
+    ticker_id = 1  # 정수 ticker_id 사용
     interval = UpbitInterval.MINUTE_1  # 1분봉 사용 (지원되는 interval)
 
     # When
-    result = upbit_adapter.to_candle_models(sample_candle_df, ticker, interval)
+    result = upbit_adapter.to_candle_models(sample_candle_df, ticker_id, interval)
 
     # Then
     assert len(result) == 3
@@ -113,7 +113,7 @@ def test_to_candle_models_with_valid_data(
 
     # 첫 번째 캔들 데이터 검증
     first_candle = result[0]
-    assert first_candle.ticker == ticker
+    assert first_candle.ticker_id == ticker_id
     assert first_candle.open == 100.0
     assert first_candle.high == 110.0
     assert first_candle.low == 90.0
@@ -125,10 +125,10 @@ def test_to_candle_models_with_valid_data(
     assert first_candle.timestamp == expected_time
     assert first_candle.timestamp.tzinfo is not None
 
-    # localtime은 KST naive datetime (인덱스에서 변환)
-    expected_localtime = datetime(2024, 1, 1, 18, 0, 0)
-    assert first_candle.localtime == expected_localtime
-    assert first_candle.localtime.tzinfo is None
+    # kst_time은 KST naive datetime (인덱스에서 변환)
+    expected_kst_time = datetime(2024, 1, 1, 18, 0, 0)
+    assert first_candle.kst_time == expected_kst_time
+    assert first_candle.kst_time.tzinfo is None
 
 
 def test_to_candle_models_with_empty_dataframe(
@@ -136,11 +136,11 @@ def test_to_candle_models_with_empty_dataframe(
 ) -> None:
     """빈 DataFrame을 빈 리스트로 변환하는지 테스트합니다."""
     # Given
-    ticker = "KRW-BTC"
+    ticker_id = 1
     interval = UpbitInterval.MINUTE_1
 
     # When
-    result = upbit_adapter.to_candle_models(empty_candle_df, ticker, interval)
+    result = upbit_adapter.to_candle_models(empty_candle_df, ticker_id, interval)
 
     # Then
     assert result == []
@@ -151,12 +151,12 @@ def test_to_candle_models_with_invalid_interval_type(
 ) -> None:
     """잘못된 interval 타입을 전달하면 TypeError가 발생하는지 테스트합니다."""
     # Given
-    ticker = "KRW-BTC"
+    ticker_id = 1
     invalid_interval = "invalid_interval"  # 문자열은 UpbitInterval이 아님
 
     # When & Then
     with pytest.raises(TypeError, match="Expected UpbitCandleInterval"):
-        upbit_adapter.to_candle_models(sample_candle_df, ticker, invalid_interval)
+        upbit_adapter.to_candle_models(sample_candle_df, ticker_id, invalid_interval)
 
 
 def test_to_candle_models_skips_nat_values(
@@ -164,11 +164,11 @@ def test_to_candle_models_skips_nat_values(
 ) -> None:
     """NaT 값을 포함한 DataFrame에서 NaT 행을 스킵하고 유효한 행만 변환하는지 테스트합니다."""
     # Given
-    ticker = "KRW-BTC"
+    ticker_id = 1
     interval = UpbitInterval.DAY
 
     # When
-    result = upbit_adapter.to_candle_models(candle_df_with_nat, ticker, interval)
+    result = upbit_adapter.to_candle_models(candle_df_with_nat, ticker_id, interval)
 
     # Then
     # NaT 행은 스킵되므로 2개만 반환되어야 함
@@ -184,17 +184,17 @@ def test_timezone_preserved_as_utc_aware(
 ) -> None:
     """timestamp(UTC)와 인덱스(KST)가 올바르게 변환되는지 테스트합니다."""
     # Given
-    ticker = "KRW-BTC"
+    ticker_id = 1
     interval = UpbitInterval.MINUTE_1
 
     # When
-    result = upbit_adapter.to_candle_models(sample_candle_df, ticker, interval)
+    result = upbit_adapter.to_candle_models(sample_candle_df, ticker_id, interval)
 
     # Then
     # timestamp 컬럼(UTC aware) → timestamp 필드(UTC aware, 변환 없이 유지)
-    # 인덱스(KST aware) → localtime 필드(KST naive)
+    # 인덱스(KST aware) → kst_time 필드(KST naive)
     # UTC 2024-01-01 09:00:00+00:00 (aware) → timestamp 필드
-    # KST 2024-01-01 18:00:00+09:00 (aware) → localtime 필드 (2024-01-01 18:00:00, naive)
+    # KST 2024-01-01 18:00:00+09:00 (aware) → kst_time 필드 (2024-01-01 18:00:00, naive)
 
     expected_times = [
         datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC),
@@ -202,7 +202,7 @@ def test_timezone_preserved_as_utc_aware(
         datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC),
     ]
 
-    expected_localtimes = [
+    expected_kst_times = [
         datetime(2024, 1, 1, 18, 0, 0),  # KST (인덱스에서 변환)
         datetime(2024, 1, 1, 19, 0, 0),  # KST (인덱스에서 변환)
         datetime(2024, 1, 1, 20, 0, 0),  # KST (인덱스에서 변환)
@@ -211,8 +211,8 @@ def test_timezone_preserved_as_utc_aware(
     for i, candle in enumerate(result):
         assert candle.timestamp == expected_times[i]
         assert candle.timestamp.tzinfo is not None  # timezone-aware datetime 확인
-        assert candle.localtime == expected_localtimes[i]
-        assert candle.localtime.tzinfo is None  # naive datetime 확인
+        assert candle.kst_time == expected_kst_times[i]
+        assert candle.kst_time.tzinfo is None  # naive datetime 확인
 
 
 @pytest.mark.parametrize(
@@ -230,10 +230,10 @@ def test_interval_conversion(
 ) -> None:
     """UpbitInterval이 적절한 모델 타입(CandleMinute1 또는 CandleDaily)으로 변환되는지 테스트합니다."""
     # Given
-    ticker = "KRW-BTC"
+    ticker_id = 1
 
     # When
-    result = upbit_adapter.to_candle_models(sample_candle_df, ticker, upbit_interval)
+    result = upbit_adapter.to_candle_models(sample_candle_df, ticker_id, upbit_interval)
 
     # Then
     assert all(isinstance(candle, expected_model_type) for candle in result)
