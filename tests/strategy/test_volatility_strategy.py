@@ -23,6 +23,7 @@ def mock_config():
     config.total_balance = 1000000
     config.allocated_balance = 100000
     config.target_vol = 0.05
+    config.min_order_amount = 5000.0
     return config
 
 
@@ -156,8 +157,12 @@ class TestVolatilityStrategyExecute:
         execution_result.executed_volume = 0.3
         mock_order_executor.sell.return_value = execution_result
 
-        # When: execute 호출
-        volatility_strategy.execute()
+        # Mock 현재가: 0.7 BTC * 50,000,000원 = 35,000,000원 > min_order_amount
+        with patch("src.strategy.volatility_strategy.UpbitAPI.get_current_price") as mock_price:
+            mock_price.return_value = 50000000
+
+            # When: execute 호출
+            volatility_strategy.execute()
 
         # Then: 매도 주문 실행됨
         mock_order_executor.sell.assert_called_once_with("KRW-BTC", initial_volume, strategy_name="volatility")
@@ -173,6 +178,40 @@ class TestVolatilityStrategyExecute:
         assert saved_cache.execution_volume == 0.7  # 1.0 - 0.3
         assert saved_cache.position_size == 1.0
         assert saved_cache.threshold == 50500000
+
+    def test_execute_sell_remaining_below_min_order_amount_should_delete_cache(self, volatility_strategy, mock_order_executor, mock_clock, mock_cache_manager, mock_config):
+        """매도 후 남은 금액이 최소 주문 금액 미만이면 캐시를 삭제한다"""
+        # Given: 보유 수량 0.001 BTC, 부분 체결 후 0.0001 BTC 남음
+        mock_clock.is_morning.return_value = False
+        import datetime as dt
+        mock_clock.today.return_value = dt.date(2024, 1, 1)
+
+        from src.strategy.cache.cache_models import VolatilityStrategyCacheData
+
+        initial_volume = 0.001
+        mock_cache = VolatilityStrategyCacheData(
+            execution_volume=initial_volume,
+            last_run_date=dt.date(2024, 1, 1),
+            position_size=1.0,
+            threshold=50500000,
+        )
+        mock_cache_manager.load_strategy_cache.return_value = mock_cache
+
+        # Mock ExecutionResult: 0.0009 BTC 체결, 0.0001 BTC 남음
+        execution_result = Mock(spec=ExecutionResult)
+        execution_result.executed_volume = 0.0009
+        mock_order_executor.sell.return_value = execution_result
+
+        # Mock 현재가: 0.0001 BTC * 40,000,000원 = 4,000원 < min_order_amount(5,000원)
+        with patch("src.strategy.volatility_strategy.UpbitAPI.get_current_price") as mock_price:
+            mock_price.return_value = 40000000
+
+            # When: execute 호출
+            volatility_strategy.execute()
+
+        # Then: 남은 금액(4,000원)이 최소 주문 금액(5,000원) 미만이므로 캐시 삭제
+        mock_cache_manager.delete_strategy_cache.assert_called_once_with("KRW-BTC", "volatility")
+        mock_cache_manager.save_strategy_cache.assert_not_called()
 
     def test_execute_sell_no_fill_should_keep_cache(self, volatility_strategy, mock_order_executor, mock_clock, mock_cache_manager):
         """매도 미체결 시 캐시를 유지한다"""

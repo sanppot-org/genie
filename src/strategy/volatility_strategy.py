@@ -19,7 +19,6 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
         """변동성 돌파 전략을 실행합니다."""
         if self._clock.is_morning():
             self._buy()
-
         else:
             self._sell()
 
@@ -53,6 +52,18 @@ class VolatilityStrategy(BaseStrategy[VolatilityStrategyCacheData]):
             remaining_volume = cache.execution_volume - result.executed_volume
 
             if remaining_volume <= 0:
+                self._delete_strategy_cache()
+                return
+
+            # 남은 금액이 최소 주문 금액 미만이면 캐시 삭제
+            current_price = UpbitAPI.get_current_price(self._config.ticker)
+            remaining_amount = remaining_volume * current_price
+
+            if remaining_amount < self._config.min_order_amount:
+                logger.warning(
+                    f"남은 수량({remaining_volume})의 금액({remaining_amount:,.0f}원)이 "
+                    f"최소 주문 금액({self._config.min_order_amount:,.0f}원) 미달. 캐시 삭제."
+                )
                 self._delete_strategy_cache()
                 return
 
