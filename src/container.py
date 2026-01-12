@@ -15,7 +15,7 @@ from src.common.slack.client import SlackClient
 from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST
 from src.database.database import Database
-from src.database.repositories import CandleDailyRepository, CandleMinute1Repository
+from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI
 from src.report.reporter import Reporter
@@ -62,6 +62,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     # Database
     database = providers.Singleton(Database, database_config)
     candle_minute1_repository = providers.Factory(CandleMinute1Repository, session=database.provided.get_session.call())
+    candle_hour1_repository = providers.Factory(CandleHour1Repository, session=database.provided.get_session.call())
     candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
     ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
 

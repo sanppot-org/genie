@@ -1,6 +1,6 @@
 """Database module for TimescaleDB integration."""
 
-from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
+from src.database.candle_repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.database import Database
 from src.database.exchange_repository import ExchangeRepository
 from src.database.models import Base, CandleDaily, CandleMinute1, Exchange, Ticker
@@ -13,6 +13,7 @@ __all__ = [
     "CandleDaily",
     "Ticker",
     "CandleMinute1Repository",
+    "CandleHour1Repository",
     "CandleDailyRepository",
     "TickerRepository",
     "Exchange",

@@ -34,7 +34,6 @@ class CandleBase(Base):
 
     __abstract__ = True  # 추상 클래스로 설정 (테이블 생성 안 함)
 
-    id: Mapped[int | None] = mapped_column(BigInteger, autoincrement=True, nullable=True)
     ticker_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     open: Mapped[float] = mapped_column(Float, nullable=False)
     high: Mapped[float] = mapped_column(Float, nullable=False)
@@ -53,6 +52,7 @@ class CandleMinute1(CandleBase):
 
     __tablename__ = "candle_minute_1"
 
+    id: Mapped[int | None] = mapped_column(BigInteger, autoincrement=True, nullable=True)
     kst_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 

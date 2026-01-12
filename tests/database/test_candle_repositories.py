@@ -353,7 +353,8 @@ class TestCandleDailyRepository:
                 volume=1500.2,
             ),
         ]
-        daily_repo.bulk_upsert(candles)
+        daily_repo.session.add_all(candles)
+        daily_repo.session.commit()
 
         # When
         result = daily_repo.get_candles(
@@ -392,7 +393,8 @@ class TestCandleDailyRepository:
                 volume=1200.3,
             ),
         ]
-        daily_repo.bulk_upsert(candles)
+        daily_repo.session.add_all(candles)
+        daily_repo.session.commit()
 
         # When
         result = daily_repo.get_latest_candle(sample_ticker.id)
@@ -437,7 +439,8 @@ class TestCandleDailyRepository:
                 volume=1200.3,
             ),
         ]
-        daily_repo.bulk_upsert(candles)
+        daily_repo.session.add_all(candles)
+        daily_repo.session.commit()
 
         # When
         result = daily_repo.get_oldest_candle(sample_ticker.id)
@@ -456,81 +459,6 @@ class TestCandleDailyRepository:
 
         # Then
         assert result is None
-
-    def test_bulk_upsert_inserts_new_candles(
-            self, daily_repo: CandleDailyRepository, sample_ticker: Ticker
-    ):
-        """bulk_upsert로 새 캔들 삽입."""
-        # Given
-        candles = [
-            CandleDaily(
-                date=datetime(2024, 1, 1).date(),
-                ticker_id=sample_ticker.id,
-                open=50000000,
-                high=52000000,
-                low=49000000,
-                close=51000000,
-                volume=1000.5,
-            ),
-            CandleDaily(
-                date=datetime(2024, 1, 2).date(),
-                ticker_id=sample_ticker.id,
-                open=51000000,
-                high=53000000,
-                low=50000000,
-                close=52000000,
-                volume=1200.3,
-            ),
-        ]
-
-        # When
-        daily_repo.bulk_upsert(candles)
-
-        # Then
-        result = daily_repo.get_candles(
-            ticker_id=sample_ticker.id,
-            start_datetime=datetime(2024, 1, 1, tzinfo=UTC),
-            end_datetime=datetime(2024, 1, 2, tzinfo=UTC),
-        )
-        assert len(result) == 2
-
-    def test_bulk_upsert_updates_existing_candles(
-            self, daily_repo: CandleDailyRepository, sample_ticker: Ticker
-    ):
-        """bulk_upsert로 기존 캔들 업데이트."""
-        # Given
-        existing = [
-            CandleDaily(
-                date=datetime(2024, 1, 1).date(),
-                ticker_id=sample_ticker.id,
-                open=50000000,
-                high=52000000,
-                low=49000000,
-                close=51000000,
-                volume=1000.5,
-            )
-        ]
-        daily_repo.bulk_upsert(existing)
-
-        updated_candle = CandleDaily(
-            date=datetime(2024, 1, 1).date(),
-            ticker_id=sample_ticker.id,
-            open=50000000,
-            high=54000000,  # 변경
-            low=49000000,
-            close=53000000,  # 변경
-            volume=1500.0,  # 변경
-        )
-
-        # When
-        daily_repo.bulk_upsert([updated_candle])
-
-        # Then
-        result = daily_repo.get_latest_candle(sample_ticker.id)
-        assert result is not None
-        assert result.high == 54000000
-        assert result.close == 53000000
-        assert result.volume == 1500.0
 
     def test_get_candles_with_default_dates(
             self, daily_repo: CandleDailyRepository, sample_ticker: Ticker
@@ -559,7 +487,8 @@ class TestCandleDailyRepository:
                 volume=1200.3,
             ),
         ]
-        daily_repo.bulk_upsert(candles)
+        daily_repo.session.add_all(candles)
+        daily_repo.session.commit()
 
         # When - start_date, end_date를 지정하지 않음
         result = daily_repo.get_candles(ticker_id=sample_ticker.id)
@@ -568,39 +497,3 @@ class TestCandleDailyRepository:
         assert len(result) == 2
         assert result[0].ticker_id == sample_ticker.id
         assert result[1].ticker_id == sample_ticker.id
-
-    def test_bulk_upsert_handles_duplicate_entries(
-            self, daily_repo: CandleDailyRepository, sample_ticker: Ticker
-    ):
-        """bulk_upsert로 중복 데이터 처리 (마지막 값 사용)."""
-        # Given - 동일한 (date, ticker_id) 조합의 중복 데이터
-        candles = [
-            CandleDaily(
-                date=datetime(2024, 1, 1).date(),
-                ticker_id=sample_ticker.id,
-                open=50000000,
-                high=52000000,
-                low=49000000,
-                close=51000000,
-                volume=1000.5,
-            ),
-            CandleDaily(
-                date=datetime(2024, 1, 1).date(),  # 중복!
-                ticker_id=sample_ticker.id,
-                open=50000000,
-                high=54000000,  # 다른 값
-                low=49000000,
-                close=53000000,  # 다른 값
-                volume=1500.0,  # 다른 값
-            ),
-        ]
-
-        # When - 오류 없이 처리됨
-        daily_repo.bulk_upsert(candles)
-
-        # Then - 마지막 값이 저장됨
-        result = daily_repo.get_latest_candle(sample_ticker.id)
-        assert result is not None
-        assert result.high == 54000000
-        assert result.close == 53000000
-        assert result.volume == 1500.0

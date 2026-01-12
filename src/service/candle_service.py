@@ -104,7 +104,10 @@ class CandleService:
         if isinstance(candle_models[0], CandleMinute1):
             self._minute1_repo.bulk_upsert(candle_models)  # type: ignore[arg-type]
         else:
-            self._daily_repo.bulk_upsert(candle_models)  # type: ignore[arg-type]
+            raise NotImplementedError(
+                "1분봉 외의 캔들 데이터 저장은 지원하지 않습니다. "
+                "(CandleHour1, CandleDaily는 MATERIALIZED VIEW입니다.)"
+            )
 
     def collect_minute1_candles(
             self,

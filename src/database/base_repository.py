@@ -5,8 +5,10 @@ from abc import ABC, abstractmethod
 from sqlalchemy.orm import Session
 
 
-class BaseRepository[T, ID](ABC):
-    """Base repository providing common CRUD operations.
+class ReadOnlyRepository[T, ID](ABC):
+    """읽기 전용 Repository 베이스 클래스.
+
+    MATERIALIZED VIEW 등 쓰기가 불가능한 데이터 소스를 위한 베이스 클래스입니다.
 
     Type parameters:
         T: Entity type
@@ -28,6 +30,36 @@ class BaseRepository[T, ID](ABC):
         Returns:
             Model class type
         """
+
+    def find_by_id(self, entity_id: ID) -> T | None:
+        """Find entity by ID.
+
+        Args:
+            entity_id: Primary key value
+
+        Returns:
+            Entity if found, None otherwise
+        """
+        return self.session.query(self._get_model_class()).filter_by(id=entity_id).first()
+
+    def find_all(self) -> list[T]:
+        """Find all entities.
+
+        Returns:
+            List of all entities
+        """
+        return self.session.query(self._get_model_class()).all()
+
+
+class BaseRepository[T, ID](ReadOnlyRepository[T, ID], ABC):
+    """읽기/쓰기 가능한 Repository 베이스 클래스.
+
+    일반 테이블을 위한 CRUD 기능을 제공합니다.
+
+    Type parameters:
+        T: Entity type
+        ID: Primary key type
+    """
 
     @abstractmethod
     def _get_unique_constraint_fields(self) -> tuple[str, ...]:
@@ -67,25 +99,6 @@ class BaseRepository[T, ID](ABC):
         self.session.commit()
         self.session.refresh(result)
         return result
-
-    def find_by_id(self, entity_id: ID) -> T | None:
-        """Find entity by ID.
-
-        Args:
-            entity_id: Primary key value
-
-        Returns:
-            Entity if found, None otherwise
-        """
-        return self.session.query(self._get_model_class()).filter_by(id=entity_id).first()
-
-    def find_all(self) -> list[T]:
-        """Find all entities.
-
-        Returns:
-            List of all entities
-        """
-        return self.session.query(self._get_model_class()).all()
 
     def delete_by_id(self, entity_id: ID) -> bool:
         """Delete entity by ID.
