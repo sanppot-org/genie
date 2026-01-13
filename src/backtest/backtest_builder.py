@@ -13,13 +13,14 @@ class BacktestBuilder:
 
     def __init__(self) -> None:
         """빌더 초기화 (기본값 설정)"""
-        self.cerebro = bt.Cerebro()
+        self.cerebro: bt.Cerebro | None = None
         self._commission_config: CommissionConfig | None = None
         self._initial_cash: float | None = None  # 필수값으로 변경
         self._sizer_config: SizerConfig | None = None
         self._strategy_class: type[Strategy] | None = None
         self._strategy_params: dict[str, object] = {}
         self._slippage: float | None = None
+        self._cheat_on_open: bool = False  # 시가 체결 옵션
         self._analyzers: list[tuple[type[Analyzer], str]] = []
         self._data_feeds: list[bt.AbstractDataBase] = []
 
@@ -60,6 +61,18 @@ class BacktestBuilder:
     def with_slippage(self, perc: float) -> "BacktestBuilder":
         """슬리피지 설정"""
         self._slippage = perc
+        return self
+
+    def with_cheat_on_open(self, enabled: bool = True) -> "BacktestBuilder":
+        """시가 체결 옵션 설정
+
+        True로 설정하면 주문이 현재 bar의 시가로 체결됩니다.
+        기본값(False)은 다음 bar의 시가로 체결됩니다.
+
+        Args:
+            enabled: True면 현재 bar 시가 체결, False면 다음 bar 시가 체결
+        """
+        self._cheat_on_open = enabled
         return self
 
     def with_analyzer(self, analyzer_class: type[Analyzer], name: str) -> "BacktestBuilder":
@@ -116,6 +129,9 @@ class BacktestBuilder:
         # 필수값 검증
         self._validate_required_fields()
 
+        # Cerebro 생성 (cheat_on_open 옵션 적용)
+        self.cerebro = bt.Cerebro(cheat_on_open=self._cheat_on_open)
+
         # 1. 전략 추가
         self.cerebro.addstrategy(self._strategy_class, **self._strategy_params)
 
@@ -157,5 +173,6 @@ class BacktestBuilder:
     def run_and_plot(self) -> list[Any]:  # type: ignore[misc]
         """백테스트 실행 및 차트 출력"""
         results = self.run()
-        self.cerebro.plot()
+        if self.cerebro is not None:
+            self.cerebro.plot()
         return results
