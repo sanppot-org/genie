@@ -36,6 +36,11 @@ class EmaSimpleAlignmentStrategy(bt.Strategy):
 
     params = (
         ("ema_periods", (5, 20, 40)),
+        ("enable_long", True),  # 롱 포지션 활성화
+        ("enable_short", True),  # 숏 포지션 활성화
+        # 간격 필터 관련 파라미터
+        ("enable_gap_filter", False),  # 간격 필터 활성화 (기본값: 비활성화)
+        ("min_gap", 2.0),  # 최소 간격 (%, EMA20과 EMA40의 차이)
     )
 
     def __init__(self) -> None:
@@ -86,6 +91,34 @@ class EmaSimpleAlignmentStrategy(bt.Strategy):
             if self.emas[i][0] >= self.emas[i + 1][0]:
                 return False
         return True
+
+    def _get_gap_ratio(self) -> float:
+        """EMA 간격 비율 계산 (%)
+
+        EMA 기간이 오름차순(5,20,40)이므로:
+        - emas[1] = EMA(20)
+        - emas[2] = EMA(40)
+
+        Returns:
+            (EMA20 - EMA40) / EMA40 * 100
+        """
+        if len(self.emas) < 3:
+            return 0.0
+        ema_mid = self.emas[1][0]  # EMA(20)
+        ema_long = self.emas[2][0]  # EMA(40)
+        if ema_long == 0:
+            return 0.0
+        return (ema_mid - ema_long) / ema_long * 100
+
+    def _has_sufficient_gap(self) -> bool:
+        """간격 필터 조건 확인
+
+        Returns:
+            True if 필터 비활성화 or |간격| >= min_gap
+        """
+        if not self.params.enable_gap_filter:  # type: ignore[attr-defined]
+            return True  # 필터 비활성화 시 항상 True
+        return abs(self._get_gap_ratio()) >= self.params.min_gap  # type: ignore[attr-defined]
 
     def _log_emas(self) -> None:
         """EMA 값 로깅"""
@@ -165,32 +198,35 @@ class EmaSimpleAlignmentStrategy(bt.Strategy):
 
         is_aligned = self._is_aligned()
         is_reverse = self._is_reverse_aligned()
+        has_gap = self._has_sufficient_gap()  # 간격 조건
 
         # === 롱 포지션 ===
-        # 롱 진입: 포지션 없음 + 정배열 시작
-        if not self.position and is_aligned and not self.was_aligned:
-            self.log(f"BUY CREATE (롱 진입), Close: {self.dataclose[0]:.2f}")
-            self._log_emas()
-            self.order = self.buy()
+        if self.params.enable_long:  # type: ignore[attr-defined]
+            # 롱 진입: 포지션 없음 + 정배열 시작 + 간격 조건
+            if not self.position and is_aligned and not self.was_aligned and has_gap:
+                self.log(f"BUY CREATE (롱 진입), Close: {self.dataclose[0]:.2f}")
+                self._log_emas()
+                self.order = self.buy()
 
-        # 롱 청산: 롱 포지션 + 정배열 붕괴
-        elif self.position.size > 0 and not is_aligned:
-            self.log(f"SELL CREATE (롱 청산), Close: {self.dataclose[0]:.2f}")
-            self._log_emas()
-            self.order = self.sell()
+            # 롱 청산: 롱 포지션 + 정배열 붕괴
+            elif self.position.size > 0 and not is_aligned:
+                self.log(f"SELL CREATE (롱 청산), Close: {self.dataclose[0]:.2f}")
+                self._log_emas()
+                self.order = self.sell()
 
         # === 숏 포지션 ===
-        # 숏 진입: 포지션 없음 + 역배열 시작
-        elif not self.position and is_reverse and not self.was_reverse_aligned:
-            self.log(f"SELL CREATE (숏 진입), Close: {self.dataclose[0]:.2f}")
-            self._log_emas()
-            self.order = self.sell()
+        if self.params.enable_short:  # type: ignore[attr-defined]
+            # 숏 진입: 포지션 없음 + 역배열 시작 + 간격 조건
+            if not self.position and is_reverse and not self.was_reverse_aligned and has_gap:
+                self.log(f"SELL CREATE (숏 진입), Close: {self.dataclose[0]:.2f}")
+                self._log_emas()
+                self.order = self.sell()
 
-        # 숏 커버: 숏 포지션 + 역배열 붕괴
-        elif self.position.size < 0 and not is_reverse:
-            self.log(f"BUY CREATE (숏 커버), Close: {self.dataclose[0]:.2f}")
-            self._log_emas()
-            self.order = self.buy()
+            # 숏 커버: 숏 포지션 + 역배열 붕괴
+            elif self.position.size < 0 and not is_reverse:
+                self.log(f"BUY CREATE (숏 커버), Close: {self.dataclose[0]:.2f}")
+                self._log_emas()
+                self.order = self.buy()
 
         # 상태 업데이트
         self.was_aligned = is_aligned

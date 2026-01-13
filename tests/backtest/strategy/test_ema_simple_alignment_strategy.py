@@ -176,6 +176,122 @@ class TestEmaSimpleAlignmentStrategy:
         second_trade = strategy.trade_history[1]
         assert second_trade["type"] == "sell", "두 번째 거래는 매도여야 함"
 
+    # === 간격 필터 테스트 ===
+
+    def test_gap_filter_default_disabled(self) -> None:
+        """간격 필터 기본값은 비활성화"""
+        # Given: 강한 상승 추세
+        cerebro = bt.Cerebro()
+        data = self._create_strong_uptrend_data()
+
+        cerebro.adddata(data)
+        cerebro.addstrategy(EmaSimpleAlignmentStrategy)  # 기본값
+        cerebro.broker.setcash(100_000_000)
+        cerebro.addsizer(bt.sizers.FixedSize, stake=1)
+
+        # When: 백테스트 실행
+        result = cerebro.run()
+        strategy = result[0]
+
+        # Then: 간격 필터 비활성화 상태
+        assert strategy.params.enable_gap_filter is False
+        assert strategy.params.min_gap == 2.0  # 기본값
+        # 간격 필터 비활성화 시에도 정배열이면 매수
+        assert strategy.buy_executed, "간격 필터 비활성화 시 정배열이면 매수해야 함"
+
+    def test_buy_with_gap_filter_when_sufficient_gap(self) -> None:
+        """간격 필터 활성화 + 충분한 간격 → 매수"""
+        # Given: 강한 상승 추세
+        # 참고: EMA는 후행 지표이므로 정배열 형성 직후에는 간격이 매우 작음
+        # 정배열 시작 순간의 간격은 0.1% 미만일 수 있음
+        cerebro = bt.Cerebro()
+        data = self._create_strong_uptrend_data()
+
+        cerebro.adddata(data)
+        cerebro.addstrategy(
+            EmaSimpleAlignmentStrategy,
+            enable_gap_filter=True,
+            min_gap=0.05,  # 정배열 형성 직후의 매우 작은 간격도 허용
+        )
+        cerebro.broker.setcash(100_000_000)
+        cerebro.addsizer(bt.sizers.FixedSize, stake=1)
+
+        # When: 백테스트 실행
+        result = cerebro.run()
+        strategy = result[0]
+
+        # Then: 간격 필터 활성화 + 매수 실행
+        assert strategy.params.enable_gap_filter is True
+        assert strategy.buy_executed, "충분한 간격에서 매수가 실행되어야 함"
+
+    def test_no_buy_with_gap_filter_when_insufficient_gap(self) -> None:
+        """간격 필터 활성화 + 불충분한 간격 → 매수 안함"""
+        # Given: 약한 상승 추세 (EMA 간격 < 5%)
+        cerebro = bt.Cerebro()
+        data = self._create_weak_uptrend_data()
+
+        cerebro.adddata(data)
+        cerebro.addstrategy(
+            EmaSimpleAlignmentStrategy,
+            enable_gap_filter=True,
+            min_gap=5.0,  # 5% 이상 간격 요구 (약한 추세는 통과 못함)
+        )
+        cerebro.broker.setcash(100_000_000)
+        cerebro.addsizer(bt.sizers.FixedSize, stake=1)
+
+        # When: 백테스트 실행
+        result = cerebro.run()
+        strategy = result[0]
+
+        # Then: 간격 필터 미통과로 매수 안함
+        assert strategy.params.enable_gap_filter is True
+        assert not strategy.buy_executed, "불충분한 간격에서는 매수하지 않아야 함"
+
+    def test_short_with_gap_filter_when_sufficient_gap(self) -> None:
+        """간격 필터 활성화 + 역배열 + 충분한 간격 → 숏"""
+        # Given: 강한 하락 추세 (역배열, EMA 간격 충분)
+        # 참고: EMA는 후행 지표이므로 역배열 형성 직후에는 간격이 매우 작음
+        cerebro = bt.Cerebro()
+        data = self._create_strong_downtrend_data()
+
+        cerebro.adddata(data)
+        cerebro.addstrategy(
+            EmaSimpleAlignmentStrategy,
+            enable_gap_filter=True,
+            min_gap=0.05,  # 역배열 형성 직후의 매우 작은 간격도 허용
+        )
+        cerebro.broker.setcash(100_000_000)
+        cerebro.addsizer(bt.sizers.FixedSize, stake=1)
+
+        # When: 백테스트 실행
+        result = cerebro.run()
+        strategy = result[0]
+
+        # Then: 간격 필터 활성화 + 숏 실행
+        assert strategy.short_executed, "충분한 간격의 역배열에서 숏이 실행되어야 함"
+
+    def test_gap_filter_custom_min_gap(self) -> None:
+        """간격 필터 min_gap 커스텀 설정"""
+        # Given
+        cerebro = bt.Cerebro()
+        data = self._create_strong_uptrend_data()
+
+        cerebro.adddata(data)
+        cerebro.addstrategy(
+            EmaSimpleAlignmentStrategy,
+            enable_gap_filter=True,
+            min_gap=3.5,  # 커스텀 값
+        )
+        cerebro.broker.setcash(100_000_000)
+
+        # When: 백테스트 실행
+        result = cerebro.run()
+        strategy = result[0]
+
+        # Then: 파라미터 확인
+        assert strategy.params.enable_gap_filter is True
+        assert strategy.params.min_gap == 3.5
+
     # === 헬퍼 메서드 ===
 
     def _create_strong_uptrend_data(self) -> bt.feeds.PandasData:
@@ -279,18 +395,54 @@ class TestEmaSimpleAlignmentStrategy:
 
         return self._prices_to_data(base_date, prices)
 
+    def _create_weak_uptrend_data(self) -> bt.feeds.PandasData:
+        """약한 상승 추세 데이터 (횡보에 가까움)"""
+        base_date = datetime(2024, 1, 1)
+
+        # 50일: 횡보
+        prices = [50000.0] * 50
+
+        # 30일: 매우 약한 상승 (일 0.3% 상승) - 횡보에 가까움
+        for i in range(30):
+            prices.append(50000.0 * (1.003 ** (i + 1)))
+
+        # 20일: 횡보 유지
+        last_price = prices[-1]
+        for i in range(20):
+            # 약간의 노이즈 추가
+            noise = 1.001 if i % 2 == 0 else 0.999
+            prices.append(last_price * noise)
+            last_price = prices[-1]
+
+        return self._prices_to_data(base_date, prices)
+
     def _prices_to_data(
-            self, base_date: datetime, prices: list[float]
+            self, base_date: datetime, prices: list[float],
+            volatility: float = 0.03
     ) -> bt.feeds.PandasData:
-        """가격 리스트를 backtrader 데이터로 변환"""
+        """가격 리스트를 backtrader 데이터로 변환
+
+        Args:
+            base_date: 시작 날짜
+            prices: 종가 리스트
+            volatility: 변동성 (high/low 범위), 기본값 3%
+        """
+        import random
+        random.seed(42)  # 재현성을 위해 시드 고정
+
         data_list = []
         for i, price in enumerate(prices):
             dt = base_date + timedelta(days=i)
+            # 각 bar마다 약간의 노이즈 추가
+            noise = random.uniform(-0.005, 0.005)
+            high_noise = random.uniform(0, 0.01)
+            low_noise = random.uniform(0, 0.01)
+
             data_list.append({
                 'datetime': dt,
-                'open': price,
-                'high': price * 1.01,
-                'low': price * 0.99,
+                'open': price * (1 + noise),
+                'high': price * (1 + volatility + high_noise),
+                'low': price * (1 - volatility - low_noise),
                 'close': price,
                 'volume': 1000.0,
             })
