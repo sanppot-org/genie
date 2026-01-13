@@ -46,7 +46,11 @@ class SizerConfig:
 
     @classmethod
     def all_in(cls) -> "SizerConfig":
-        """전체 현금 투입 Sizer
+        """전체 현금 투입 Sizer (정수 단위)
+
+        Note:
+            정수 단위로만 거래됩니다. 암호화폐처럼 소수점 거래가
+            필요한 경우 fractional_all_in()을 사용하세요.
 
         Example:
             SizerConfig.all_in()
