@@ -54,6 +54,96 @@ class UpbitCandleInterval(Enum):
         """Upbit API 엔드포인트"""
         return self.value[1]
 
+    @property
+    def minutes(self) -> int | None:
+        """분봉의 경우 분 단위 반환, 아니면 None"""
+        if self.name.startswith("MINUTE_"):
+            return int(self.name.split("_")[1])
+        return None
+
+
+def _get_last_closed_candle_time(
+        interval: UpbitCandleInterval,
+        _now: datetime | None = None,
+) -> datetime:
+    """현재 시각 기준으로 마지막 마감된 캔들의 시작 시각을 반환한다 (UTC).
+
+    Upbit API의 `to` 파라미터에 전달하면 미마감 봉이 제외된다.
+
+    Args:
+        interval: 캔들 간격
+        _now: 테스트용 현재 시각 주입 (기본값: None이면 실제 현재 시각 사용)
+
+    Returns:
+        마지막 마감 캔들의 시작 시각 (UTC, timezone-aware)
+
+    Examples:
+        >>> # 현재 10:23:45 UTC일 때
+        >>> _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_1)
+        datetime(2024, 1, 15, 10, 23, 0, tzinfo=UTC)  # 10:23 봉은 미마감, 10:22까지 마감
+    """
+    from datetime import UTC as UTC_TZ
+    from datetime import timedelta
+
+    import pytz
+
+    now = _now if _now is not None else datetime.now(UTC_TZ)
+
+    # 분봉 처리
+    minutes = interval.minutes
+    if minutes is not None:
+        if minutes < 60:
+            # 분 단위: 현재 분을 interval로 나눈 몫 * interval
+            floored_minute = (now.minute // minutes) * minutes
+            return now.replace(minute=floored_minute, second=0, microsecond=0)
+        elif minutes == 60:
+            # 1시간: 정시로 내림
+            return now.replace(minute=0, second=0, microsecond=0)
+        else:
+            # 4시간 (240분): 시간을 4로 나눈 몫 * 4
+            floored_hour = (now.hour // 4) * 4
+            return now.replace(hour=floored_hour, minute=0, second=0, microsecond=0)
+
+    # 일봉: KST 09:00 기준
+    if interval == UpbitCandleInterval.DAY:
+        kst = pytz.timezone('Asia/Seoul')
+        now_kst = now.astimezone(kst)
+        cutoff_kst = now_kst.replace(hour=9, minute=0, second=0, microsecond=0)
+        if now_kst < cutoff_kst:
+            # 09:00 이전이면 전일 09:00
+            cutoff_kst = cutoff_kst - timedelta(days=1)
+        return cutoff_kst.astimezone(UTC_TZ)
+
+    # 주봉: 월요일 KST 09:00 기준
+    if interval == UpbitCandleInterval.WEEK:
+        kst = pytz.timezone('Asia/Seoul')
+        now_kst = now.astimezone(kst)
+        # 현재 주의 월요일 09:00 계산
+        days_since_monday = now_kst.weekday()
+        monday_kst = now_kst - timedelta(days=days_since_monday)
+        cutoff_kst = monday_kst.replace(hour=9, minute=0, second=0, microsecond=0)
+        if now_kst < cutoff_kst:
+            # 이번 주 월요일 09:00 이전이면 지난주 월요일
+            cutoff_kst = cutoff_kst - timedelta(weeks=1)
+        return cutoff_kst.astimezone(UTC_TZ)
+
+    # 월봉: 매월 1일 KST 09:00 기준
+    if interval == UpbitCandleInterval.MONTH:
+        kst = pytz.timezone('Asia/Seoul')
+        now_kst = now.astimezone(kst)
+        cutoff_kst = now_kst.replace(day=1, hour=9, minute=0, second=0, microsecond=0)
+        if now_kst < cutoff_kst:
+            # 이번 달 1일 09:00 이전이면 지난 달 1일
+            # 지난 달의 1일 계산
+            if now_kst.month == 1:
+                cutoff_kst = cutoff_kst.replace(year=now_kst.year - 1, month=12)
+            else:
+                cutoff_kst = cutoff_kst.replace(month=now_kst.month - 1)
+        return cutoff_kst.astimezone(UTC_TZ)
+
+    # 알 수 없는 interval은 현재 시각 그대로 반환 (fallback)
+    return now
+
 
 class UpbitAPI:
     @staticmethod
@@ -604,6 +694,10 @@ class UpbitAPI:
             raise ValueError("market은 비어있을 수 없습니다")
         if count <= 0:
             raise ValueError("count는 1 이상이어야 합니다")
+
+        # 미마감 봉 제외: to가 None이면 마지막 마감 시각으로 설정
+        if to is None:
+            to = _get_last_closed_candle_time(interval)
 
         try:
             # count가 200 이하면 단일 호출

@@ -9,7 +9,6 @@ import datetime as dt
 
 import backtrader as bt
 import pandas as pd
-import pytest
 
 
 class TestSplitStrategy:

@@ -807,3 +807,113 @@ class TestUpbitAPISellAll:
 
             # sell_market_order는 호출되지 않아야 함
             mock_upbit_instance.sell_market_order.assert_not_called()
+
+
+class TestGetLastClosedCandleTime:
+    """_get_last_closed_candle_time 헬퍼 함수 테스트"""
+
+    @pytest.fixture
+    def fixed_time(self):
+        """테스트용 고정 시각: 2024-01-15 10:23:45.123456 UTC"""
+        from datetime import UTC, datetime
+        return datetime(2024, 1, 15, 10, 23, 45, 123456, tzinfo=UTC)
+
+    def test_minute_1_현재분_시작시각_반환(self, fixed_time):
+        """1분봉: 현재 분의 시작 시각을 반환한다 (초, 마이크로초 = 0)"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_1, _now=fixed_time)
+
+        expected = datetime(2024, 1, 15, 10, 23, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_minute_3_3분_단위로_내림(self, fixed_time):
+        """3분봉: 3분 단위로 내림한 시각을 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_3, _now=fixed_time)
+
+        # 23분 -> 21분 (21 = 7 * 3)
+        expected = datetime(2024, 1, 15, 10, 21, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_minute_5_5분_단위로_내림(self, fixed_time):
+        """5분봉: 5분 단위로 내림한 시각을 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_5, _now=fixed_time)
+
+        # 23분 -> 20분 (20 = 4 * 5)
+        expected = datetime(2024, 1, 15, 10, 20, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_minute_15_15분_단위로_내림(self, fixed_time):
+        """15분봉: 15분 단위로 내림한 시각을 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_15, _now=fixed_time)
+
+        # 23분 -> 15분 (15 = 1 * 15)
+        expected = datetime(2024, 1, 15, 10, 15, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_minute_60_정시로_내림(self, fixed_time):
+        """60분봉: 정시로 내림한 시각을 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_60, _now=fixed_time)
+
+        expected = datetime(2024, 1, 15, 10, 0, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_minute_240_4시간_단위로_내림(self, fixed_time):
+        """240분봉: 4시간 단위로 내림한 시각을 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.MINUTE_240, _now=fixed_time)
+
+        # 10시 -> 8시 (8 = 2 * 4)
+        expected = datetime(2024, 1, 15, 8, 0, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_day_kst_09시_이후_당일_09시_반환(self):
+        """일봉: KST 09시 이후이면 당일 09:00 KST를 UTC로 변환하여 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        # KST 15:00 = UTC 06:00
+        utc_time = datetime(2024, 1, 15, 6, 0, 0, tzinfo=UTC)
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.DAY, _now=utc_time)
+
+        # KST 09:00 = UTC 00:00
+        expected = datetime(2024, 1, 15, 0, 0, 0, 0, tzinfo=UTC)
+        assert result == expected
+
+    def test_day_kst_09시_이전_전일_09시_반환(self):
+        """일봉: KST 09시 이전이면 전일 09:00 KST를 UTC로 변환하여 반환한다"""
+        from datetime import UTC, datetime
+
+        from src.upbit.upbit_api import UpbitCandleInterval, _get_last_closed_candle_time
+
+        # KST 08:00 = UTC 이전날 23:00
+        utc_time = datetime(2024, 1, 14, 23, 0, 0, tzinfo=UTC)
+
+        result = _get_last_closed_candle_time(UpbitCandleInterval.DAY, _now=utc_time)
+
+        # 전일 KST 09:00 = UTC 00:00 (2024-01-14)
+        expected = datetime(2024, 1, 14, 0, 0, 0, 0, tzinfo=UTC)
+        assert result == expected

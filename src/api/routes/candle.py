@@ -31,6 +31,7 @@ def collect_minute1_candles(
 
     total_saved = candle_service.collect_minute1_candles(
         ticker=ticker,
+        start=request.start,
         to=request.to,
         batch_size=request.batch_size,
         mode=request.mode,

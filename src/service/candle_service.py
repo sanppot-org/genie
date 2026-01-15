@@ -112,9 +112,10 @@ class CandleService:
     def collect_minute1_candles(
             self,
             ticker: Ticker,
+            start: datetime | None = None,
             to: datetime | None = None,
             batch_size: int = 1000,
-            mode: CollectMode = CollectMode.INCREMENTAL,
+            mode: CollectMode = CollectMode.INCREMENTAL
     ) -> int:
         """1분봉 데이터를 수집하여 DB에 저장.
 
@@ -128,6 +129,7 @@ class CandleService:
         Args:
             ticker: 종목
             to: 마지막으로 캔들을 마감한 시각 (해당 시각 이전 데이터 수집, None이면 현재 시각)
+            start: 수집 시작 일자 (해당 시각 이전 데이터는 수집하지 않음, None이면 제한 없음)
             batch_size: DB 저장 배치 크기 (기본값: 1000)
             mode: 수집 모드 (기본값: CollectMode.INCREMENTAL)
 
@@ -142,11 +144,11 @@ class CandleService:
             >>> from src.service.candle_service import CollectMode
             >>> service = CandleService(minute1_repo, daily_repo, factory)
             >>> # 증분 수집 (DB 최신 이후 데이터만)
-            >>> total = service.collect_minute1_candles("KRW-BTC", ticker_id=1)
+            >>> total = service.collect_minute1_candles("KRW-BTC")
             >>> # 전체 데이터 재수집
-            >>> total = service.collect_minute1_candles("KRW-BTC", ticker_id=1, mode=CollectMode.FULL)
+            >>> total = service.collect_minute1_candles("KRW-BTC",mode=CollectMode.FULL)
             >>> # 과거 데이터 채우기
-            >>> total = service.collect_minute1_candles("KRW-BTC", ticker_id=1, mode=CollectMode.BACKFILL)
+            >>> total = service.collect_minute1_candles("KRW-BTC",mode=CollectMode.BACKFILL)
             >>> print(f"총 {total}개 캔들 저장 완료")
         """
         import logging
@@ -214,6 +216,19 @@ class CandleService:
                 df = df[df["timestamp"] > boundary_ts_aware]
                 if df.empty:
                     logger.info(f"DB 최신 데이터까지 수집 완료 (market={ticker.ticker})")
+                    break
+
+            # start 이전 데이터 필터링
+            if start is not None:
+                from datetime import UTC as UTC_TZ
+                start_aware = (
+                    start.replace(tzinfo=UTC_TZ)
+                    if start.tzinfo is None
+                    else start
+                )
+                df = df[df["timestamp"] >= start_aware]
+                if df.empty:
+                    logger.info(f"시작일자({start})에 도달하여 수집 종료 (market={ticker.ticker})")
                     break
 
             candle_models = self._factory.get_adapter(DataSource.UPBIT).to_candle_models(df, ticker.id, UpbitCandleInterval.MINUTE_1)

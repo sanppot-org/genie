@@ -46,6 +46,7 @@ class CollectCandlesRequest(BaseModel):
 
     ticker_id: int
     to: datetime | None = None
+    start: datetime | None = None
     batch_size: int = 1000
     mode: CollectMode = CollectMode.INCREMENTAL
 

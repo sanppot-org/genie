@@ -214,7 +214,7 @@ class TestCollectMinute1CandlesFullSyncMode:
             mock_api_class.return_value = mock_api
 
             # When: mode=CollectMode.FULL
-            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.FULL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10, mode=CollectMode.FULL)
 
             # Then: 오래된 데이터 포함 전체 저장
             assert total_saved == 2
@@ -272,7 +272,7 @@ class TestCollectMinute1CandlesFullSyncMode:
             mock_api_class.return_value = mock_api
 
             # When: mode=CollectMode.FULL
-            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.FULL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10, mode=CollectMode.FULL)
 
             # Then: 모든 배치 수집
             assert total_saved == 2
@@ -336,7 +336,7 @@ class TestCollectMinute1CandlesBackfillMode:
             mock_api_class.return_value = mock_api
 
             # When: BACKFILL 모드로 수집
-            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.BACKFILL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10, mode=CollectMode.BACKFILL)
 
             # Then: 과거 데이터 1개 저장
             assert total_saved == 1
@@ -404,7 +404,7 @@ class TestCollectMinute1CandlesBackfillMode:
             mock_api_class.return_value = mock_api
 
             # When: BACKFILL 모드
-            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.BACKFILL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10, mode=CollectMode.BACKFILL)
 
             # Then: 2개의 과거 데이터 저장
             assert total_saved == 2
@@ -442,10 +442,84 @@ class TestCollectMinute1CandlesBackfillMode:
             mock_api_class.return_value = mock_api
 
             # When: BACKFILL 모드 (DB 비어있음)
-            total_saved = candle_service.collect_minute1_candles(sample_ticker, mode=CollectMode.BACKFILL, batch_size=10)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, batch_size=10, mode=CollectMode.BACKFILL)
 
             # Then: 전체 데이터 저장
             assert total_saved == 1
             # to 파라미터가 None (기본값)으로 호출됨
             first_call_kwargs = mock_api.get_candles.call_args_list[0].kwargs
             assert first_call_kwargs.get("to") is None
+
+
+class TestCollectMinute1CandlesStartParameter:
+    """start 파라미터 테스트"""
+
+    def test_stops_when_all_data_is_before_start(
+            self,
+            candle_service: CandleService,
+            sample_ticker: Ticker,
+    ):
+        """모든 데이터가 start 이전이면 수집을 중단한다."""
+        # Given: API가 start 이전 데이터만 반환
+        old_data = pd.DataFrame({
+            "open": [49000000],
+            "high": [50000000],
+            "low": [48000000],
+            "close": [49500000],
+            "volume": [8.0],
+            "value": [400000000],
+            "timestamp": [pd.Timestamp("2024-01-01 09:00:00", tz="UTC")],
+        }, index=pd.DatetimeIndex([
+            pd.Timestamp("2024-01-01 18:00:00", tz="Asia/Seoul"),
+        ], name="index"))
+
+        with patch("src.upbit.upbit_api.UpbitAPI") as mock_api_class:
+            mock_api = MagicMock()
+            mock_api.get_candles.return_value = old_data
+            mock_api_class.return_value = mock_api
+
+            # When: start를 데이터보다 미래로 설정
+            start = datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, start=start, mode=CollectMode.FULL)
+
+            # Then: 아무것도 저장하지 않음
+            assert total_saved == 0
+            assert mock_api.get_candles.call_count == 1
+
+    def test_filters_data_before_start(
+            self,
+            candle_service: CandleService,
+            minute1_repo: CandleMinute1Repository,
+            sample_ticker: Ticker,
+    ):
+        """start 이전 데이터는 필터링하고 이후 데이터만 저장한다."""
+        # Given: API가 start 전후 데이터 모두 반환
+        mixed_data = pd.DataFrame({
+            "open": [49000000, 50000000],
+            "high": [50000000, 51000000],
+            "low": [48000000, 49000000],
+            "close": [49500000, 50500000],
+            "volume": [8.0, 10.0],
+            "value": [400000000, 500000000],
+            "timestamp": [
+                pd.Timestamp("2024-01-01 09:00:00", tz="UTC"),  # start 이전
+                pd.Timestamp("2024-01-01 10:00:00", tz="UTC"),  # start 이후
+            ],
+        }, index=pd.DatetimeIndex([
+            pd.Timestamp("2024-01-01 18:00:00", tz="Asia/Seoul"),
+            pd.Timestamp("2024-01-01 19:00:00", tz="Asia/Seoul"),
+        ], name="index"))
+
+        empty_df = pd.DataFrame()
+
+        with patch("src.upbit.upbit_api.UpbitAPI") as mock_api_class:
+            mock_api = MagicMock()
+            mock_api.get_candles.side_effect = [mixed_data, empty_df]
+            mock_api_class.return_value = mock_api
+
+            # When: start를 중간 시점으로 설정
+            start = datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
+            total_saved = candle_service.collect_minute1_candles(sample_ticker, start=start, batch_size=10, mode=CollectMode.FULL)
+
+            # Then: start 이후 데이터만 저장됨
+            assert total_saved == 1
