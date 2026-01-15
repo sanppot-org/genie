@@ -12,8 +12,10 @@ class AssetType(StrEnum):
     """자산 유형"""
 
     CRYPTO = "CRYPTO"  # 암호화폐 (KRW-BTC, KRW-ETH)
-    STOCK = "STOCK"  # 주식 (005930, AAPL)
-    ETF = "ETF"  # ETF
+    KR_STOCK = "KR_STOCK"  # 한국 주식 (005930, 035720)
+    US_STOCK = "US_STOCK"  # 미국 주식 (AAPL, TSLA)
+    KR_ETF = "KR_ETF"  # 한국 ETF
+    US_ETF = "US_ETF"  # 미국 ETF  # ETF
 
 
 DEFAULT_CACHE_DIR = ".cache"
