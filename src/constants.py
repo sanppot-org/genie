@@ -18,6 +18,14 @@ class AssetType(StrEnum):
     US_ETF = "US_ETF"  # 미국 ETF  # ETF
 
 
+class TimeZone(StrEnum):
+    """타임존"""
+
+    SEOUL = "Asia/Seoul"
+    UTC = "UTC"
+    NEW_YORK = "America/New_York"
+
+
 DEFAULT_CACHE_DIR = ".cache"
 
 KST = ZoneInfo("Asia/Seoul")

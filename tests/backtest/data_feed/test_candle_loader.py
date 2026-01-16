@@ -141,7 +141,7 @@ class TestCandlesToDataframe:
     ) -> CandleMinute1:
         """테스트용 CandleMinute1 생성"""
         candle = CandleMinute1()
-        candle.kst_time = kst_time
+        candle.local_time = kst_time
         candle.timestamp = kst_time
         candle.ticker_id = 1
         candle.open = open_price
@@ -162,7 +162,7 @@ class TestCandlesToDataframe:
     ) -> CandleHour1:
         """테스트용 CandleHour1 생성"""
         candle = CandleHour1()
-        candle.kst_time = kst_time
+        candle.local_time = kst_time
         candle.ticker_id = 1
         candle.open = open_price
         candle.high = high

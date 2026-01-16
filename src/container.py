@@ -9,24 +9,31 @@ from src.allocation_manager import AllocatedBalanceProvider
 from src.bithumb.bithumb_api import BithumbApi
 from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.clock import SystemClock
+from src.common.data_adapter import DataSource
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
 from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST
 from src.database.database import Database
+from src.database.exchange_repository import ExchangeRepository
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI
+from src.providers.binance_candle_client import BinanceCandleClient
+from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
+from src.service.exchange_service import ExchangeService
 from src.service.ticker_service import TickerService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.strategy_context import StrategyContext
 from src.upbit.upbit_api import UpbitAPI
+from util.binance.binance_api import BinanceAPI
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -38,6 +45,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.lifespan",  # lifespan.py 추가
             "src.api.routes.strategy",  # strategy 라우터 추가
             "src.api.routes.ticker",  # ticker 라우터 추가
+            "src.api.routes.exchange",  # exchange 라우터 추가
             "src.api.routes.candle",  # candle 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
@@ -65,6 +73,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     candle_hour1_repository = providers.Factory(CandleHour1Repository, session=database.provided.get_session.call())
     candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
     ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
+    exchange_repository = providers.Factory(ExchangeRepository, session=database.provided.get_session.call())
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -123,6 +132,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
     # Adapters
     candle_adapter_factory = providers.Singleton(CandleAdapterFactory)
 
+    # Candle Clients
+    binance_api = providers.Singleton(BinanceAPI)
+    upbit_candle_client = providers.Singleton(UpbitCandleClient, upbit_api)
+    binance_candle_client = providers.Singleton(BinanceCandleClient, binance_api)
+
     # Services
     candle_service = providers.Factory(
         CandleService,
@@ -130,7 +144,18 @@ class ApplicationContainer(containers.DeclarativeContainer):
         daily_repository=candle_daily_repository,
         adapter_factory=candle_adapter_factory,
     )
+    candle_query_service = providers.Factory(
+        CandleQueryService,
+        clients=providers.Dict({
+            DataSource.UPBIT: upbit_candle_client,
+            DataSource.BINANCE: binance_candle_client,
+        }),
+    )
     ticker_service = providers.Factory(
         TickerService,
         repository=ticker_repository,
+    )
+    exchange_service = providers.Factory(
+        ExchangeService,
+        repository=exchange_repository,
     )

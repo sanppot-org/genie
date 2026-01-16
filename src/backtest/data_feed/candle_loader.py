@@ -43,14 +43,14 @@ def candles_to_dataframe(
         time_field = 'date'
         timeframe = "1d"
     elif isinstance(candle, CandleMinute1):
-        time_field = 'kst_time'
+        time_field = 'local_time'
         timeframe = "1m"
     elif isinstance(candle, CandleHour1):
-        time_field = 'kst_time'
+        time_field = 'local_time'
         timeframe = "1h"
     else:
-        # 기본값: kst_time 시도
-        time_field = 'kst_time' if hasattr(candle, 'kst_time') else 'date'
+        # 기본값: local_time 시도
+        time_field = 'local_time' if hasattr(candle, 'local_time') else 'date'
         timeframe = "unknown"
 
     # DataFrame 생성

@@ -17,7 +17,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),
+                local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -27,7 +27,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 1),
+                local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
@@ -37,7 +37,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 2, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 2),
+                local_time=datetime(2024, 1, 1, 18, 2),
                 ticker_id=sample_ticker.id,
                 open=51000000,
                 high=52000000,
@@ -69,7 +69,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),
+                local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -79,7 +79,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 1),
+                local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
@@ -117,7 +117,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),
+                local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -127,7 +127,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 1),
+                local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
@@ -164,7 +164,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),
+                local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -174,7 +174,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 1),
+                local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
@@ -203,7 +203,7 @@ class TestCandleMinute1Repository:
         existing = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),
+                local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -216,7 +216,7 @@ class TestCandleMinute1Repository:
 
         updated_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-            kst_time=datetime(2024, 1, 1, 18, 0),
+            local_time=datetime(2024, 1, 1, 18, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
             high=52000000,  # 변경
@@ -248,7 +248,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=now - timedelta(hours=2),
-                kst_time=kst_now_2h.replace(tzinfo=None),
+                local_time=kst_now_2h.replace(tzinfo=None),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -258,7 +258,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=now - timedelta(hours=1),
-                kst_time=kst_now_1h.replace(tzinfo=None),
+                local_time=kst_now_1h.replace(tzinfo=None),
                 ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
@@ -285,7 +285,7 @@ class TestCandleMinute1Repository:
         candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),
+                local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -295,7 +295,7 @@ class TestCandleMinute1Repository:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 18, 0),  # 중복!
+                local_time=datetime(2024, 1, 1, 18, 0),  # 중복!
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=52000000,  # 다른 값

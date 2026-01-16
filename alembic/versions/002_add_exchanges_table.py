@@ -8,6 +8,7 @@ Create Date: 2025-01-09 00:00:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -25,9 +26,21 @@ def upgrade() -> None:
         'exchanges',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
         sa.Column('name', sa.String(length=50), nullable=False),
+        sa.Column('timezone', sa.String(length=50), nullable=False),
+        sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
+        sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('name', name='uix_exchange_name'),
     )
+
+    # Create trigger for auto-updating updated_at
+    op.execute("""
+               CREATE TRIGGER trigger_exchanges_updated_at
+                   BEFORE UPDATE
+                   ON exchanges
+                   FOR EACH ROW
+               EXECUTE FUNCTION update_updated_at_column();
+               """)
 
 
 def downgrade() -> None:

@@ -125,10 +125,10 @@ def test_to_candle_models_with_valid_data(
     assert first_candle.timestamp == expected_time
     assert first_candle.timestamp.tzinfo is not None
 
-    # kst_time은 KST naive datetime (인덱스에서 변환)
-    expected_kst_time = datetime(2024, 1, 1, 18, 0, 0)
-    assert first_candle.kst_time == expected_kst_time
-    assert first_candle.kst_time.tzinfo is None
+    # local_time은 KST naive datetime (인덱스에서 변환)
+    expected_local_time = datetime(2024, 1, 1, 18, 0, 0)
+    assert first_candle.local_time == expected_local_time
+    assert first_candle.local_time.tzinfo is None
 
 
 def test_to_candle_models_with_empty_dataframe(
@@ -192,9 +192,9 @@ def test_timezone_preserved_as_utc_aware(
 
     # Then
     # timestamp 컬럼(UTC aware) → timestamp 필드(UTC aware, 변환 없이 유지)
-    # 인덱스(KST aware) → kst_time 필드(KST naive)
+    # 인덱스(KST aware) → local_time 필드(KST naive)
     # UTC 2024-01-01 09:00:00+00:00 (aware) → timestamp 필드
-    # KST 2024-01-01 18:00:00+09:00 (aware) → kst_time 필드 (2024-01-01 18:00:00, naive)
+    # KST 2024-01-01 18:00:00+09:00 (aware) → local_time 필드 (2024-01-01 18:00:00, naive)
 
     expected_times = [
         datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC),
@@ -202,7 +202,7 @@ def test_timezone_preserved_as_utc_aware(
         datetime(2024, 1, 1, 11, 0, 0, tzinfo=pytz.UTC),
     ]
 
-    expected_kst_times = [
+    expected_local_times = [
         datetime(2024, 1, 1, 18, 0, 0),  # KST (인덱스에서 변환)
         datetime(2024, 1, 1, 19, 0, 0),  # KST (인덱스에서 변환)
         datetime(2024, 1, 1, 20, 0, 0),  # KST (인덱스에서 변환)
@@ -211,8 +211,8 @@ def test_timezone_preserved_as_utc_aware(
     for i, candle in enumerate(result):
         assert candle.timestamp == expected_times[i]
         assert candle.timestamp.tzinfo is not None  # timezone-aware datetime 확인
-        assert candle.kst_time == expected_kst_times[i]
-        assert candle.kst_time.tzinfo is None  # naive datetime 확인
+        assert candle.local_time == expected_local_times[i]
+        assert candle.local_time.tzinfo is None  # naive datetime 확인
 
 
 @pytest.mark.parametrize(

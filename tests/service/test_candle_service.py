@@ -23,7 +23,7 @@ class TestCollectMinute1CandlesIncrementalMode:
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            kst_time=datetime(2024, 1, 1, 19, 0),
+            local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
@@ -69,7 +69,7 @@ class TestCollectMinute1CandlesIncrementalMode:
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            kst_time=datetime(2024, 1, 1, 19, 0),
+            local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
@@ -179,7 +179,7 @@ class TestCollectMinute1CandlesFullSyncMode:
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            kst_time=datetime(2024, 1, 1, 19, 0),
+            local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
@@ -229,7 +229,7 @@ class TestCollectMinute1CandlesFullSyncMode:
         # Given: DB에 데이터가 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            kst_time=datetime(2024, 1, 1, 19, 0),
+            local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,
@@ -294,7 +294,7 @@ class TestCollectMinute1CandlesBackfillMode:
         existing_candles = [
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 19, 0),
+                local_time=datetime(2024, 1, 1, 19, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
                 high=51000000,
@@ -304,7 +304,7 @@ class TestCollectMinute1CandlesBackfillMode:
             ),
             CandleMinute1(
                 timestamp=datetime(2024, 1, 1, 11, 0, tzinfo=UTC),
-                kst_time=datetime(2024, 1, 1, 20, 0),
+                local_time=datetime(2024, 1, 1, 20, 0),
                 ticker_id=sample_ticker.id,
                 open=50500000,
                 high=51500000,
@@ -361,7 +361,7 @@ class TestCollectMinute1CandlesBackfillMode:
         # Given: DB에 캔들이 있음
         existing_candle = CandleMinute1(
             timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
-            kst_time=datetime(2024, 1, 1, 19, 0),
+            local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
             high=51000000,

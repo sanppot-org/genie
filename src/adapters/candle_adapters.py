@@ -81,7 +81,7 @@ class UpbitCandleAdapter(CandleDataAdapter):
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
-                        kst_time=kst_time_dt,
+                        local_time=kst_time_dt,
                         ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
                         high=float(row.high),  # type: ignore[arg-type]
@@ -173,7 +173,7 @@ class BinanceCandleAdapter(CandleDataAdapter):
                 models.append(
                     model_class(
                         timestamp=utc_dt,
-                        kst_time=kst_time_dt,
+                        local_time=kst_time_dt,
                         ticker_id=ticker_id,
                         open=float(row.Open),  # type: ignore[arg-type]
                         high=float(row.High),  # type: ignore[arg-type]
@@ -284,7 +284,7 @@ class HantuCandleAdapter(CandleDataAdapter):
                 models.append(
                     model_class(
                         timestamp=utc_dt,
-                        kst_time=kst_time_dt,
+                        local_time=kst_time_dt,
                         ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
                         high=float(row.high),  # type: ignore[arg-type]

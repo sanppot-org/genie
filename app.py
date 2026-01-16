@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from src.api.exception_handlers import handle_exception
 from src.api.lifespan import lifespan
-from src.api.routes import candle, health, strategy, ticker
+from src.api.routes import candle, exchange, health, strategy, ticker
 from src.config import AppConfig
 from src.container import ApplicationContainer
 from src.logging_config import setup_logging
@@ -33,4 +33,5 @@ app.add_exception_handler(GenieError, handle_exception)
 app.include_router(health.router)
 app.include_router(strategy.router, prefix="/api")
 app.include_router(ticker.router, prefix="/api")
+app.include_router(exchange.router, prefix="/api")
 app.include_router(candle.router, prefix="/api")

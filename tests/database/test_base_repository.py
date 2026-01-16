@@ -6,7 +6,8 @@ import pytest
 
 from src.constants import AssetType
 from src.database.base_repository import BaseRepository
-from src.database.models import CandleMinute1, Ticker
+from src.database.exchange_repository import ExchangeRepository
+from src.database.models import CandleMinute1, Exchange, Ticker
 from src.database.ticker_repository import TickerRepository
 
 
@@ -17,7 +18,7 @@ class CandleMinute1RepositoryImpl(BaseRepository[CandleMinute1, int]):
         return CandleMinute1
 
     def _get_unique_constraint_fields(self) -> tuple[str, ...]:
-        return ("kst_time", "ticker_id")
+        return ("local_time", "ticker_id")
 
 
 @pytest.fixture
@@ -33,10 +34,19 @@ def ticker_repo(session):
 
 
 @pytest.fixture
-def sample_tickers(ticker_repo):
+def exchange_repo(session):
+    """Exchange Repository fixture."""
+    return ExchangeRepository(session)
+
+
+@pytest.fixture
+def sample_tickers(ticker_repo, exchange_repo):
     """테스트용 Ticker 엔티티 생성 fixture."""
-    btc = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO)
-    eth = Ticker(ticker="KRW-ETH", asset_type=AssetType.CRYPTO)
+    exchange = Exchange(name="Upbit", timezone="Asia/Seoul")
+    exchange_repo.save(exchange)
+
+    btc = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=exchange.id)
+    eth = Ticker(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, exchange_id=exchange.id)
     ticker_repo.save(btc)
     ticker_repo.save(eth)
     return {"BTC": btc, "ETH": eth}
@@ -48,7 +58,7 @@ def test_save_creates_new_entity(candle_repo_impl, sample_tickers):
     btc_ticker = sample_tickers["BTC"]
     candle = CandleMinute1(
         timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
-        kst_time=datetime(2024, 1, 1, 18, 0, 0),
+        local_time=datetime(2024, 1, 1, 18, 0, 0),
         ticker_id=btc_ticker.id,
         open=50000000.0,
         high=51000000.0,
@@ -74,7 +84,7 @@ def test_find_all_returns_all_entities(candle_repo_impl, sample_tickers):
     eth_ticker = sample_tickers["ETH"]
     candle1 = CandleMinute1(
         timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
-        kst_time=datetime(2024, 1, 1, 18, 0, 0),
+        local_time=datetime(2024, 1, 1, 18, 0, 0),
         ticker_id=btc_ticker.id,
         open=50000000.0,
         high=51000000.0,
@@ -84,7 +94,7 @@ def test_find_all_returns_all_entities(candle_repo_impl, sample_tickers):
     )
     candle2 = CandleMinute1(
         timestamp=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
-        kst_time=datetime(2024, 1, 1, 19, 0, 0),
+        local_time=datetime(2024, 1, 1, 19, 0, 0),
         ticker_id=eth_ticker.id,
         open=3000000.0,
         high=3100000.0,

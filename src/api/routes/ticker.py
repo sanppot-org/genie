@@ -11,15 +11,15 @@ from src.service.ticker_service import TickerService
 router = APIRouter(tags=["tickers"])
 
 
-@router.post("/tickers", response_model=GenieResponse[TickerResponse], status_code=status.HTTP_201_CREATED)
+@router.put("/tickers", response_model=GenieResponse[TickerResponse], status_code=status.HTTP_201_CREATED)
 @inject
 def create_or_update_ticker(
         ticker_in: TickerCreate,
         service: TickerService = Depends(Provide[ApplicationContainer.ticker_service]),
 ) -> GenieResponse[TickerResponse]:
     """Ticker 생성 또는 업데이트 (upsert)"""
-    ticker = service.upsert(ticker=ticker_in.ticker, asset_type=ticker_in.asset_type)
-    return GenieResponse(data=ticker)
+    ticker = service.upsert(ticker_in)
+    return GenieResponse(data=TickerResponse.from_ticker(ticker))
 
 
 @router.get("/tickers", response_model=GenieResponse[list[TickerResponse]])
@@ -29,7 +29,7 @@ def get_all_tickers(
 ) -> GenieResponse[list[TickerResponse]]:
     """전체 ticker 조회"""
     tickers = service.get_all()
-    return GenieResponse(data=tickers)
+    return GenieResponse(data=[TickerResponse.from_ticker(t) for t in tickers])
 
 
 @router.get("/tickers/{ticker_id}", response_model=GenieResponse[TickerResponse])
@@ -40,7 +40,7 @@ def get_ticker(
 ) -> GenieResponse[TickerResponse]:
     """ID로 ticker 조회"""
     ticker = service.get_by_id(ticker_id)
-    return GenieResponse(data=ticker)
+    return GenieResponse(data=TickerResponse.from_ticker(ticker))
 
 
 @router.delete("/tickers/{ticker_id}", status_code=status.HTTP_204_NO_CONTENT)

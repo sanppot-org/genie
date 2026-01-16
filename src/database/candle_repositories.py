@@ -128,9 +128,9 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         """Unique constraint 필드 반환
 
         Returns:
-            (kst_time, ticker_id)
+            (local_time, ticker_id)
         """
-        return "kst_time", "ticker_id"
+        return "local_time", "ticker_id"
 
     @override
     def get_candles(
@@ -206,7 +206,7 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         여러 레코드를 삽입하거나 업데이트합니다.
 
         Note:
-            동일한 (kst_time, ticker_id) 조합의 중복 데이터는 마지막 값만 사용됩니다.
+            동일한 (local_time, ticker_id) 조합의 중복 데이터는 마지막 값만 사용됩니다.
 
         Args:
             entities: 저장할 캔들 리스트
@@ -219,9 +219,9 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         # 딕셔너리로 중복 제거 (동일 키는 마지막 값으로 덮어씀)
         unique_map: dict[tuple[datetime, int], dict] = {}
         for e in entities:
-            key = (e.kst_time, e.ticker_id)
+            key = (e.local_time, e.ticker_id)
             unique_map[key] = {
-                "kst_time": e.kst_time,
+                "local_time": e.local_time,
                 "ticker_id": e.ticker_id,
                 "open": e.open,
                 "high": e.high,
@@ -236,7 +236,7 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         # INSERT ... ON CONFLICT DO UPDATE
         stmt = insert(CandleMinute1).values(values)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["kst_time", "ticker_id"],
+            index_elements=["local_time", "ticker_id"],
             set_={
                 "open": stmt.excluded.open,
                 "high": stmt.excluded.high,
@@ -293,10 +293,10 @@ class CandleHour1Repository(ReadOnlyCandleRepository[CandleHour1]):
             self.session.query(CandleHour1)
             .filter(
                 CandleHour1.ticker_id == ticker_id,
-                CandleHour1.kst_time >= start_datetime,
-                CandleHour1.kst_time <= end_datetime,
+                CandleHour1.local_time >= start_datetime,
+                CandleHour1.local_time <= end_datetime,
             )
-            .order_by(CandleHour1.kst_time)
+            .order_by(CandleHour1.local_time)
             .all()
         )
 
@@ -313,7 +313,7 @@ class CandleHour1Repository(ReadOnlyCandleRepository[CandleHour1]):
         return (
             self.session.query(CandleHour1)
             .filter(CandleHour1.ticker_id == ticker_id)
-            .order_by(CandleHour1.kst_time.desc())
+            .order_by(CandleHour1.local_time.desc())
             .first()
         )
 
@@ -330,7 +330,7 @@ class CandleHour1Repository(ReadOnlyCandleRepository[CandleHour1]):
         return (
             self.session.query(CandleHour1)
             .filter(CandleHour1.ticker_id == ticker_id)
-            .order_by(CandleHour1.kst_time.asc())
+            .order_by(CandleHour1.local_time.asc())
             .first()
         )
 

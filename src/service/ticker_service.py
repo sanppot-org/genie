@@ -1,5 +1,7 @@
 """Ticker service for business logic."""
-from src.constants import AssetType
+from sqlalchemy.exc import IntegrityError
+
+from src.api.schemas import TickerCreate
 from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
 from src.service.exceptions import GenieError
@@ -16,18 +18,19 @@ class TickerService:
         """
         self._repo = repository
 
-    def upsert(self, ticker: str, asset_type: AssetType) -> Ticker:
+    def upsert(self, ticker_in: TickerCreate) -> Ticker:
         """Ticker 생성 또는 업데이트 (upsert).
 
         Args:
-            ticker: 티커 코드 (예: KRW-BTC)
-            asset_type: 자산 유형 (AssetType.CRYPTO, AssetType.STOCK, AssetType.ETF)
+            ticker_in: Ticker 생성 요청 스키마
 
         Returns:
             생성 또는 업데이트된 Ticker
         """
-        entity = Ticker(ticker=ticker, asset_type=asset_type)
-        return self._repo.save(entity)
+        try:
+            return self._repo.save(ticker_in.to_entity())
+        except IntegrityError as e:
+            raise GenieError.not_found(ticker_in.exchange_id) from e
 
     def get_all(self) -> list[Ticker]:
         """전체 ticker 조회.
