@@ -22,7 +22,8 @@ class CandleAdapterFactory:
         self._adapters: dict[DataSource, CandleDataAdapter] = {
             DataSource.UPBIT: UpbitCandleAdapter(),
             DataSource.BINANCE: BinanceCandleAdapter(),
-            DataSource.HANTU: HantuCandleAdapter(),
+            DataSource.HANTU_D: HantuCandleAdapter(),
+            DataSource.HANTU_O: HantuCandleAdapter(),
         }
 
     def get_adapter(self, source: DataSource) -> CandleDataAdapter:

@@ -8,14 +8,23 @@ import pytest
 
 from src.common.candle_client import CandleClient, CandleInterval
 from src.common.data_adapter import DataSource
+from src.database.models import Ticker
 from src.service.candle_query_service import CandleQueryService
+
+
+def _create_mock_ticker(ticker_code: str, data_source: DataSource) -> MagicMock:
+    """Mock Ticker 생성 헬퍼."""
+    mock_ticker = MagicMock(spec=Ticker)
+    mock_ticker.ticker = ticker_code
+    mock_ticker.data_source = data_source.value
+    return mock_ticker
 
 
 class TestCandleQueryServiceBasic:
     """CandleQueryService 기본 테스트."""
 
-    def test_get_candles_with_upbit_source(self) -> None:
-        """Upbit 소스로 캔들 조회."""
+    def test_get_candles_with_upbit_ticker(self) -> None:
+        """Upbit Ticker로 캔들 조회."""
         mock_client = MagicMock(spec=CandleClient)
         expected_df = pd.DataFrame(
             {"open": [100.0], "close": [105.0]},
@@ -24,9 +33,10 @@ class TestCandleQueryServiceBasic:
         mock_client.get_candles.return_value = expected_df
 
         service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
+
         result = service.get_candles(
-            source=DataSource.UPBIT,
-            symbol="KRW-BTC",
+            ticker=mock_ticker,
             interval=CandleInterval.DAY,
             count=100,
         )
@@ -39,8 +49,8 @@ class TestCandleQueryServiceBasic:
         )
         assert result.equals(expected_df)
 
-    def test_get_candles_with_binance_source(self) -> None:
-        """Binance 소스로 캔들 조회."""
+    def test_get_candles_with_binance_ticker(self) -> None:
+        """Binance Ticker로 캔들 조회."""
         mock_client = MagicMock(spec=CandleClient)
         expected_df = pd.DataFrame(
             {"open": [50000.0], "close": [51000.0]},
@@ -49,9 +59,10 @@ class TestCandleQueryServiceBasic:
         mock_client.get_candles.return_value = expected_df
 
         service = CandleQueryService({DataSource.BINANCE: mock_client})
+        mock_ticker = _create_mock_ticker("BTCUSDT", DataSource.BINANCE)
+
         result = service.get_candles(
-            source=DataSource.BINANCE,
-            symbol="BTCUSDT",
+            ticker=mock_ticker,
             interval=CandleInterval.HOUR_1,
             count=50,
         )
@@ -70,11 +81,11 @@ class TestCandleQueryServiceBasic:
         mock_client.get_candles.return_value = pd.DataFrame()
 
         service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
         end_time = datetime(2024, 1, 31, tzinfo=UTC)
 
         service.get_candles(
-            source=DataSource.UPBIT,
-            symbol="KRW-BTC",
+            ticker=mock_ticker,
             interval=CandleInterval.DAY,
             count=100,
             end_time=end_time,
@@ -88,14 +99,14 @@ class TestCandleQueryServiceBasic:
         )
 
     def test_get_candles_unknown_source_raises_error(self) -> None:
-        """등록되지 않은 소스 사용 시 에러."""
+        """등록되지 않은 소스의 Ticker 사용 시 에러."""
         mock_client = MagicMock(spec=CandleClient)
         service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("BTCUSDT", DataSource.BINANCE)  # Binance는 등록 안 됨
 
         with pytest.raises(ValueError, match="등록되지 않은 데이터 소스"):
             service.get_candles(
-                source=DataSource.BINANCE,  # 등록되지 않음
-                symbol="BTCUSDT",
+                ticker=mock_ticker,
                 interval=CandleInterval.DAY,
             )
 
@@ -119,8 +130,11 @@ class TestCandleQueryServiceMultipleSources:
             DataSource.BINANCE: binance_client,
         })
 
-        result_upbit = service.get_candles(DataSource.UPBIT, "KRW-BTC", CandleInterval.DAY)
-        result_binance = service.get_candles(DataSource.BINANCE, "BTCUSDT", CandleInterval.DAY)
+        upbit_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
+        binance_ticker = _create_mock_ticker("BTCUSDT", DataSource.BINANCE)
+
+        result_upbit = service.get_candles(upbit_ticker, CandleInterval.DAY)
+        result_binance = service.get_candles(binance_ticker, CandleInterval.DAY)
 
         assert result_upbit.equals(upbit_df)
         assert result_binance.equals(binance_df)

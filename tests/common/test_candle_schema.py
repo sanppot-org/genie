@@ -1,6 +1,6 @@
 """CommonCandleSchema 테스트."""
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 from pandera.errors import SchemaError

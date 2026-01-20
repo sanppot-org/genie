@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 from pandera.typing import DataFrame
 
-from src.common.candle_client import CandleInterval
+from src.common.candle_client import CandleClient, CandleInterval
 from src.common.candle_schema import CommonCandleSchema
 from util.binance.binance_api import BinanceAPI
 from util.binance.model.candle import BinanceCandleData, BinanceCandleInterval
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     pass
 
 
-class BinanceCandleClient:
+class BinanceCandleClient(CandleClient):
     """Binance API를 CandleClient Protocol로 래핑.
 
     기존 BinanceAPI를 수정하지 않고 CandleClient Protocol을 구현합니다.

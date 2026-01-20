@@ -7,9 +7,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.api.schemas import TickerCreate
+from src.common.data_adapter import DataSource
 from src.constants import AssetType
-from src.database.exchange_repository import ExchangeRepository
-from src.database.models import Base, Exchange
+from src.database.models import Base
 from src.database.ticker_repository import TickerRepository
 from src.service.exceptions import GenieError
 from src.service.ticker_service import TickerService
@@ -35,47 +35,33 @@ def test_session() -> Generator[Session, None, None]:
 
 
 @pytest.fixture
-def exchange_repo(test_session: Session) -> ExchangeRepository:
-    """테스트용 ExchangeRepository"""
-    return ExchangeRepository(test_session)
-
-
-@pytest.fixture
-def sample_exchange(exchange_repo: ExchangeRepository) -> Exchange:
-    """테스트용 Exchange"""
-    exchange = Exchange(name="Upbit", timezone="Asia/Seoul")
-    exchange_repo.save(exchange)
-    return exchange
-
-
-@pytest.fixture
 def service(test_session: Session) -> TickerService:
     """테스트용 TickerService"""
     repo = TickerRepository(test_session)
     return TickerService(repo)
 
 
-def test_upsert_creates_new_ticker(service: TickerService, sample_exchange: Exchange) -> None:
+def test_upsert_creates_new_ticker(service: TickerService) -> None:
     """새 ticker 생성"""
     # When
-    ticker_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    ticker_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT)
     ticker = service.upsert(ticker_in)
 
     # Then
     assert ticker.id is not None
     assert ticker.ticker == "KRW-BTC"
     assert ticker.asset_type == AssetType.CRYPTO
-    assert ticker.exchange_id == sample_exchange.id
+    assert ticker.data_source == DataSource.UPBIT.value
 
 
-def test_upsert_updates_existing_ticker(service: TickerService, sample_exchange: Exchange) -> None:
+def test_upsert_updates_existing_ticker(service: TickerService) -> None:
     """기존 ticker 업데이트 (upsert)"""
     # Given
-    original_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    original_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT)
     original = service.upsert(original_in)
 
     # When
-    updated_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.KR_STOCK, exchange_id=sample_exchange.id)
+    updated_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.KR_STOCK, data_source=DataSource.UPBIT)
     updated = service.upsert(updated_in)
 
     # Then
@@ -85,11 +71,11 @@ def test_upsert_updates_existing_ticker(service: TickerService, sample_exchange:
     assert len(service.get_all()) == 1
 
 
-def test_get_all_tickers(service: TickerService, sample_exchange: Exchange) -> None:
+def test_get_all_tickers(service: TickerService) -> None:
     """전체 ticker 조회"""
     # Given
-    service.upsert(TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
-    service.upsert(TickerCreate(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
+    service.upsert(TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT))
+    service.upsert(TickerCreate(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT))
 
     # When
     tickers = service.get_all()
@@ -100,10 +86,10 @@ def test_get_all_tickers(service: TickerService, sample_exchange: Exchange) -> N
     assert any(t.ticker == "KRW-ETH" for t in tickers)
 
 
-def test_get_ticker_by_id(service: TickerService, sample_exchange: Exchange) -> None:
+def test_get_ticker_by_id(service: TickerService) -> None:
     """ID로 ticker 조회"""
     # Given
-    ticker_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    ticker_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT)
     created = service.upsert(ticker_in)
 
     # When
@@ -121,10 +107,10 @@ def test_get_ticker_raises_when_not_found(service: TickerService) -> None:
         service.get_by_id(999)
 
 
-def test_delete_ticker_success(service: TickerService, sample_exchange: Exchange) -> None:
+def test_delete_ticker_success(service: TickerService) -> None:
     """ticker 삭제 성공"""
     # Given
-    ticker_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    ticker_in = TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT)
     created = service.upsert(ticker_in)
 
     # When

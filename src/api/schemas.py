@@ -3,8 +3,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from src.constants import AssetType, TimeZone
-from src.database import Exchange, Ticker
+from src.common.candle_client import CandleInterval
+from src.common.data_adapter import DataSource
+from src.constants import AssetType
+from src.database import Ticker
 from src.service.candle_service import CollectMode
 
 
@@ -17,59 +19,19 @@ class SellResponse(BaseModel):
     remaining_volume: float | None = None
 
 
-class ExchangeCreate(BaseModel):
-    """Exchange 생성 요청"""
-
-    name: str
-    timezone: TimeZone
-
-    def to_entity(self) -> Exchange:
-        """Exchange 엔티티로 변환"""
-        return Exchange(
-            name=self.name,
-            timezone=self.timezone,
-        )
-
-
-class ExchangeUpdate(BaseModel):
-    """Exchange 수정 요청"""
-
-    name: str | None = None
-    timezone: TimeZone | None = None
-
-
-class ExchangeResponse(BaseModel):
-    """Exchange 응답"""
-
-    id: int
-    name: str
-    timezone: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-    @classmethod
-    def from_exchange(cls, exchange: Exchange) -> "ExchangeResponse":
-        """Exchange 엔티티에서 응답 생성"""
-        return cls(
-            id=exchange.id,
-            name=exchange.name,
-            timezone=exchange.timezone,
-        )
-
-
 class TickerCreate(BaseModel):
     """Ticker 생성 요청"""
 
     ticker: str
     asset_type: AssetType
-    exchange_id: int
+    data_source: DataSource
 
     def to_entity(self) -> Ticker:
         """Ticker 엔티티로 변환"""
         return Ticker(
             ticker=self.ticker,
             asset_type=self.asset_type,
-            exchange_id=self.exchange_id,
+            data_source=self.data_source.value,
         )
 
 
@@ -79,8 +41,7 @@ class TickerResponse(BaseModel):
     id: int
     ticker: str
     asset_type: AssetType
-    exchange_id: int
-    exchange_name: str | None = None
+    data_source: DataSource
     timezone: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -88,13 +49,14 @@ class TickerResponse(BaseModel):
     @classmethod
     def from_ticker(cls, ticker: Ticker) -> "TickerResponse":
         """Ticker 엔티티에서 응답 생성"""
+        # DataSource는 str Enum이므로 값으로 멤버 조회
+        source = DataSource(ticker.data_source)  # type: ignore[call-arg]
         return cls(
             id=ticker.id,
             ticker=ticker.ticker,
             asset_type=ticker.asset_type,
-            exchange_id=ticker.exchange_id,
-            exchange_name=ticker.exchange.name if ticker.exchange else None,
-            timezone=ticker.exchange.timezone if ticker.exchange else None,
+            data_source=source,
+            timezone=source.timezone,
         )
 
 
@@ -123,3 +85,34 @@ class CollectCandlesResponse(BaseModel):
     ticker_id: int
     ticker: str
     mode: CollectMode
+
+
+class QueryCandlesRequest(BaseModel):
+    """캔들 조회 요청"""
+
+    ticker_id: int
+    interval: CandleInterval = CandleInterval.DAY
+    count: int = 100
+    end_time: datetime | None = None
+
+
+class CandleData(BaseModel):
+    """캔들 데이터"""
+
+    timestamp: datetime
+    local_time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
+class QueryCandlesResponse(BaseModel):
+    """캔들 조회 응답"""
+
+    ticker_id: int
+    ticker: str
+    interval: CandleInterval
+    count: int
+    candles: list[CandleData]

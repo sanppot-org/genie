@@ -30,7 +30,7 @@ class TickerService:
         try:
             return self._repo.save(ticker_in.to_entity())
         except IntegrityError as e:
-            raise GenieError.not_found(ticker_in.exchange_id) from e
+            raise GenieError.already_exists(ticker_in.ticker) from e
 
     def get_all(self) -> list[Ticker]:
         """전체 ticker 조회.

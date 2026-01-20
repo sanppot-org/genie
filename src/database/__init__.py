@@ -2,8 +2,7 @@
 
 from src.database.candle_repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.database import Database
-from src.database.exchange_repository import ExchangeRepository
-from src.database.models import Base, CandleDaily, CandleMinute1, Exchange, Ticker
+from src.database.models import Base, CandleDaily, CandleMinute1, Ticker
 from src.database.ticker_repository import TickerRepository
 
 __all__ = [
@@ -16,6 +15,4 @@ __all__ = [
     "CandleHour1Repository",
     "CandleDailyRepository",
     "TickerRepository",
-    "Exchange",
-    "ExchangeRepository",
 ]

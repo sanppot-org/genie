@@ -16,17 +16,17 @@ from src.common.slack.client import SlackClient
 from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
 from src.constants import KST
 from src.database.database import Database
-from src.database.exchange_repository import ExchangeRepository
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.ticker_repository import TickerRepository
-from src.hantu import HantuDomesticAPI
+from src.hantu import HantuDomesticAPI, HantuOverseasAPI
+from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
+from src.providers.hantu_candle_client import HantuDomesticCandleClient
 from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
-from src.service.exchange_service import ExchangeService
 from src.service.ticker_service import TickerService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
@@ -45,7 +45,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.lifespan",  # lifespan.py 추가
             "src.api.routes.strategy",  # strategy 라우터 추가
             "src.api.routes.ticker",  # ticker 라우터 추가
-            "src.api.routes.exchange",  # exchange 라우터 추가
             "src.api.routes.candle",  # candle 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
@@ -66,6 +65,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     upbit_api = providers.Singleton(UpbitAPI, upbit_config)
     bithumb_api = providers.Singleton(BithumbApi, bithumb_config)
     hantu_domestic_api = providers.Singleton(HantuDomesticAPI, hantu_config)
+    hantu_overseas_api = providers.Singleton(HantuOverseasAPI, hantu_config)
 
     # Database
     database = providers.Singleton(Database, database_config)
@@ -73,7 +73,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
     candle_hour1_repository = providers.Factory(CandleHour1Repository, session=database.provided.get_session.call())
     candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
     ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
-    exchange_repository = providers.Factory(ExchangeRepository, session=database.provided.get_session.call())
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -136,6 +135,8 @@ class ApplicationContainer(containers.DeclarativeContainer):
     binance_api = providers.Singleton(BinanceAPI)
     upbit_candle_client = providers.Singleton(UpbitCandleClient, upbit_api)
     binance_candle_client = providers.Singleton(BinanceCandleClient, binance_api)
+    hantu_overseas_candle_client = providers.Singleton(HantuOverseasCandleClient, hantu_overseas_api)
+    hantu_domestic_candle_client = providers.Singleton(HantuDomesticCandleClient, hantu_domestic_api)
 
     # Services
     candle_service = providers.Factory(
@@ -149,13 +150,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
         clients=providers.Dict({
             DataSource.UPBIT: upbit_candle_client,
             DataSource.BINANCE: binance_candle_client,
+            DataSource.HANTU_O: hantu_overseas_candle_client,
+            DataSource.HANTU_D: hantu_domestic_candle_client,
         }),
     )
     ticker_service = providers.Factory(
         TickerService,
         repository=ticker_repository,
-    )
-    exchange_service = providers.Factory(
-        ExchangeService,
-        repository=exchange_repository,
     )

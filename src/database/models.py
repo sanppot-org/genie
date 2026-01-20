@@ -2,10 +2,11 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Float, ForeignKey, Identity, Integer, PrimaryKeyConstraint, String, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, Date, DateTime, Float, Identity, Integer, PrimaryKeyConstraint, String, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from src.constants import AssetType, TimeZone
+from src.common.data_adapter import DataSource
+from src.constants import AssetType
 
 
 class Base(DeclarativeBase):
@@ -116,26 +117,6 @@ class CandleDaily(CandleBase):
         return f"<CandleDaily(ticker_id={self.ticker_id}, date={self.date}, close={self.close})>"
 
 
-class Exchange(Base, TimestampMixin):
-    """거래소 마스터 테이블
-
-    Attributes:
-        id: 자동 증가 ID (primary key)
-        name: 거래소 이름 (예: Upbit, Binance)
-        timezone: 거래소 시간대 (예: Asia/Seoul, UTC)
-    """
-
-    __tablename__ = "exchanges"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
-    timezone: Mapped[TimeZone] = mapped_column(String(50), nullable=False)
-
-    def __repr__(self) -> str:
-        """문자열 표현"""
-        return f"<Exchange(name={self.name}, timezone={self.timezone})>"
-
-
 class Ticker(Base, TimestampMixin):
     """티커 마스터 테이블
 
@@ -145,8 +126,7 @@ class Ticker(Base, TimestampMixin):
         id: 자동 증가 PK
         ticker: 티커 코드 (예: KRW-BTC, AAPL, 005930)
         asset_type: 자산 유형 (CRYPTO, STOCK, ETF)
-        exchange_id: 거래소 FK
-        exchange: 거래소 관계
+        data_source: 데이터 소스 (UPBIT, BINANCE, HANTU)
     """
 
     __tablename__ = "tickers"
@@ -154,10 +134,8 @@ class Ticker(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
     asset_type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
-    exchange_id: Mapped[int] = mapped_column(Integer, ForeignKey("exchanges.id"), nullable=False, index=True)
-
-    exchange: Mapped["Exchange"] = relationship("Exchange", lazy="joined")
+    data_source: Mapped[DataSource] = mapped_column(String(20), nullable=False, index=True)
 
     def __repr__(self) -> str:
         """문자열 표현"""
-        return f"<Ticker(ticker={self.ticker}, asset_type={self.asset_type}, exchange_id={self.exchange_id})>"
+        return f"<Ticker(ticker={self.ticker}, asset_type={self.asset_type}, data_source={self.data_source})>"

@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app import app, container
 from src.api.schemas import TickerCreate
+from src.common.data_adapter import DataSource
 from src.constants import AssetType
-from src.database.exchange_repository import ExchangeRepository
-from src.database.models import Base, Exchange, Ticker
+from src.database.models import Base, Ticker
 from src.database.ticker_repository import TickerRepository
 from src.service.ticker_service import TickerService
 
@@ -42,40 +42,27 @@ def repo(test_session: Session) -> TickerRepository:
     return TickerRepository(test_session)
 
 
-@pytest.fixture
-def exchange_repo(test_session: Session) -> ExchangeRepository:
-    """테스트용 ExchangeRepository"""
-    return ExchangeRepository(test_session)
-
-
-@pytest.fixture
-def sample_exchange(exchange_repo: ExchangeRepository) -> Exchange:
-    """테스트용 Exchange"""
-    exchange = Exchange(name="Upbit", timezone="Asia/Seoul")
-    exchange_repo.save(exchange)
-    return exchange
-
-
-def test_create_ticker_success(repo: TickerRepository, sample_exchange: Exchange) -> None:
+def test_create_ticker_success(repo: TickerRepository) -> None:
     """새 ticker 생성 성공"""
     # When
-    ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
     saved = repo.save(ticker)
 
     # Then
     assert saved.id is not None
     assert saved.ticker == "KRW-BTC"
     assert saved.asset_type == AssetType.CRYPTO
+    assert saved.data_source == DataSource.UPBIT.value
 
 
-def test_create_ticker_duplicate_updates(repo: TickerRepository, sample_exchange: Exchange) -> None:
+def test_create_ticker_duplicate_updates(repo: TickerRepository) -> None:
     """중복 ticker 저장 시 업데이트 (upsert)"""
     # Given: 이미 존재하는 ticker
-    ticker1 = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    ticker1 = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
     repo.save(ticker1)
 
     # When: 동일한 ticker로 다시 저장
-    ticker2 = Ticker(ticker="KRW-BTC", asset_type=AssetType.KR_STOCK, exchange_id=sample_exchange.id)
+    ticker2 = Ticker(ticker="KRW-BTC", asset_type=AssetType.KR_STOCK, data_source=DataSource.UPBIT.value)
     saved = repo.save(ticker2)
 
     # Then: 업데이트됨
@@ -83,11 +70,11 @@ def test_create_ticker_duplicate_updates(repo: TickerRepository, sample_exchange
     assert len(repo.find_all()) == 1
 
 
-def test_find_all_tickers(repo: TickerRepository, sample_exchange: Exchange) -> None:
+def test_find_all_tickers(repo: TickerRepository) -> None:
     """전체 ticker 조회"""
     # Given: 여러 ticker 생성
-    repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
-    repo.save(Ticker(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
+    repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value))
+    repo.save(Ticker(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value))
 
     # When
     tickers = repo.find_all()
@@ -98,10 +85,10 @@ def test_find_all_tickers(repo: TickerRepository, sample_exchange: Exchange) -> 
     assert any(t.ticker == "KRW-ETH" for t in tickers)
 
 
-def test_find_ticker_by_id(repo: TickerRepository, sample_exchange: Exchange) -> None:
+def test_find_ticker_by_id(repo: TickerRepository) -> None:
     """ID로 ticker 조회"""
     # Given: ticker 생성
-    saved = repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
+    saved = repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value))
 
     # When
     found = repo.find_by_id(saved.id)
@@ -121,10 +108,10 @@ def test_find_ticker_not_found_returns_none(repo: TickerRepository) -> None:
     assert found is None
 
 
-def test_delete_ticker_success(repo: TickerRepository, sample_exchange: Exchange) -> None:
+def test_delete_ticker_success(repo: TickerRepository) -> None:
     """ticker 삭제 성공"""
     # Given: ticker 생성
-    saved = repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
+    saved = repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value))
     ticker_id = saved.id
 
     # When
@@ -144,10 +131,10 @@ def test_delete_ticker_not_found_returns_false(repo: TickerRepository) -> None:
     assert result is False
 
 
-def test_exists_returns_true_when_exists(repo: TickerRepository, sample_exchange: Exchange) -> None:
+def test_exists_returns_true_when_exists(repo: TickerRepository) -> None:
     """ticker가 존재하면 True 반환"""
     # Given
-    repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id))
+    repo.save(Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value))
 
     # When/Then
     assert repo.exists("KRW-BTC") is True
@@ -167,22 +154,14 @@ def _create_mock_ticker(
         ticker_id: int,
         ticker_code: str,
         asset_type: AssetType,
-        exchange_id: int,
-        exchange_name: str = "Upbit",
-        timezone: str = "Asia/Seoul",
+        data_source: str = DataSource.UPBIT.value,
 ) -> MagicMock:
     """Mock Ticker 생성 헬퍼"""
     mock_ticker = MagicMock(spec=Ticker)
     mock_ticker.id = ticker_id
     mock_ticker.ticker = ticker_code
     mock_ticker.asset_type = asset_type
-    mock_ticker.exchange_id = exchange_id
-
-    # exchange relationship mock
-    mock_exchange = MagicMock(spec=Exchange)
-    mock_exchange.name = exchange_name
-    mock_exchange.timezone = timezone
-    mock_ticker.exchange = mock_exchange
+    mock_ticker.data_source = data_source
 
     return mock_ticker
 
@@ -215,14 +194,14 @@ class TestCreateTickerAPI:
             ticker_id=1,
             ticker_code="KRW-BTC",
             asset_type=AssetType.CRYPTO,
-            exchange_id=1,
+            data_source=DataSource.UPBIT.value,
         )
         mock_ticker_service.upsert.return_value = mock_ticker
 
         # When
         response = client_with_mock.put(
             "/api/tickers",
-            json={"ticker": "KRW-BTC", "asset_type": "CRYPTO", "exchange_id": 1},
+            json={"ticker": "KRW-BTC", "asset_type": "CRYPTO", "data_source": "upbit"},
         )
 
         # Then
@@ -231,10 +210,10 @@ class TestCreateTickerAPI:
         assert data["data"]["id"] == 1
         assert data["data"]["ticker"] == "KRW-BTC"
         assert data["data"]["asset_type"] == "CRYPTO"
-        assert data["data"]["exchange_id"] == 1
+        assert data["data"]["data_source"] == "upbit"
         assert data["data"]["timezone"] == "Asia/Seoul"
         mock_ticker_service.upsert.assert_called_once_with(
-            TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=1)
+            TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT)
         )
 
     def test_잘못된_asset_type_실패(self) -> None:
@@ -245,7 +224,7 @@ class TestCreateTickerAPI:
         # When
         response = client.put(
             "/api/tickers",
-            json={"ticker": "KRW-BTC", "asset_type": "INVALID", "exchange_id": 1},
+            json={"ticker": "KRW-BTC", "asset_type": "INVALID", "data_source": "upbit"},
         )
 
         # Then
@@ -259,14 +238,14 @@ class TestCreateTickerAPI:
         # When
         response = client.put(
             "/api/tickers",
-            json={"asset_type": "CRYPTO", "exchange_id": 1},
+            json={"asset_type": "CRYPTO", "data_source": "upbit"},
         )
 
         # Then
         assert response.status_code == 422
 
-    def test_exchange_id_누락_실패(self) -> None:
-        """exchange_id가 누락되면 422 에러를 반환한다"""
+    def test_data_source_누락_실패(self) -> None:
+        """data_source가 누락되면 422 에러를 반환한다"""
         # Given
         client = TestClient(app)
 
@@ -290,8 +269,8 @@ class TestGetAllTickersAPI:
     ) -> None:
         """전체 ticker 조회 시 200 응답을 반환한다"""
         # Given
-        ticker1 = _create_mock_ticker(1, "KRW-BTC", AssetType.CRYPTO, 1)
-        ticker2 = _create_mock_ticker(2, "KRW-ETH", AssetType.CRYPTO, 1)
+        ticker1 = _create_mock_ticker(1, "KRW-BTC", AssetType.CRYPTO)
+        ticker2 = _create_mock_ticker(2, "KRW-ETH", AssetType.CRYPTO)
         mock_ticker_service.get_all.return_value = [ticker1, ticker2]
 
         # When
@@ -332,7 +311,7 @@ class TestGetTickerByIdAPI:
     ) -> None:
         """ID로 ticker 조회 시 200 응답을 반환한다"""
         # Given
-        mock_ticker = _create_mock_ticker(1, "KRW-BTC", AssetType.CRYPTO, 1)
+        mock_ticker = _create_mock_ticker(1, "KRW-BTC", AssetType.CRYPTO)
         mock_ticker_service.get_by_id.return_value = mock_ticker
 
         # When

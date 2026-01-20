@@ -1,15 +1,12 @@
 """캔들 데이터 조회를 위한 공통 인터페이스 정의."""
 
+from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pandera.typing import DataFrame
 
 from src.common.candle_schema import CommonCandleSchema
-
-if TYPE_CHECKING:
-    pass
 
 
 class CandleInterval(StrEnum):
@@ -38,11 +35,10 @@ class CandleInterval(StrEnum):
     MONTH = "1M"
 
 
-@runtime_checkable
-class CandleClient(Protocol):
-    """캔들 데이터 조회 프로토콜.
+class CandleClient(ABC):
+    """캔들 데이터 조회 추상 클래스.
 
-    각 거래소 API가 이 프로토콜을 구현하여
+    각 거래소 API가 이 클래스를 상속하여
     통일된 방식으로 캔들 데이터를 조회할 수 있습니다.
 
     반환되는 DataFrame 형식:
@@ -51,6 +47,7 @@ class CandleClient(Protocol):
     - 정렬: 시간순 오름차순 (과거 → 최신)
     """
 
+    @abstractmethod
     def get_candles(
             self,
             symbol: str,
@@ -71,9 +68,10 @@ class CandleClient(Protocol):
             - index: DatetimeIndex (UTC)
             - columns: open, high, low, close, volume
         """
-        ...
+        pass
 
     @property
+    @abstractmethod
     def supported_intervals(self) -> list[CandleInterval]:
         """지원하는 캔들 간격 목록."""
-        ...
+        pass

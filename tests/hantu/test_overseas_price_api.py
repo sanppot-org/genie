@@ -76,26 +76,28 @@ class TestGetDailyCandles:
 
     @pytest.fixture
     def mock_response(self):
-        """캔들 API 모의 응답"""
+        """캔들 API 모의 응답
+
+        KIS API inquire-daily-chartprice 응답 형식:
+        - output1: 요약 정보 (dict)
+        - output2: 캔들 데이터 (list)
+        """
         return {
             "rt_cd": "0",
             "msg_cd": "SUCCESS",
             "msg1": "성공",
-            "output1": [
+            "output1": {},  # 요약 정보
+            "output2": [
                 {
-                    "xymd": "20240101",
-                    "clos": "150.00",
-                    "sign": "1",
-                    "diff": "1.50",
-                    "rate": "1.01",
-                    "open": "148.50",
-                    "high": "151.00",
-                    "low": "148.00",
-                    "tvol": "45000000",
-                    "tamt": "6750000000",
+                    "stck_bsop_date": "20240101",
+                    "ovrs_nmix_prpr": "150.00",
+                    "ovrs_nmix_oprc": "148.50",
+                    "ovrs_nmix_hgpr": "151.00",
+                    "ovrs_nmix_lwpr": "148.00",
+                    "acml_vol": "45000000",
+                    "mod_yn": "N",
                 }
             ],
-            "output2": {},
         }
 
     def test_get_daily_candles_returns_valid_response(self, api, mock_response):
@@ -108,9 +110,9 @@ class TestGetDailyCandles:
             result = api.get_daily_candles(asset_type=OverseasAssetType.INDEX, symbol="AAPL", start_date="20240101", end_date="20240131")
 
             assert isinstance(result, OverseasDailyCandleResponse)
-            assert len(result.output1) > 0
-            assert result.output1[0].xymd == "20240101"
-            assert result.output1[0].clos == "150.00"
+            assert len(result.candles) > 0
+            assert result.candles[0].stck_bsop_date == "20240101"
+            assert result.candles[0].ovrs_nmix_prpr == "150.00"
 
     def test_get_daily_candles_with_period_parameter(self, api, mock_response):
         """기간 구분 파라미터 테스트"""

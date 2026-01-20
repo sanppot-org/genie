@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pandas as pd
 from pandera.typing import DataFrame
 
-from src.common.candle_client import CandleInterval
+from src.common.candle_client import CandleClient, CandleInterval
 from src.common.candle_schema import CommonCandleSchema
 from src.upbit.upbit_api import UpbitAPI, UpbitCandleInterval
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     pass
 
 
-class UpbitCandleClient:
+class UpbitCandleClient(CandleClient):
     """Upbit API를 CandleClient Protocol로 래핑.
 
     기존 UpbitAPI를 수정하지 않고 CandleClient Protocol을 구현합니다.
@@ -108,7 +108,8 @@ class UpbitCandleClient:
             )
         return upbit_interval
 
-    def _standardize_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _standardize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         """DataFrame을 표준 형식으로 변환.
 
         - timestamp: UTC 시간

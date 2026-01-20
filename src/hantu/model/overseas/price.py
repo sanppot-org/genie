@@ -26,25 +26,50 @@ class OverseasCurrentPriceResponse(BaseModel):
 
 
 class OverseasDailyCandleData(BaseModel):
-    """해외주식 일/주/월/년 캔들 데이터"""
+    """해외주식 종목/지수/환율 일/주/월/년 캔들 데이터
 
-    xymd: str = Field(..., description="일자")
-    clos: str = Field(..., description="종가")
-    sign: str = Field(..., description="전일대비부호")
-    diff: str = Field(..., description="전일대비")
-    rate: str = Field(..., description="등락률")
-    open: str = Field(..., description="시가")
-    high: str = Field(..., description="고가")
-    low: str = Field(..., description="저가")
-    tvol: str = Field(..., description="거래량")
-    tamt: str = Field(..., description="거래대금")
+    KIS API inquire-daily-chartprice 응답 필드:
+    - stck_bsop_date: 영업 일자
+    - ovrs_nmix_prpr: 현재가(종가)
+    - ovrs_nmix_oprc: 시가
+    - ovrs_nmix_hgpr: 고가
+    - ovrs_nmix_lwpr: 저가
+    - acml_vol: 누적 거래량
+    - mod_yn: 변경 여부
+    """
+
+    stck_bsop_date: str = Field(..., description="영업 일자 (YYYYMMDD)")
+    ovrs_nmix_prpr: str = Field(..., description="현재가(종가)")
+    ovrs_nmix_oprc: str = Field(..., description="시가")
+    ovrs_nmix_hgpr: str = Field(..., description="고가")
+    ovrs_nmix_lwpr: str = Field(..., description="저가")
+    acml_vol: str = Field(..., description="누적 거래량")
+    mod_yn: str = Field(default="N", description="변경 여부")
 
 
 class OverseasDailyCandleResponse(BaseModel):
-    """해외주식 일/주/월/년 캔들 응답"""
+    """해외주식 일/주/월/년 캔들 응답
 
-    output1: list[OverseasDailyCandleData] = Field(default_factory=list, description="캔들 데이터 목록")
-    output2: dict | None = Field(None, description="추가 정보")
+    KIS API 응답 구조:
+    - output1: 요약 정보 (dict) 또는 캔들 데이터 (list)
+    - output2: 캔들 데이터 (list) 또는 추가 정보 (dict)
+
+    일반적으로 output2에 캔들 데이터가 리스트로 반환됩니다.
+    """
+
+    output1: dict | list[OverseasDailyCandleData] = Field(default_factory=dict, description="요약 정보 또는 캔들 데이터")
+    output2: list[OverseasDailyCandleData] | dict = Field(default_factory=list, description="캔들 데이터 또는 추가 정보")
+
+    @property
+    def candles(self) -> list[OverseasDailyCandleData]:
+        """캔들 데이터 리스트 반환"""
+        # output2가 캔들 리스트인 경우 (일반적)
+        if isinstance(self.output2, list):
+            return self.output2
+        # output1이 캔들 리스트인 경우 (대체)
+        if isinstance(self.output1, list):
+            return self.output1
+        return []
 
 
 class OverseasOrderbookItem(BaseModel):

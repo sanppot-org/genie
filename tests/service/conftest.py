@@ -7,11 +7,11 @@ import pytest
 from sqlalchemy.orm import Session
 
 from src.adapters.adapter_factory import CandleAdapterFactory
+from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
-from src.database.exchange_repository import ExchangeRepository
-from src.database.models import Exchange, Ticker
+from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
 from src.service.candle_service import CandleService
 
@@ -86,30 +86,12 @@ def ticker_repo(session: Session) -> TickerRepository:
 
 
 @pytest.fixture
-def exchange_repo(session: Session) -> ExchangeRepository:
-    """Exchange Repository fixture"""
-    return ExchangeRepository(session)
-
-
-@pytest.fixture
-def sample_exchange(exchange_repo: ExchangeRepository) -> Exchange:
-    """테스트용 Exchange 엔티티 생성 fixture
-
-    Returns:
-        Exchange: id가 할당된 Exchange 엔티티 (Upbit, Asia/Seoul)
-    """
-    exchange = Exchange(name="Upbit", timezone="Asia/Seoul")
-    exchange_repo.save(exchange)
-    return exchange
-
-
-@pytest.fixture
-def sample_ticker(ticker_repo: TickerRepository, sample_exchange: Exchange) -> Ticker:
+def sample_ticker(ticker_repo: TickerRepository) -> Ticker:
     """테스트용 Ticker 엔티티 생성 fixture
 
     Returns:
         Ticker: id가 할당된 Ticker 엔티티
     """
-    ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=sample_exchange.id)
+    ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
     ticker_repo.save(ticker)
     return ticker

@@ -5,6 +5,8 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from src.constants import TimeZone
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -18,9 +20,23 @@ class DataSource(str, Enum):
     문자열과 호환 가능하도록 str을 상속받습니다.
     """
 
-    UPBIT = "upbit"
-    BINANCE = "binance"
-    HANTU = "hantu"
+    UPBIT = ("upbit", TimeZone.SEOUL)
+    BINANCE = ("binance", TimeZone.UTC)
+    HANTU_D = ("hantu_domastic", TimeZone.SEOUL)
+    HANTU_O = ("hantu_overseas", TimeZone.NEW_YORK)
+
+    _timezone: TimeZone  # mypy를 위한 타입 힌트
+
+    def __new__(cls, value: str, timezone: TimeZone) -> "DataSource":
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj._timezone = timezone
+        return obj
+
+    @property
+    def timezone(self) -> TimeZone:
+        """데이터 소스의 기본 시간대 반환."""
+        return self._timezone
 
 
 class CandleDataAdapter(ABC):
@@ -37,9 +53,7 @@ class CandleDataAdapter(ABC):
     """
 
     @abstractmethod
-    def to_candle_models(
-            self, df: "pd.DataFrame", ticker_id: int, interval: object
-    ) -> Sequence["CandleBase"]:
+    def to_candle_models(self, df: "pd.DataFrame", ticker_id: int, interval: object) -> Sequence["CandleBase"]:
         """Raw DataFrame을 캔들 모델 리스트로 변환.
 
         각 어댑터는 출처별 interval 타입을 받아서:

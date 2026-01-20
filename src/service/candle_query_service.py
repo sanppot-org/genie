@@ -1,5 +1,7 @@
 """통합 캔들 조회 서비스."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -10,7 +12,7 @@ from src.common.candle_schema import CommonCandleSchema
 from src.common.data_adapter import DataSource
 
 if TYPE_CHECKING:
-    pass
+    from src.database.models import Ticker
 
 
 class CandleQueryService:
@@ -24,13 +26,15 @@ class CandleQueryService:
     Example:
         >>> from src.common.data_adapter import DataSource
         >>> from src.common.candle_client import CandleInterval
+        >>> from src.database.models import Ticker
         >>>
         >>> # DI 컨테이너에서 주입받아 사용
         >>> service = CandleQueryService({
         ...     DataSource.UPBIT: upbit_client,
         ...     DataSource.BINANCE: binance_client,
         ... })
-        >>> df = service.get_candles(DataSource.UPBIT, "KRW-BTC", CandleInterval.DAY)
+        >>> # Ticker 객체를 통해 조회
+        >>> df = service.get_candles(ticker, CandleInterval.DAY)
     """
 
     def __init__(self, clients: dict[DataSource, CandleClient]) -> None:
@@ -43,8 +47,7 @@ class CandleQueryService:
 
     def get_candles(
             self,
-            source: DataSource,
-            symbol: str,
+            ticker: Ticker,
             interval: CandleInterval,
             count: int = 100,
             end_time: datetime | None = None,
@@ -52,8 +55,7 @@ class CandleQueryService:
         """캔들 데이터 조회.
 
         Args:
-            source: 데이터 소스 (DataSource enum)
-            symbol: 심볼 (거래소별 형식, 예: "KRW-BTC", "BTCUSDT", "AAPL")
+            ticker: Ticker 엔티티 (data_source와 ticker 코드 포함)
             interval: 캔들 간격 (CandleInterval)
             count: 조회할 캔들 개수 (기본값: 100)
             end_time: 종료 시간 (해당 시간 이전 데이터 조회, UTC)
@@ -66,9 +68,9 @@ class CandleQueryService:
         Raises:
             ValueError: 등록되지 않은 데이터 소스인 경우
         """
-        client = self._get_client(source)
+        client = self._get_client(ticker.data_source)
         return client.get_candles(
-            symbol=symbol,
+            symbol=ticker.ticker,
             interval=interval,
             count=count,
             end_time=end_time,

@@ -4,10 +4,10 @@ from datetime import UTC, datetime
 
 import pytest
 
+from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.base_repository import BaseRepository
-from src.database.exchange_repository import ExchangeRepository
-from src.database.models import CandleMinute1, Exchange, Ticker
+from src.database.models import CandleMinute1, Ticker
 from src.database.ticker_repository import TickerRepository
 
 
@@ -34,19 +34,10 @@ def ticker_repo(session):
 
 
 @pytest.fixture
-def exchange_repo(session):
-    """Exchange Repository fixture."""
-    return ExchangeRepository(session)
-
-
-@pytest.fixture
-def sample_tickers(ticker_repo, exchange_repo):
+def sample_tickers(ticker_repo):
     """테스트용 Ticker 엔티티 생성 fixture."""
-    exchange = Exchange(name="Upbit", timezone="Asia/Seoul")
-    exchange_repo.save(exchange)
-
-    btc = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, exchange_id=exchange.id)
-    eth = Ticker(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, exchange_id=exchange.id)
+    btc = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
+    eth = Ticker(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
     ticker_repo.save(btc)
     ticker_repo.save(eth)
     return {"BTC": btc, "ETH": eth}

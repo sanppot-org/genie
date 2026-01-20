@@ -1,6 +1,6 @@
 """공통 캔들 DataFrame 스키마 정의."""
 
-from datetime import datetime
+from typing import Any
 
 import pandera.pandas as pa
 from pandera.typing import Series
@@ -39,8 +39,8 @@ class CommonCandleSchema(pa.DataFrameModel):
         >>> validated = CommonCandleSchema.validate(df)
     """
 
-    timestamp: Series[datetime]
-    local_time: Series[datetime]
+    timestamp: Series[Any]  # datetime 객체 (pandera는 object dtype으로 처리)
+    local_time: Series[Any]  # datetime 객체 (pandera는 object dtype으로 처리)
     open: Series[float]
     high: Series[float]
     low: Series[float]
