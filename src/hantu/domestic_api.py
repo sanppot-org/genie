@@ -346,7 +346,13 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         return chart.DailyChartResponseBody.model_validate(res.json())
 
-    def get_minute_chart(self, ticker: str, target_date: date, target_time: time_obj, market_code: MarketCode = MarketCode.KRX) -> chart.MinuteChartResponseBody:
+    def get_minute_chart(
+            self,
+            ticker: str,
+            target_date: date,
+            target_time: time_obj,
+            market_code: MarketCode = MarketCode.ALL
+    ) -> chart.MinuteChartResponseBody:
         """분봉 차트 조회
 
         - 한 번 호출에 최대 120건

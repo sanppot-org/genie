@@ -139,12 +139,6 @@ class ApplicationContainer(containers.DeclarativeContainer):
     hantu_domestic_candle_client = providers.Singleton(HantuDomesticCandleClient, hantu_domestic_api)
 
     # Services
-    candle_service = providers.Factory(
-        CandleService,
-        minute1_repository=candle_minute1_repository,
-        daily_repository=candle_daily_repository,
-        adapter_factory=candle_adapter_factory,
-    )
     candle_query_service = providers.Factory(
         CandleQueryService,
         clients=providers.Dict({
@@ -153,6 +147,13 @@ class ApplicationContainer(containers.DeclarativeContainer):
             DataSource.HANTU_O: hantu_overseas_candle_client,
             DataSource.HANTU_D: hantu_domestic_candle_client,
         }),
+    )
+    candle_service = providers.Factory(
+        CandleService,
+        minute1_repository=candle_minute1_repository,
+        daily_repository=candle_daily_repository,
+        adapter_factory=candle_adapter_factory,
+        query_service=candle_query_service,
     )
     ticker_service = providers.Factory(
         TickerService,

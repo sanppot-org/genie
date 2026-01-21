@@ -57,6 +57,21 @@ class TestTickerRepository:
         assert result is not None
         assert result.ticker == "KRW-BTC"
 
+    def test_find_by_ticker_ignores_case(
+            self, ticker_repo: TickerRepository
+    ) -> None:
+        """find_by_ticker는 대소문자를 구분하지 않음."""
+        # Given
+        ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
+        ticker_repo.save(ticker)
+
+        # When - 소문자로 조회
+        result = ticker_repo.find_by_ticker("krw-btc")
+
+        # Then
+        assert result is not None
+        assert result.ticker == "KRW-BTC"
+
     def test_find_by_ticker_returns_none_when_not_exists(
             self, ticker_repo: TickerRepository
     ) -> None:

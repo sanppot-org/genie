@@ -1,5 +1,7 @@
 """Ticker repository for database operations."""
 
+from sqlalchemy import func
+
 from src.constants import AssetType
 from src.database.base_repository import BaseRepository
 from src.database.models import Ticker
@@ -28,7 +30,9 @@ class TickerRepository(BaseRepository[Ticker, int]):
         Returns:
             Ticker if found, None otherwise
         """
-        return self.session.query(Ticker).filter_by(ticker=ticker).first()
+        return self.session.query(Ticker).filter(
+            func.lower(Ticker.ticker) == ticker.lower()
+        ).first()
 
     def find_by_asset_type(self, asset_type: AssetType) -> list[Ticker]:
         """자산 유형으로 필터링.

@@ -315,3 +315,96 @@ class HantuCandleAdapter(CandleDataAdapter):
     def _to_daily_models(self, df: pd.DataFrame, ticker_id: int) -> list[CandleDaily]:
         """Hantu DataFrame → list[CandleDaily]."""
         return self._df_to_models(df, ticker_id, CandleDaily)
+
+
+class CommonCandleAdapter(CandleDataAdapter):
+    """공통 캔들 어댑터 - CandleQueryService가 반환하는 표준 DataFrame 처리.
+
+    CommonCandleSchema를 따르는 DataFrame을 캔들 모델로 변환합니다.
+    CandleInterval을 사용하여 거래소에 독립적으로 동작합니다.
+
+    특징:
+    - 컬럼: timestamp, local_time, open, high, low, close, volume
+    - Index: UTC DatetimeIndex
+    - Interval: CandleInterval enum
+    """
+
+    def to_candle_models(
+            self, df: pd.DataFrame, ticker_id: int, interval: object
+    ) -> Sequence[CandleBase]:
+        """CommonCandleSchema DataFrame → 캔들 모델 리스트.
+
+        Args:
+            df: CommonCandleSchema를 따르는 DataFrame
+            ticker_id: 티커 ID
+            interval: CandleInterval enum
+
+        Returns:
+            CandleMinute1 또는 CandleDaily 모델 리스트
+
+        Raises:
+            TypeError: interval이 CandleInterval이 아닌 경우
+            ValueError: 지원하지 않는 interval인 경우
+        """
+        from src.common.candle_client import CandleInterval
+
+        if not isinstance(interval, CandleInterval):
+            raise TypeError(f"Expected CandleInterval, got {type(interval)}")
+
+        if interval == CandleInterval.MINUTE_1:
+            return self._to_minute1_models(df, ticker_id)
+        elif interval == CandleInterval.DAY:
+            return self._to_daily_models(df, ticker_id)
+        else:
+            raise ValueError(
+                f"Unsupported interval: {interval}. "
+                f"Only MINUTE_1 and DAY are supported."
+            )
+
+    def _to_minute1_models(
+            self, df: pd.DataFrame, ticker_id: int
+    ) -> list[CandleMinute1]:
+        """CommonCandleSchema DataFrame → CandleMinute1 리스트."""
+        if df.empty:
+            return []
+
+        models = []
+        for row in df.itertuples():
+            models.append(CandleMinute1(
+                timestamp=row.timestamp,
+                local_time=row.local_time,
+                ticker_id=ticker_id,
+                open=float(row.open),  # type: ignore[arg-type]
+                high=float(row.high),  # type: ignore[arg-type]
+                low=float(row.low),  # type: ignore[arg-type]
+                close=float(row.close),  # type: ignore[arg-type]
+                volume=float(row.volume),  # type: ignore[arg-type]
+            ))
+        return models
+
+    def _to_daily_models(
+            self, df: pd.DataFrame, ticker_id: int
+    ) -> list[CandleDaily]:
+        """CommonCandleSchema DataFrame → CandleDaily 리스트."""
+        if df.empty:
+            return []
+
+        models = []
+        for row in df.itertuples():
+            # local_time에서 date 추출
+            local_time = row.local_time
+            if hasattr(local_time, 'date'):
+                date = local_time.date()
+            else:
+                date = local_time
+
+            models.append(CandleDaily(
+                date=date,
+                ticker_id=ticker_id,
+                open=float(row.open),  # type: ignore[arg-type]
+                high=float(row.high),  # type: ignore[arg-type]
+                low=float(row.low),  # type: ignore[arg-type]
+                close=float(row.close),  # type: ignore[arg-type]
+                volume=float(row.volume),  # type: ignore[arg-type]
+            ))
+        return models

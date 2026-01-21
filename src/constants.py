@@ -4,6 +4,7 @@
 모든 문자열 상수와 매직 넘버를 중앙에서 관리합니다.
 """
 
+from datetime import tzinfo
 from enum import StrEnum
 from zoneinfo import ZoneInfo
 
@@ -24,6 +25,11 @@ class TimeZone(StrEnum):
     SEOUL = "Asia/Seoul"
     UTC = "UTC"
     NEW_YORK = "America/New_York"
+
+    @property
+    def tz(self) -> tzinfo:
+        """ZoneInfo 객체 반환."""
+        return ZoneInfo(self.value)
 
 
 DEFAULT_CACHE_DIR = ".cache"

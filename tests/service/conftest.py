@@ -13,6 +13,7 @@ from src.database.candle_repositories import CandleDailyRepository, CandleMinute
 from src.database.database import Database
 from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
+from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 
 
@@ -64,19 +65,20 @@ def adapter_factory() -> CandleAdapterFactory:
 
 
 @pytest.fixture
+def mock_query_service() -> MagicMock:
+    """Mock CandleQueryService fixture"""
+    return MagicMock(spec=CandleQueryService)
+
+
+@pytest.fixture
 def candle_service(
         minute1_repo: CandleMinute1Repository,
         daily_repo: CandleDailyRepository,
         adapter_factory: CandleAdapterFactory,
+        mock_query_service: MagicMock,
 ) -> CandleService:
     """CandleService fixture"""
-    return CandleService(minute1_repo, daily_repo, adapter_factory)
-
-
-@pytest.fixture
-def mock_upbit_api() -> MagicMock:
-    """Mock UpbitAPI fixture"""
-    return MagicMock()
+    return CandleService(minute1_repo, daily_repo, adapter_factory, mock_query_service)
 
 
 @pytest.fixture

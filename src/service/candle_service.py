@@ -22,11 +22,35 @@ class CollectMode(StrEnum):
     BACKFILL = "BACKFILL"
 
 
+def _to_utc(dt: datetime) -> datetime:
+    """datetime을 UTC로 변환.
+
+    - naive: UTC로 간주하고 tzinfo 추가
+    - aware: UTC로 변환
+
+    Args:
+        dt: 변환할 datetime
+
+    Returns:
+        UTC timezone이 적용된 datetime
+    """
+    from datetime import UTC as UTC_TZ
+
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC_TZ)
+    else:
+        return dt.astimezone(UTC_TZ)
+
+
 if TYPE_CHECKING:
+    import logging
+
     import pandas as pd
 
     from src.adapters.adapter_factory import CandleAdapterFactory
+    from src.database.models import CandleMinute1
     from src.database.repositories import CandleDailyRepository, CandleMinute1Repository
+    from src.service.candle_query_service import CandleQueryService
 
 
 class CandleService:
@@ -47,17 +71,20 @@ class CandleService:
             minute1_repository: "CandleMinute1Repository",
             daily_repository: "CandleDailyRepository",
             adapter_factory: "CandleAdapterFactory",
+            query_service: "CandleQueryService",
     ) -> None:
         """CandleService 초기화.
 
         Args:
             minute1_repository: 1분봉 캔들 데이터 저장소
-            daily_repository: 일봉 캔들 데이터 저장소@
+            daily_repository: 일봉 캔들 데이터 저장소
             adapter_factory: 어댑터 팩토리
+            query_service: 통합 캔들 조회 서비스
         """
         self._minute1_repo = minute1_repository
         self._daily_repo = daily_repository
         self._factory = adapter_factory
+        self._query_service = query_service
 
     def save_candles(
             self,
@@ -109,6 +136,106 @@ class CandleService:
                 "(CandleHour1, CandleDaily는 MATERIALIZED VIEW입니다.)"
             )
 
+    def _flush_candles(
+            self,
+            candles: list["CandleMinute1"],
+            logger: "logging.Logger",
+    ) -> int:
+        """누적된 캔들 데이터를 DB에 저장하고 저장된 개수 반환.
+
+        Args:
+            candles: 저장할 캔들 모델 리스트
+            logger: 로거
+
+        Returns:
+            저장된 캔들 개수
+        """
+        if not candles:
+            return 0
+        self._minute1_repo.bulk_upsert(candles)
+        logger.info(f"DB 저장 완료: {len(candles)}개")
+        return len(candles)
+
+    def _filter_by_boundary(
+            self,
+            df: "pd.DataFrame",
+            mode: CollectMode,
+            boundary: datetime | None,
+    ) -> "pd.DataFrame":
+        """INCREMENTAL 모드의 경계 타임스탬프 필터링.
+
+        Args:
+            df: 필터링할 DataFrame
+            mode: 수집 모드
+            boundary: 경계 타임스탬프 (이 시각 이후 데이터만 유지)
+
+        Returns:
+            필터링된 DataFrame
+        """
+        if mode != CollectMode.INCREMENTAL or boundary is None:
+            return df
+        return df[df["timestamp"] > _to_utc(boundary)]
+
+    def _filter_by_start(
+            self,
+            df: "pd.DataFrame",
+            start: datetime | None,
+    ) -> "pd.DataFrame":
+        """시작 시각 필터링.
+
+        Args:
+            df: 필터링할 DataFrame
+            start: 시작 시각 (이 시각 이후 데이터만 유지)
+
+        Returns:
+            필터링된 DataFrame
+        """
+        if start is None:
+            return df
+        return df[df["timestamp"] >= start]
+
+    def _get_mode_boundary(
+            self,
+            ticker: Ticker,
+            mode: CollectMode,
+            to: datetime | None,
+            logger: "logging.Logger",
+    ) -> tuple[datetime | None, datetime | None]:
+        """모드별 경계 타임스탬프와 to_date 반환.
+
+        Args:
+            ticker: 종목
+            mode: 수집 모드
+            to: 초기 to_date 값
+            logger: 로거
+
+        Returns:
+            (boundary_timestamp, to_date) 튜플
+            - boundary_timestamp: INCREMENTAL 모드에서 DB 최신 타임스탬프
+            - to_date: 수집 시작 기준 시각
+        """
+        boundary_timestamp: datetime | None = None
+        to_date = to
+
+        if mode == CollectMode.INCREMENTAL:
+            latest = self._minute1_repo.get_latest_candle(ticker.id)
+            boundary_timestamp = latest.timestamp if latest else None
+            if boundary_timestamp:
+                logger.info(f"Incremental 모드: {boundary_timestamp} 이후 데이터만 수집 (market={ticker.ticker})")
+            else:
+                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
+        elif mode == CollectMode.BACKFILL:
+            oldest = self._minute1_repo.get_oldest_candle(ticker.id)
+            if oldest:
+                to_date = oldest.timestamp
+                logger.info(f"Backfill 모드: {oldest.timestamp} 이전 데이터만 수집 (market={ticker.ticker})")
+            else:
+                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
+        else:  # FULL
+            logger.info(f"Full 모드: 전체 데이터 수집 (market={ticker.ticker})")
+
+        return boundary_timestamp, to_date
+
     def collect_minute1_candles(
             self,
             ticker: Ticker,
@@ -154,47 +281,33 @@ class CandleService:
         import logging
         from typing import cast
 
-        from src.common.data_adapter import DataSource
+        from src.common.candle_client import CandleInterval
         from src.database.models import CandleMinute1
-        from src.upbit.upbit_api import UpbitAPI, UpbitCandleInterval
 
         logger = logging.getLogger(__name__)
 
         if batch_size <= 0:
             raise ValueError("batch_size는 0보다 커야 합니다")
 
-        # 모드별 경계 timestamp 조회
-        boundary_timestamp: datetime | None = None
+        # 타임존 변환: aware datetime은 UTC로 변환, naive는 UTC로 간주
+        if start is not None:
+            start = _to_utc(start)
+        if to is not None:
+            to = _to_utc(to)
 
-        if mode == CollectMode.INCREMENTAL:
-            latest = self._minute1_repo.get_latest_candle(ticker.id)
-            boundary_timestamp = latest.timestamp if latest else None
-            if boundary_timestamp:
-                logger.info(f"Incremental 모드: {boundary_timestamp} 이후 데이터만 수집 (market={ticker.ticker})")
-            else:
-                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
-        elif mode == CollectMode.BACKFILL:
-            oldest = self._minute1_repo.get_oldest_candle(ticker.id)
-            if oldest:
-                to = oldest.timestamp  # BACKFILL: oldest timestamp부터 시작
-                logger.info(f"Backfill 모드: {oldest.timestamp} 이전 데이터만 수집 (market={ticker.ticker})")
-            else:
-                logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
-        else:  # FULL
-            logger.info(f"Full 모드: 전체 데이터 수집 (market={ticker.ticker})")
+        # 모드별 경계 timestamp 조회
+        boundary_timestamp, to_date = self._get_mode_boundary(ticker, mode, to, logger)
 
         accumulated_candles: list[CandleMinute1] = []
         total_saved = 0
-        to_date: datetime | None = to
-        upbit_api = UpbitAPI()
 
         while True:
             try:
-                df = upbit_api.get_candles(
-                    market=ticker.ticker,
-                    interval=UpbitCandleInterval.MINUTE_1,
+                df = self._query_service.get_candles(
+                    ticker=ticker,
+                    interval=CandleInterval.MINUTE_1,
                     count=batch_size,
-                    to=to_date,
+                    end_time=to_date,
                 )
             except Exception as e:
                 logger.error(f"API 호출 실패: {e}")
@@ -205,33 +318,18 @@ class CandleService:
                 break
 
             # INCREMENTAL 모드: DB 최신보다 오래된 데이터 필터링
-            if mode == CollectMode.INCREMENTAL and boundary_timestamp:
-                # SQLite는 timezone 정보를 저장하지 않으므로 UTC aware로 변환
-                from datetime import UTC as UTC_TZ
-                boundary_ts_aware = (
-                    boundary_timestamp.replace(tzinfo=UTC_TZ)
-                    if boundary_timestamp.tzinfo is None
-                    else boundary_timestamp
-                )
-                df = df[df["timestamp"] > boundary_ts_aware]
-                if df.empty:
-                    logger.info(f"DB 최신 데이터까지 수집 완료 (market={ticker.ticker})")
-                    break
+            df = self._filter_by_boundary(df, mode, boundary_timestamp)  # type: ignore[assignment]
+            if df.empty:
+                logger.info(f"DB 최신 데이터까지 수집 완료 (market={ticker.ticker})")
+                break
 
             # start 이전 데이터 필터링
-            if start is not None:
-                from datetime import UTC as UTC_TZ
-                start_aware = (
-                    start.replace(tzinfo=UTC_TZ)
-                    if start.tzinfo is None
-                    else start
-                )
-                df = df[df["timestamp"] >= start_aware]
-                if df.empty:
-                    logger.info(f"시작일자({start})에 도달하여 수집 종료 (market={ticker.ticker})")
-                    break
+            df = self._filter_by_start(df, start)  # type: ignore[assignment]
+            if df.empty:
+                logger.info(f"시작일자({start})에 도달하여 수집 종료 (market={ticker.ticker})")
+                break
 
-            candle_models = self._factory.get_adapter(DataSource.UPBIT).to_candle_models(df, ticker.id, UpbitCandleInterval.MINUTE_1)
+            candle_models = self._factory.get_common_adapter().to_candle_models(df, ticker.id, CandleInterval.MINUTE_1)
 
             if not candle_models:
                 logger.warning(f"변환된 캔들 데이터가 없습니다 (market={ticker.ticker})")
@@ -242,6 +340,9 @@ class CandleService:
 
             to_date = df.index[0]
 
+            # API가 요청한 개수보다 적게 반환하면 마지막 페이지
+            is_last_page = len(df) < batch_size
+
             logger.info(
                 f"수집: {len(candle_models)}개, "
                 f"누적: {len(accumulated_candles)}개, "
@@ -251,20 +352,23 @@ class CandleService:
             # 배치 저장
             if len(accumulated_candles) >= batch_size:
                 try:
-                    self._minute1_repo.bulk_upsert(accumulated_candles)
-                    total_saved += len(accumulated_candles)
-                    logger.info(f"DB 저장 완료: {len(accumulated_candles)}개 (총 {total_saved}개)")
+                    total_saved += self._flush_candles(accumulated_candles, logger)
+                    logger.info(f"총 {total_saved}개 저장됨")
                     accumulated_candles.clear()
                 except Exception as e:
                     logger.error(f"DB 저장 실패: {e}")
                     raise
 
+            # 마지막 페이지면 루프 종료
+            if is_last_page:
+                logger.info(f"마지막 페이지 수집 완료 (market={ticker.ticker})")
+                break
+
         # 최종 남은 데이터 저장
         if accumulated_candles:
             try:
-                self._minute1_repo.bulk_upsert(accumulated_candles)
-                total_saved += len(accumulated_candles)
-                logger.info(f"최종 DB 저장 완료: {len(accumulated_candles)}개 (총 {total_saved}개)")
+                total_saved += self._flush_candles(accumulated_candles, logger)
+                logger.info(f"최종 저장 완료, 총 {total_saved}개 저장됨")
             except Exception as e:
                 logger.error(f"최종 DB 저장 실패: {e}")
                 raise

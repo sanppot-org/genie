@@ -2,7 +2,12 @@
 
 from src.common.data_adapter import CandleDataAdapter, DataSource
 
-from .candle_adapters import BinanceCandleAdapter, HantuCandleAdapter, UpbitCandleAdapter
+from .candle_adapters import (
+    BinanceCandleAdapter,
+    CommonCandleAdapter,
+    HantuCandleAdapter,
+    UpbitCandleAdapter,
+)
 
 
 class CandleAdapterFactory:
@@ -25,6 +30,7 @@ class CandleAdapterFactory:
             DataSource.HANTU_D: HantuCandleAdapter(),
             DataSource.HANTU_O: HantuCandleAdapter(),
         }
+        self._common_adapter = CommonCandleAdapter()
 
     def get_adapter(self, source: DataSource) -> CandleDataAdapter:
         """출처에 맞는 어댑터 반환.
@@ -55,3 +61,14 @@ class CandleAdapterFactory:
             >>> factory.register_adapter(DataSource.UPBIT, custom_adapter)
         """
         self._adapters[source] = adapter
+
+    def get_common_adapter(self) -> CommonCandleAdapter:
+        """공통 어댑터 반환.
+
+        CandleQueryService가 반환하는 CommonCandleSchema DataFrame을
+        처리하기 위한 공통 어댑터를 반환합니다.
+
+        Returns:
+            CommonCandleAdapter 인스턴스
+        """
+        return self._common_adapter

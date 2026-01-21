@@ -168,8 +168,8 @@ class TestGetMinuteCandles:
         mock_get = mocker.patch("requests.get")
         mock_get.side_effect = [first_response, second_response]
 
-        # When
-        result = api.get_minute_candles(symbol="TSLA", minute_interval=OverseasMinuteInterval.MIN_1)
+        # When - limit=2를 지정하여 target_count가 2가 되도록 설정
+        result = api.get_minute_candles(symbol="TSLA", minute_interval=OverseasMinuteInterval.MIN_1, limit=2)
 
         # Then
         assert result.output1.rsym == "DNASTSLA"
@@ -181,7 +181,7 @@ class TestGetMinuteCandles:
         assert result.output2[1].xhms == "152900"
         assert result.output2[1].last == "150.00"
 
-        # 두 번째 호출 확인
+        # 연속 조회로 2번 호출 확인
         assert mock_get.call_count == 2
 
     def test_get_minute_candles_with_parameters(self, mocker):
