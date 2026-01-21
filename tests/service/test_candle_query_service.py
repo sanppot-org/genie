@@ -16,7 +16,7 @@ def _create_mock_ticker(ticker_code: str, data_source: DataSource) -> MagicMock:
     """Mock Ticker 생성 헬퍼."""
     mock_ticker = MagicMock(spec=Ticker)
     mock_ticker.ticker = ticker_code
-    mock_ticker.data_source = data_source.value
+    mock_ticker.data_source = data_source  # DataSource enum 직접 설정
     return mock_ticker
 
 

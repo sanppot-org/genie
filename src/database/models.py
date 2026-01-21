@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Float, Identity, Integer, PrimaryKeyConstraint, String, func
+from sqlalchemy import BigInteger, Date, DateTime, Enum, Float, Identity, Integer, PrimaryKeyConstraint, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.common.data_adapter import DataSource
@@ -40,7 +40,7 @@ class CandleBase(Base):
 
     Note:
         시간 필드는 각 서브클래스에서 정의합니다.
-        - CandleMinute1: timestamp (UTC), localtime (KST)
+        - CandleMinute1: timestamp (UTC), local_time (거래소 현지 시간, naive)
         - CandleDaily: date (날짜만)
     """
 
@@ -59,7 +59,7 @@ class CandleMinute1(CandleBase, TimestampMixin):
 
     Attributes:
         timestamp: 캔들 시각 (UTC, timezone-aware)
-        local_time: 캔들 시각 (KST, naive datetime)
+        local_time: 캔들 시각 (거래소 현지 시간, naive)
     """
 
     __tablename__ = "candle_minute_1"
@@ -81,7 +81,7 @@ class CandleHour1(CandleBase):
     """1시간봉 캔들 데이터 모델 (MATERIALIZED VIEW - 읽기 전용)
 
     Attributes:
-        local_time: 캔들 시각 (KST, naive datetime)
+        local_time: 캔들 시각 (거래소 현지 시간, naive)
     """
 
     __tablename__ = "candle_hour_1"
@@ -134,7 +134,7 @@ class Ticker(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
     asset_type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
-    data_source: Mapped[DataSource] = mapped_column(String(20), nullable=False, index=True)
+    data_source: Mapped[DataSource] = mapped_column(Enum(DataSource, native_enum=False), nullable=False, index=True)
 
     def __repr__(self) -> str:
         """문자열 표현"""

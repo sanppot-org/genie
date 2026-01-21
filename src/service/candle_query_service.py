@@ -64,6 +64,7 @@ class CandleQueryService:
             표준 캔들 DataFrame[CommonCandleSchema]
             - index: DatetimeIndex (UTC)
             - columns: open, high, low, close, volume
+            - local_time: 거래소 현지 시간 (naive datetime)
 
         Raises:
             ValueError: 등록되지 않은 데이터 소스인 경우
