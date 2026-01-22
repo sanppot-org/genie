@@ -36,7 +36,7 @@ class TickerService:
         """전체 ticker 조회.
 
         Returns:
-            모든 Ticker 목록
+            모든 Ticker 목록 (id 오름차순)
         """
         return self._repo.find_all()
 

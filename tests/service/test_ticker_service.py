@@ -86,6 +86,21 @@ def test_get_all_tickers(service: TickerService) -> None:
     assert any(t.ticker == "KRW-ETH" for t in tickers)
 
 
+def test_get_all_returns_sorted_by_id_ascending(service: TickerService) -> None:
+    """전체 ticker 조회 시 id 오름차순 정렬"""
+    # Given - 순서를 섞어서 생성
+    service.upsert(TickerCreate(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT))
+    service.upsert(TickerCreate(ticker="KRW-ETH", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT))
+    service.upsert(TickerCreate(ticker="KRW-XRP", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT))
+
+    # When
+    tickers = service.get_all()
+
+    # Then
+    assert len(tickers) == 3
+    assert tickers[0].id < tickers[1].id < tickers[2].id
+
+
 def test_get_ticker_by_id(service: TickerService) -> None:
     """ID로 ticker 조회"""
     # Given

@@ -1,8 +1,15 @@
 """Base Repository for common CRUD operations."""
 
 from abc import ABC, abstractmethod
+from typing import Any, Protocol
 
 from sqlalchemy.orm import Session
+
+
+class HasId(Protocol):
+    """id 속성을 가진 엔티티를 위한 Protocol."""
+
+    id: Any
 
 
 class ReadOnlyRepository[T, ID](ABC):
@@ -43,7 +50,7 @@ class ReadOnlyRepository[T, ID](ABC):
         return self.session.query(self._get_model_class()).filter_by(id=entity_id).first()
 
     def find_all(self) -> list[T]:
-        """Find all entities.
+        """Find all entities (no ordering - for models without id).
 
         Returns:
             List of all entities
@@ -51,13 +58,14 @@ class ReadOnlyRepository[T, ID](ABC):
         return self.session.query(self._get_model_class()).all()
 
 
-class BaseRepository[T, ID](ReadOnlyRepository[T, ID], ABC):
+class BaseRepository[T: HasId, ID](ReadOnlyRepository[T, ID], ABC):
     """읽기/쓰기 가능한 Repository 베이스 클래스.
 
     일반 테이블을 위한 CRUD 기능을 제공합니다.
+    id 속성을 가진 엔티티만 사용 가능합니다.
 
     Type parameters:
-        T: Entity type
+        T: Entity type (must have id attribute)
         ID: Primary key type
     """
 
@@ -68,6 +76,15 @@ class BaseRepository[T, ID](ReadOnlyRepository[T, ID], ABC):
         Returns:
             Tuple of field names that form unique constraint
         """
+
+    def find_all(self) -> list[T]:
+        """Find all entities (ordered by id ascending).
+
+        Returns:
+            List of all entities ordered by id
+        """
+        model_class = self._get_model_class()
+        return self.session.query(model_class).order_by(model_class.id).all()
 
     def save(self, entity: T) -> T:
         """Save or update entity (upsert).
