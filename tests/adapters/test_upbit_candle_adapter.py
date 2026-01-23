@@ -122,8 +122,8 @@ def test_to_candle_models_with_valid_data(
 
     # timestamp는 UTC timezone-aware datetime으로 저장됨
     expected_time = datetime(2024, 1, 1, 9, 0, 0, tzinfo=pytz.UTC)
-    assert first_candle.timestamp == expected_time
-    assert first_candle.timestamp.tzinfo is not None
+    assert first_candle.utc_time == expected_time
+    assert first_candle.utc_time.tzinfo is not None
 
     # local_time은 KST naive datetime (인덱스에서 변환)
     expected_local_time = datetime(2024, 1, 1, 18, 0, 0)
@@ -209,8 +209,8 @@ def test_timezone_preserved_as_utc_aware(
     ]
 
     for i, candle in enumerate(result):
-        assert candle.timestamp == expected_times[i]
-        assert candle.timestamp.tzinfo is not None  # timezone-aware datetime 확인
+        assert candle.utc_time == expected_times[i]
+        assert candle.utc_time.tzinfo is not None  # timezone-aware datetime 확인
         assert candle.local_time == expected_local_times[i]
         assert candle.local_time.tzinfo is None  # naive datetime 확인
 

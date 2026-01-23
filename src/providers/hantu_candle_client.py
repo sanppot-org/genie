@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from datetime import time as time_obj
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from pandera.typing import DataFrame
@@ -25,6 +26,31 @@ if TYPE_CHECKING:
         OverseasDailyCandleResponse,
         OverseasMinuteCandleResponse,
     )
+
+# 캔들 데이터 컬럼 정의
+_CANDLE_COLUMNS = ["timestamp", "local_time", "open", "high", "low", "close", "volume"]
+
+
+def _merge_and_trim_candles(all_candles: list[pd.DataFrame], count: int) -> pd.DataFrame:
+    """여러 캔들 DataFrame을 병합하고 요청한 개수만큼 잘라서 반환.
+
+    Args:
+        all_candles: 병합할 DataFrame 리스트
+        count: 최종 반환할 캔들 개수
+
+    Returns:
+        병합 및 정렬된 DataFrame (최신 count개)
+    """
+    if not all_candles:
+        return pd.DataFrame(columns=_CANDLE_COLUMNS)
+
+    result = pd.concat(all_candles)
+    result = result.sort_index(ascending=True)
+
+    if len(result) > count:
+        result = result.tail(count)
+
+    return result
 
 
 class HantuOverseasCandleClient(CandleClient):
@@ -93,7 +119,7 @@ class HantuOverseasCandleClient(CandleClient):
             - columns: open, high, low, close, volume
         """
         if self._is_minute_interval(interval):
-            df = self._get_minute_candles(symbol, interval, count)
+            df = self._get_minute_candles(symbol, interval, count, end_time)
         else:
             df = self._get_daily_candles(symbol, interval, count, end_time)
 
@@ -127,18 +153,28 @@ class HantuOverseasCandleClient(CandleClient):
             symbol: str,
             interval: CandleInterval,
             count: int,
+            end_time: datetime | None = None,
     ) -> pd.DataFrame:
         """분봉 데이터 조회.
 
         API가 연속조회를 통해 요청한 개수만큼 데이터를 반환합니다.
+
+        Args:
+            symbol: 종목코드
+            interval: 캔들 간격
+            count: 조회할 개수
+            end_time: 종료 시간 (UTC naive datetime)
         """
         minute_interval = self._to_minute_interval(interval)
 
-        response = self._api.get_minute_candles(
-            symbol=symbol,
-            minute_interval=minute_interval,
-            limit=count,  # API가 자동 페이징으로 count만큼 조회
-        )
+        # end_time이 있으면 UTC → America/New_York으로 변환
+        ny_end_time = None
+        if end_time:
+            # naive UTC → aware UTC → New York 시간
+            utc_aware = end_time.replace(tzinfo=ZoneInfo("UTC"))
+            ny_end_time = utc_aware.astimezone(TimeZone.NEW_YORK.tz)
+
+        response = self._api.get_minute_candles(symbol=symbol, minute_interval=minute_interval, limit=count, end_time=ny_end_time)
 
         df = self._minute_response_to_dataframe(response)
 
@@ -196,18 +232,7 @@ class HantuOverseasCandleClient(CandleClient):
             oldest_date = df.index.min().to_pydatetime()
             current_end = oldest_date - timedelta(days=1)
 
-        if not all_candles:
-            return pd.DataFrame(
-                columns=["timestamp", "local_time", "open", "high", "low", "close", "volume"]
-            )
-
-        result = pd.concat(all_candles)
-        result = result.sort_index(ascending=True)
-
-        if len(result) > count:
-            result = result.tail(count)
-
-        return result
+        return _merge_and_trim_candles(all_candles, count)
 
     @staticmethod
     def _get_days_per_candle(interval: CandleInterval) -> int:
@@ -335,6 +360,7 @@ class HantuDomesticCandleClient(CandleClient):
             interval: CandleInterval,
             count: int = 100,
             end_time: datetime | None = None,
+            exclude_incomplete: bool = True,
     ) -> DataFrame[CommonCandleSchema]:
         """캔들 데이터 조회.
 
@@ -343,16 +369,24 @@ class HantuDomesticCandleClient(CandleClient):
             interval: 캔들 간격 (CandleInterval)
             count: 조회할 캔들 개수 (기본값: 100)
             end_time: 종료 시간 (해당 시간 이전 데이터 조회, UTC)
+            exclude_incomplete: 미마감 캔들 제외 여부 (기본값: True)
 
         Returns:
             표준 캔들 DataFrame[CommonCandleSchema]
             - index: DatetimeIndex (UTC)
             - columns: open, high, low, close, volume
         """
+        # 미마감 캔들 제외 시 1개 더 조회
+        fetch_count = count + 1 if exclude_incomplete else count
+
         if self._is_minute_interval(interval):
-            df = self._get_minute_candles(symbol, count, end_time)
+            df = self._get_minute_candles(symbol, fetch_count, end_time)
         else:
-            df = self._get_daily_candles(symbol, interval, count, end_time)
+            df = self._get_daily_candles(symbol, interval, fetch_count, end_time)
+
+        # 미마감 캔들(마지막 행) 제외
+        if exclude_incomplete and len(df) > 0:
+            df = df.iloc[:-1]
 
         return CommonCandleSchema.validate(df)
 
@@ -387,59 +421,66 @@ class HantuDomesticCandleClient(CandleClient):
         1. 첫 번째 조회: end_time부터 최대 120개
         2. 두 번째 조회: 첫 번째 조회의 가장 오래된 캔들 시간 - 1분 부터 120개
         3. 필요한 개수만큼 반복
+
+        Args:
+            symbol: 종목코드
+            count: 조회할 캔들 개수
+            end_time: 종료 시간 (UTC naive datetime)
         """
-        # end_time이 없으면 현재 시간 (이미 KST)
-        # end_time이 있으면 UTC이므로 KST로 변환 (+9시간)
+        # end_time이 없으면 현재 KST 시간 사용
         if end_time is None:
-            current_kst_time = datetime.now()
+            current_kst_time = datetime.now(TimeZone.SEOUL.tz)
         else:
-            current_kst_time = end_time + timedelta(hours=9)
+            # end_time은 UTC naive datetime → KST로 변환
+            utc_aware = end_time.replace(tzinfo=ZoneInfo("UTC"))
+            current_kst_time = utc_aware.astimezone(TimeZone.SEOUL.tz)
+
+        # naive datetime으로 변환 (API 호출용)
+        current_kst_naive = current_kst_time.replace(tzinfo=None)
 
         all_candles: list[pd.DataFrame] = []
         remaining = count
+        empty_count = 0  # 연속 빈 응답 카운터 (휴장일 처리용)
 
         while remaining > 0:
             response = self._api.get_minute_chart(
                 ticker=symbol,
-                target_date=current_kst_time.date(),
-                target_time=time_obj(current_kst_time.hour, current_kst_time.minute, current_kst_time.second),
+                target_date=current_kst_naive.date(),
+                target_time=time_obj(current_kst_naive.hour, current_kst_naive.minute, current_kst_naive.second),
             )
 
             df = self._minute_response_to_dataframe(response)
 
             if df.empty:
-                break  # 더 이상 데이터 없음
+                # 휴장일 처리: 전날 23:59로 롤백하여 재시도
+                prev_day = current_kst_naive.date() - timedelta(days=1)
+                current_kst_naive = datetime.combine(prev_day, time_obj(23, 59, 0))
+                empty_count += 1
+                if empty_count > 30:  # 무한 루프 방지 (연속 휴장일 최대 30일)
+                    break
+                continue
 
+            # 데이터를 받았으면 empty_count 리셋
+            empty_count = 0
             all_candles.append(df)
             remaining -= len(df)
 
             # 다음 조회를 위해 가장 오래된 캔들 시간 - 1분 설정
-            # df.index는 UTC이므로 KST로 변환 (+9시간)
+            # df.index는 UTC이므로 KST로 변환
             oldest_utc = df.index.min().to_pydatetime()
-            oldest_kst = oldest_utc + timedelta(hours=9)
+            oldest_utc_aware = oldest_utc.replace(tzinfo=ZoneInfo("UTC"))
+            oldest_kst = oldest_utc_aware.astimezone(TimeZone.SEOUL.tz)
             next_query_kst = oldest_kst - timedelta(minutes=1)
 
             # 장 시작 시간(09:00) 이전이면 전날 23:59로 설정
             # (시간만 바꾸면 안 되고, 전날 날짜 + 23:59로 해야 전날 데이터 조회 가능)
             if next_query_kst.hour < 9:
                 prev_day = oldest_kst.date() - timedelta(days=1)
-                current_kst_time = datetime.combine(prev_day, time_obj(23, 59, 0))
+                current_kst_naive = datetime.combine(prev_day, time_obj(23, 59, 0))
             else:
-                current_kst_time = next_query_kst
+                current_kst_naive = next_query_kst.replace(tzinfo=None)
 
-        if not all_candles:
-            return pd.DataFrame(
-                columns=["timestamp", "local_time", "open", "high", "low", "close", "volume"]
-            )
-
-        # 모든 결과 병합 후 요청한 count만큼 반환
-        result = pd.concat(all_candles)
-        result = result.sort_index(ascending=True)  # 시간순 정렬
-
-        if len(result) > count:
-            result = result.tail(count)  # 최신 count개 반환
-
-        return result
+        return _merge_and_trim_candles(all_candles, count)
 
     def _get_daily_candles(
             self,
@@ -493,18 +534,7 @@ class HantuDomesticCandleClient(CandleClient):
             oldest_date = df.index.min().to_pydatetime()
             current_end = oldest_date - timedelta(days=1)
 
-        if not all_candles:
-            return pd.DataFrame(
-                columns=["timestamp", "local_time", "open", "high", "low", "close", "volume"]
-            )
-
-        result = pd.concat(all_candles)
-        result = result.sort_index(ascending=True)
-
-        if len(result) > count:
-            result = result.tail(count)
-
-        return result
+        return _merge_and_trim_candles(all_candles, count)
 
     @staticmethod
     def _get_days_per_candle(interval: CandleInterval) -> int:

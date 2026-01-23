@@ -307,7 +307,7 @@ class TestHantuDomesticCandleClientPagination:
         mock_api.get_minute_chart.return_value = mock_response
 
         client = HantuDomesticCandleClient(mock_api)
-        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=50)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=50, exclude_incomplete=False)
 
         # API가 1번만 호출되었는지 확인
         assert mock_api.get_minute_chart.call_count == 1
@@ -330,15 +330,68 @@ class TestHantuDomesticCandleClientPagination:
         mock_api.get_minute_chart.side_effect = [first_response, second_response]
 
         client = HantuDomesticCandleClient(mock_api)
-        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=200)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=200, exclude_incomplete=False)
 
         # API가 2번 호출되었는지 확인
         assert mock_api.get_minute_chart.call_count == 2
         # 200개 반환 (120 + 80)
         assert len(result) == 200
 
-    def test_get_minute_candles_stops_on_empty_response(self) -> None:
-        """빈 응답 시 페이징 중단."""
+    def test_get_minute_candles_handles_holiday_gap(self) -> None:
+        """휴장일 갭 처리: 빈 응답 시 전날로 롤백하여 재시도."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+
+        # 첫 번째 호출 (1/2 09:00~08:xx): 50개 반환
+        # base_hour=8이면 가장 오래된 캔들이 08:10 → 08:09 → 9시 이전이므로 전날 23:59로 변경
+        first_candles = [self._create_mock_minute_candle(i, base_date="20260102", base_hour=8) for i in range(50)]
+        first_response = MagicMock()
+        first_response.output2 = first_candles
+
+        # 두 번째 호출 (1/1 23:59): 빈 응답 (신정 휴일)
+        empty_response_1 = MagicMock()
+        empty_response_1.output2 = []
+
+        # 세 번째 호출 (12/31 23:59): 빈 응답 (연말 휴일)
+        empty_response_2 = MagicMock()
+        empty_response_2.output2 = []
+
+        # 네 번째 호출 (12/30 23:59~): 50개 반환
+        fourth_candles = [self._create_mock_minute_candle(i, base_date="20251230", base_hour=15) for i in range(50)]
+        fourth_response = MagicMock()
+        fourth_response.output2 = fourth_candles
+
+        mock_api.get_minute_chart.side_effect = [
+            first_response,
+            empty_response_1,
+            empty_response_2,
+            fourth_response,
+        ]
+
+        client = HantuDomesticCandleClient(mock_api)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=100, exclude_incomplete=False)
+
+        # API가 4번 호출되었는지 확인
+        assert mock_api.get_minute_chart.call_count == 4
+        # 100개 반환 (50 + 50)
+        assert len(result) == 100
+
+        # 두 번째 호출 시 전날(1/1)로 롤백되었는지 확인
+        second_call = mock_api.get_minute_chart.call_args_list[1]
+        assert second_call.kwargs["target_date"] == date(2026, 1, 1)
+        assert second_call.kwargs["target_time"] == time(23, 59, 0)
+
+        # 세 번째 호출 시 12/31로 롤백되었는지 확인
+        third_call = mock_api.get_minute_chart.call_args_list[2]
+        assert third_call.kwargs["target_date"] == date(2025, 12, 31)
+        assert third_call.kwargs["target_time"] == time(23, 59, 0)
+
+        # 네 번째 호출 시 12/30로 롤백되었는지 확인
+        fourth_call = mock_api.get_minute_chart.call_args_list[3]
+        assert fourth_call.kwargs["target_date"] == date(2025, 12, 30)
+        assert fourth_call.kwargs["target_time"] == time(23, 59, 0)
+
+    def test_get_minute_candles_stops_after_max_empty_retries(self) -> None:
+        """30번 이상 연속 빈 응답 시 페이징 중단."""
         mock_api = MagicMock(spec=HantuDomesticAPI)
 
         # 첫 번째 호출: 50개 반환
@@ -346,17 +399,20 @@ class TestHantuDomesticCandleClientPagination:
         first_response = MagicMock()
         first_response.output2 = first_candles
 
-        # 두 번째 호출: 빈 응답
-        second_response = MagicMock()
-        second_response.output2 = []
+        # 31번 빈 응답 (무한 루프 방지 테스트)
+        empty_response = MagicMock()
+        empty_response.output2 = []
+        empty_responses = [empty_response] * 31
 
-        mock_api.get_minute_chart.side_effect = [first_response, second_response]
+        mock_api.get_minute_chart.side_effect = [first_response] + empty_responses
 
         client = HantuDomesticCandleClient(mock_api)
-        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=200)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=200, exclude_incomplete=False)
 
-        # 50개만 반환 (첫 번째 응답만)
+        # 50개만 반환 (첫 번째 응답 + 31번 빈 응답 후 중단)
         assert len(result) == 50
+        # API가 32번 호출되었는지 확인 (1 + 31)
+        assert mock_api.get_minute_chart.call_count == 32
 
     def test_get_minute_candles_continues_on_partial_page(self) -> None:
         """120개 미만 응답 시에도 전날 데이터 조회 계속."""
@@ -373,19 +429,20 @@ class TestHantuDomesticCandleClientPagination:
         second_response = MagicMock()
         second_response.output2 = second_candles
 
-        # 세 번째 호출: 빈 응답 (더 이상 데이터 없음)
-        empty_response = MagicMock()
-        empty_response.output2 = []
+        # 세 번째 호출: 80개 반환 (전전날 데이터)
+        third_candles = [self._create_mock_minute_candle(i, base_date="20231231", base_hour=14) for i in range(80)]
+        third_response = MagicMock()
+        third_response.output2 = third_candles
 
-        mock_api.get_minute_chart.side_effect = [first_response, second_response, empty_response]
+        mock_api.get_minute_chart.side_effect = [first_response, second_response, third_response]
 
         client = HantuDomesticCandleClient(mock_api)
-        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=200)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=200, exclude_incomplete=False)
 
-        # API가 3번 호출되었는지 확인 (120 미만이어도 계속 조회, 빈 응답에서 중단)
+        # API가 3번 호출되었는지 확인 (120 미만이어도 계속 조회)
         assert mock_api.get_minute_chart.call_count == 3
-        # 120개 반환 (60 + 60, 빈 응답 전까지)
-        assert len(result) == 120
+        # 200개 반환 (60 + 60 + 80)
+        assert len(result) == 200
 
         # 두 번째 호출 시 전날 날짜(20240101)와 23:59로 호출되었는지 확인
         second_call = mock_api.get_minute_chart.call_args_list[1]
@@ -451,7 +508,7 @@ class TestHantuDomesticCandleClientDailyCandles:
 
         client = HantuDomesticCandleClient(mock_api)
         end_time = datetime(2024, 1, 31)
-        client.get_candles("005930", CandleInterval.DAY, count=100, end_time=end_time)
+        client.get_candles("005930", CandleInterval.DAY, count=100, end_time=end_time, exclude_incomplete=False)
 
         # API 호출 확인
         call_kwargs = mock_api.get_daily_chart.call_args.kwargs
@@ -498,7 +555,7 @@ class TestHantuDomesticCandleClientDailyCandles:
         mock_api.get_daily_chart.side_effect = [first_response, second_response]
 
         client = HantuDomesticCandleClient(mock_api)
-        result = client.get_candles("005930", CandleInterval.DAY, count=200)
+        result = client.get_candles("005930", CandleInterval.DAY, count=200, exclude_incomplete=False)
 
         # API가 2번 호출되었는지 확인
         assert mock_api.get_daily_chart.call_count == 2
@@ -521,7 +578,7 @@ class TestHantuDomesticCandleClientDailyCandles:
         mock_api.get_daily_chart.side_effect = [first_response, empty_response]
 
         client = HantuDomesticCandleClient(mock_api)
-        result = client.get_candles("005930", CandleInterval.DAY, count=200)
+        result = client.get_candles("005930", CandleInterval.DAY, count=200, exclude_incomplete=False)
 
         # API가 2번 호출되었는지 확인 (빈 응답에서 중단)
         assert mock_api.get_daily_chart.call_count == 2
@@ -636,3 +693,233 @@ class TestHantuOverseasCandleClientDailyCandles:
         assert mock_api.get_daily_candles.call_count == 2
         # 50개만 반환 (첫 번째 호출 결과만)
         assert len(result) == 50
+
+
+class TestHantuOverseasCandleClientEndTime:
+    """해외주식 분봉 조회 시 end_time 파라미터 전달 테스트."""
+
+    def test_get_minute_candles_without_end_time_passes_none(self) -> None:
+        """end_time 없이 호출 시 None 전달."""
+        mock_api = MagicMock(spec=HantuOverseasAPI)
+        mock_response = MagicMock()
+        mock_response.output2 = []
+        mock_api.get_minute_candles.return_value = mock_response
+
+        client = HantuOverseasCandleClient(mock_api)
+        client.get_candles(
+            symbol="AAPL",
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+        )
+
+        # end_time이 None으로 전달되었는지 확인
+        call_kwargs = mock_api.get_minute_candles.call_args.kwargs
+        assert call_kwargs["end_time"] is None
+
+    def test_get_minute_candles_with_utc_end_time_converts_to_new_york(self) -> None:
+        """UTC end_time이 New York 시간으로 변환되어 전달."""
+        mock_api = MagicMock(spec=HantuOverseasAPI)
+        mock_response = MagicMock()
+        mock_response.output2 = []
+        mock_api.get_minute_candles.return_value = mock_response
+
+        client = HantuOverseasCandleClient(mock_api)
+
+        # UTC naive datetime으로 2026-01-20 22:16:00 설정
+        # → New York 시간으로는 2026-01-20 17:16:00 (EST, -5시간)
+        end_time = datetime(2026, 1, 20, 22, 16, 0)  # UTC naive
+
+        client.get_candles(
+            symbol="AAPL",
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+            end_time=end_time,
+        )
+
+        # end_time이 New York 시간으로 변환되어 전달되었는지 확인
+        call_kwargs = mock_api.get_minute_candles.call_args.kwargs
+        actual_end_time = call_kwargs["end_time"]
+
+        # EST 기준: 2026-01-20 17:16:00
+        from zoneinfo import ZoneInfo
+        expected_ny_time = datetime(2026, 1, 20, 17, 16, 0, tzinfo=ZoneInfo("America/New_York"))
+        assert actual_end_time == expected_ny_time
+
+    def test_get_minute_candles_with_end_time_handles_date_change(self) -> None:
+        """UTC→New York 변환 시 날짜가 바뀌는 경우 처리."""
+        mock_api = MagicMock(spec=HantuOverseasAPI)
+        mock_response = MagicMock()
+        mock_response.output2 = []
+        mock_api.get_minute_candles.return_value = mock_response
+
+        client = HantuOverseasCandleClient(mock_api)
+
+        # UTC 2026-01-21 03:00:00 → New York 2026-01-20 22:00:00 (EST)
+        end_time = datetime(2026, 1, 21, 3, 0, 0)  # UTC naive
+
+        client.get_candles(
+            symbol="TSLA",
+            interval=CandleInterval.MINUTE_5,
+            count=50,
+            end_time=end_time,
+        )
+
+        call_kwargs = mock_api.get_minute_candles.call_args.kwargs
+        actual_end_time = call_kwargs["end_time"]
+
+        # EST 기준: 2026-01-20 22:00:00
+        from zoneinfo import ZoneInfo
+        expected_ny_time = datetime(2026, 1, 20, 22, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+        assert actual_end_time == expected_ny_time
+
+
+class TestHantuDomesticCandleClientExcludeIncomplete:
+    """미마감 캔들 제외 기능 테스트."""
+
+    @staticmethod
+    def _create_mock_minute_candle(index: int, base_date: str = "20240101", base_hour: int = 15) -> MagicMock:
+        """테스트용 Mock 분봉 캔들 데이터 생성."""
+        mock_candle = MagicMock()
+        hour = base_hour - (index // 60)
+        minute = 59 - (index % 60)
+        mock_candle.stck_bsop_date = base_date
+        mock_candle.stck_cntg_hour = f"{hour:02d}{minute:02d}00"
+        mock_candle.stck_oprc = f"{100 + index}"
+        mock_candle.stck_hgpr = f"{101 + index}"
+        mock_candle.stck_lwpr = f"{99 + index}"
+        mock_candle.stck_prpr = f"{100 + index}"
+        mock_candle.cntg_vol = f"{1000 + index}"
+        return mock_candle
+
+    def test_exclude_incomplete_true_by_default(self) -> None:
+        """exclude_incomplete 기본값은 True."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+
+        # 51개 반환하면 마지막 1개 제외하여 50개 반환
+        mock_candles = [self._create_mock_minute_candle(i) for i in range(51)]
+        mock_response = MagicMock()
+        mock_response.output2 = mock_candles
+        mock_api.get_minute_chart.return_value = mock_response
+
+        client = HantuDomesticCandleClient(mock_api)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=50)
+
+        # 50개만 반환 (마지막 1개 제외)
+        assert len(result) == 50
+
+    def test_exclude_incomplete_false_returns_all(self) -> None:
+        """exclude_incomplete=False일 때 마지막 캔들 포함."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+
+        mock_candles = [self._create_mock_minute_candle(i) for i in range(50)]
+        mock_response = MagicMock()
+        mock_response.output2 = mock_candles
+        mock_api.get_minute_chart.return_value = mock_response
+
+        client = HantuDomesticCandleClient(mock_api)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=50, exclude_incomplete=False)
+
+        # 50개 모두 반환 (마지막 캔들 포함)
+        assert len(result) == 50
+
+    def test_exclude_incomplete_empty_dataframe_returns_empty(self) -> None:
+        """빈 DataFrame일 때 에러 없이 빈 DataFrame 반환."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+
+        mock_response = MagicMock()
+        mock_response.output2 = []
+        mock_api.get_minute_chart.return_value = mock_response
+
+        client = HantuDomesticCandleClient(mock_api)
+        result = client.get_candles("005930", CandleInterval.MINUTE_1, count=50, exclude_incomplete=True)
+
+        # 빈 DataFrame 반환
+        assert result.empty
+
+
+class TestHantuDomesticCandleClientEndTime:
+    """국내주식 분봉 조회 시 end_time 파라미터 전달 테스트."""
+
+    def test_get_minute_candles_without_end_time_uses_current_time(self) -> None:
+        """end_time 없이 호출 시 현재 시간 사용."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+        mock_response = MagicMock()
+        mock_response.output2 = []
+        mock_api.get_minute_chart.return_value = mock_response
+
+        client = HantuDomesticCandleClient(mock_api)
+        client.get_candles(
+            symbol="005930",
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+        )
+
+        # get_minute_chart가 호출되었는지 확인
+        assert mock_api.get_minute_chart.called
+
+    def test_get_minute_candles_with_utc_end_time_converts_to_kst(self) -> None:
+        """UTC end_time이 KST로 변환되어 API에 전달."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+        mock_response = MagicMock()
+        # 충분한 데이터 반환 (빈 응답 시 전날 롤백 방지)
+        mock_candle = MagicMock()
+        mock_candle.stck_bsop_date = "20240115"
+        mock_candle.stck_cntg_hour = "175900"
+        mock_candle.stck_oprc = "100"
+        mock_candle.stck_hgpr = "101"
+        mock_candle.stck_lwpr = "99"
+        mock_candle.stck_prpr = "100"
+        mock_candle.cntg_vol = "1000"
+        mock_response.output2 = [mock_candle] * 100
+        mock_api.get_minute_chart.return_value = mock_response
+
+        client = HantuDomesticCandleClient(mock_api)
+
+        # UTC 시간으로 2024-01-15 09:00:00 설정
+        # → KST 시간으로는 2024-01-15 18:00:00 (+9시간)
+        end_time = datetime(2024, 1, 15, 9, 0, 0)  # UTC naive datetime
+
+        client.get_candles(
+            symbol="005930",
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+            end_time=end_time,
+        )
+
+        # 첫 번째 API 호출에 전달된 target_date와 target_time 확인
+        first_call_kwargs = mock_api.get_minute_chart.call_args_list[0].kwargs
+        assert first_call_kwargs["target_date"] == date(2024, 1, 15)  # KST 날짜
+        assert first_call_kwargs["target_time"] == time(18, 0, 0)  # KST 시간
+
+    def test_get_minute_candles_with_utc_end_time_handles_date_change(self) -> None:
+        """UTC→KST 변환 시 날짜가 바뀌는 경우 처리."""
+        mock_api = MagicMock(spec=HantuDomesticAPI)
+        mock_response = MagicMock()
+        # 충분한 데이터 반환 (빈 응답 시 전날 롤백 방지)
+        mock_candle = MagicMock()
+        mock_candle.stck_bsop_date = "20240116"
+        mock_candle.stck_cntg_hour = "045900"
+        mock_candle.stck_oprc = "100"
+        mock_candle.stck_hgpr = "101"
+        mock_candle.stck_lwpr = "99"
+        mock_candle.stck_prpr = "100"
+        mock_candle.cntg_vol = "1000"
+        mock_response.output2 = [mock_candle] * 100
+        mock_api.get_minute_chart.return_value = mock_response
+
+        client = HantuDomesticCandleClient(mock_api)
+
+        # UTC 2024-01-15 20:00:00 → KST 2024-01-16 05:00:00
+        end_time = datetime(2024, 1, 15, 20, 0, 0)  # UTC naive datetime
+
+        client.get_candles(
+            symbol="005930",
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+            end_time=end_time,
+        )
+
+        # 첫 번째 API 호출에서 KST로 변환 시 날짜가 바뀌어야 함
+        first_call_kwargs = mock_api.get_minute_chart.call_args_list[0].kwargs
+        assert first_call_kwargs["target_date"] == date(2024, 1, 16)  # 다음날
+        assert first_call_kwargs["target_time"] == time(5, 0, 0)  # KST 시간

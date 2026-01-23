@@ -42,7 +42,7 @@ class TestCollectMinute1CandlesIncrementalMode:
         """DB에 최신 데이터가 있으면 그 이후 데이터만 수집하고 중단한다."""
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
-            timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
+            utc_time=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
             local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
@@ -83,7 +83,7 @@ class TestCollectMinute1CandlesIncrementalMode:
         """DB 최신보다 새로운 데이터만 수집한다."""
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
-            timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
+            utc_time=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
             local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
@@ -133,7 +133,7 @@ class TestCollectMinute1CandlesIncrementalMode:
         # DB에 새 캔들이 저장됨
         latest = minute1_repo.get_latest_candle(sample_ticker.id)
         assert latest is not None
-        assert latest.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 11, 0, tzinfo=UTC)
+        assert latest.utc_time.replace(tzinfo=UTC) == datetime(2024, 1, 1, 11, 0, tzinfo=UTC)
 
     def test_collects_all_when_db_is_empty(
             self,
@@ -185,7 +185,7 @@ class TestCollectMinute1CandlesFullSyncMode:
         """mode=CollectMode.FULL일 때 DB 최신 데이터를 무시하고 전체 수집한다."""
         # Given: DB에 이미 캔들이 있음
         existing_candle = CandleMinute1(
-            timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
+            utc_time=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
             local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
@@ -232,7 +232,7 @@ class TestCollectMinute1CandlesFullSyncMode:
         """FULL 모드는 API가 빈 데이터를 반환할 때까지 계속 수집한다."""
         # Given: DB에 데이터가 있음
         existing_candle = CandleMinute1(
-            timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
+            utc_time=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
             local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
@@ -291,7 +291,7 @@ class TestCollectMinute1CandlesBackfillMode:
         # Given: DB에 캔들이 있음 (10:00, 11:00)
         existing_candles = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 19, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -301,7 +301,7 @@ class TestCollectMinute1CandlesBackfillMode:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 11, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 11, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 20, 0),
                 ticker_id=sample_ticker.id,
                 open=50500000,
@@ -353,7 +353,7 @@ class TestCollectMinute1CandlesBackfillMode:
         """BACKFILL 모드는 API가 빈 데이터를 반환할 때까지 수집한다."""
         # Given: DB에 캔들이 있음
         existing_candle = CandleMinute1(
-            timestamp=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
+            utc_time=datetime(2024, 1, 1, 10, 0, tzinfo=UTC),
             local_time=datetime(2024, 1, 1, 19, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
@@ -582,7 +582,7 @@ class TestCollectMinute1CandlesTimezoneConversion:
         latest = minute1_repo.get_latest_candle(sample_ticker.id)
         assert latest is not None
         # UTC 10:00
-        assert latest.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
+        assert latest.utc_time.replace(tzinfo=UTC) == datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
 
     def test_converts_kst_to_to_utc(
             self,

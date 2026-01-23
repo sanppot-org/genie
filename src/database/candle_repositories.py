@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import override
 
-from src.database.base_repository import BaseRepository, ReadOnlyRepository
+from src.database.base_repository import BaseRepository, HasId, ReadOnlyRepository
 from src.database.models import CandleDaily, CandleHour1, CandleMinute1
 
 
@@ -58,7 +58,7 @@ class ReadOnlyCandleRepository[T](ReadOnlyRepository[T, int], ABC):
         pass
 
 
-class WritableCandleRepository[T](BaseRepository[T, int], ABC):
+class WritableCandleRepository[T: HasId](BaseRepository[T, int], ABC):
     """읽기/쓰기 가능한 캔들 데이터 Repository 베이스 클래스.
 
     일반 테이블 기반 캔들 데이터(CandleMinute1)를 위한 베이스 클래스입니다.
@@ -158,10 +158,10 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
             self.session.query(CandleMinute1)
             .filter(
                 CandleMinute1.ticker_id == ticker_id,
-                CandleMinute1.timestamp >= start_datetime,
-                CandleMinute1.timestamp <= end_datetime,
+                CandleMinute1.utc_time >= start_datetime,
+                CandleMinute1.utc_time <= end_datetime,
             )
-            .order_by(CandleMinute1.timestamp)
+            .order_by(CandleMinute1.utc_time)
             .all()
         )
 
@@ -178,7 +178,7 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         return (
             self.session.query(CandleMinute1)
             .filter(CandleMinute1.ticker_id == ticker_id)
-            .order_by(CandleMinute1.timestamp.desc())
+            .order_by(CandleMinute1.utc_time.desc())
             .first()
         )
 
@@ -195,7 +195,7 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         return (
             self.session.query(CandleMinute1)
             .filter(CandleMinute1.ticker_id == ticker_id)
-            .order_by(CandleMinute1.timestamp.asc())
+            .order_by(CandleMinute1.utc_time.asc())
             .first()
         )
 
@@ -228,7 +228,7 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
                 "low": e.low,
                 "close": e.close,
                 "volume": e.volume,
-                "timestamp": e.timestamp,
+                "utc_time": e.utc_time,
             }
 
         values = list(unique_map.values())
@@ -243,7 +243,7 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
                 "low": stmt.excluded.low,
                 "close": stmt.excluded.close,
                 "volume": stmt.excluded.volume,
-                "timestamp": stmt.excluded.timestamp,
+                "utc_time": stmt.excluded.utc_time,
             },
         )
 

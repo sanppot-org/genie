@@ -76,7 +76,7 @@ class TestCandleQueryServiceBasic:
         assert result.equals(expected_df)
 
     def test_get_candles_with_end_time(self) -> None:
-        """end_time 파라미터 전달."""
+        """end_time 파라미터 전달 - UTC aware datetime은 naive로 변환되어 전달."""
         mock_client = MagicMock(spec=CandleClient)
         mock_client.get_candles.return_value = pd.DataFrame()
 
@@ -91,11 +91,13 @@ class TestCandleQueryServiceBasic:
             end_time=end_time,
         )
 
+        # UTC aware datetime은 naive datetime으로 변환되어 전달됨
+        expected_end_time = datetime(2024, 1, 31)  # naive
         mock_client.get_candles.assert_called_once_with(
             symbol="KRW-BTC",
             interval=CandleInterval.DAY,
             count=100,
-            end_time=end_time,
+            end_time=expected_end_time,
         )
 
     def test_get_candles_unknown_source_raises_error(self) -> None:
@@ -184,3 +186,105 @@ class TestCandleQueryServiceAvailableSources:
         assert DataSource.UPBIT in sources
         assert DataSource.BINANCE in sources
         assert len(sources) == 2
+
+
+class TestCandleQueryServiceTimezoneNormalization:
+    """end_time 타임존 정규화 테스트."""
+
+    def test_get_candles_converts_timezone_aware_end_time_to_utc_naive(self) -> None:
+        """timezone-aware end_time이 UTC naive datetime으로 변환되어 client에 전달되는지 확인."""
+        from zoneinfo import ZoneInfo
+
+        mock_client = MagicMock(spec=CandleClient)
+        mock_client.get_candles.return_value = pd.DataFrame()
+
+        service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
+
+        # Given: KST 시간 (UTC+9)
+        kst_time = datetime(2024, 1, 15, 18, 0, 0, tzinfo=ZoneInfo("Asia/Seoul"))
+
+        # When: get_candles 호출
+        service.get_candles(
+            ticker=mock_ticker,
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+            end_time=kst_time,
+        )
+
+        # Then: client에는 UTC naive datetime으로 전달
+        expected_utc = datetime(2024, 1, 15, 9, 0, 0)  # KST 18:00 = UTC 09:00
+        mock_client.get_candles.assert_called_once_with(
+            symbol="KRW-BTC",
+            interval=CandleInterval.MINUTE_1,
+            count=100,
+            end_time=expected_utc,
+        )
+
+    def test_get_candles_converts_utc_aware_end_time_to_utc_naive(self) -> None:
+        """UTC timezone-aware end_time이 naive datetime으로 변환되어 전달."""
+        mock_client = MagicMock(spec=CandleClient)
+        mock_client.get_candles.return_value = pd.DataFrame()
+
+        service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
+
+        # Given: UTC aware datetime
+        utc_aware_time = datetime(2024, 1, 15, 9, 0, 0, tzinfo=UTC)
+
+        # When: get_candles 호출
+        service.get_candles(
+            ticker=mock_ticker,
+            interval=CandleInterval.MINUTE_1,
+            end_time=utc_aware_time,
+        )
+
+        # Then: client에는 UTC naive datetime으로 전달
+        expected_utc = datetime(2024, 1, 15, 9, 0, 0)  # naive
+        mock_client.get_candles.assert_called_once()
+        actual_end_time = mock_client.get_candles.call_args.kwargs["end_time"]
+        assert actual_end_time == expected_utc
+        assert actual_end_time.tzinfo is None
+
+    def test_get_candles_keeps_naive_datetime_as_is(self) -> None:
+        """naive datetime은 그대로 전달 (UTC로 가정)."""
+        mock_client = MagicMock(spec=CandleClient)
+        mock_client.get_candles.return_value = pd.DataFrame()
+
+        service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
+
+        # Given: naive datetime
+        naive_time = datetime(2024, 1, 15, 9, 0, 0)
+
+        # When: get_candles 호출
+        service.get_candles(
+            ticker=mock_ticker,
+            interval=CandleInterval.MINUTE_1,
+            end_time=naive_time,
+        )
+
+        # Then: 그대로 전달
+        mock_client.get_candles.assert_called_once()
+        actual_end_time = mock_client.get_candles.call_args.kwargs["end_time"]
+        assert actual_end_time == naive_time
+        assert actual_end_time.tzinfo is None
+
+    def test_get_candles_none_end_time_stays_none(self) -> None:
+        """None end_time은 그대로 None 전달."""
+        mock_client = MagicMock(spec=CandleClient)
+        mock_client.get_candles.return_value = pd.DataFrame()
+
+        service = CandleQueryService({DataSource.UPBIT: mock_client})
+        mock_ticker = _create_mock_ticker("KRW-BTC", DataSource.UPBIT)
+
+        # When: end_time 없이 호출
+        service.get_candles(
+            ticker=mock_ticker,
+            interval=CandleInterval.MINUTE_1,
+        )
+
+        # Then: None 전달
+        mock_client.get_candles.assert_called_once()
+        actual_end_time = mock_client.get_candles.call_args.kwargs["end_time"]
+        assert actual_end_time is None

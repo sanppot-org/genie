@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from pandera.typing import DataFrame
@@ -58,7 +58,9 @@ class CandleQueryService:
             ticker: Ticker 엔티티 (data_source와 ticker 코드 포함)
             interval: 캔들 간격 (CandleInterval)
             count: 조회할 캔들 개수 (기본값: 100)
-            end_time: 종료 시간 (해당 시간 이전 데이터 조회, UTC)
+            end_time: 종료 시간 (해당 시간 이전 데이터 조회)
+                - timezone-aware: UTC로 변환 후 naive datetime으로 전달
+                - naive: UTC로 가정하고 그대로 전달
 
         Returns:
             표준 캔들 DataFrame[CommonCandleSchema]
@@ -69,12 +71,13 @@ class CandleQueryService:
         Raises:
             ValueError: 등록되지 않은 데이터 소스인 경우
         """
+        normalized_end_time = self._normalize_to_utc(end_time)
         client = self._get_client(ticker.data_source)
         return client.get_candles(
             symbol=ticker.ticker,
             interval=interval,
             count=count,
-            end_time=end_time,
+            end_time=normalized_end_time,
         )
 
     def get_supported_intervals(self, source: DataSource) -> list[CandleInterval]:
@@ -96,6 +99,30 @@ class CandleQueryService:
     def available_sources(self) -> list[DataSource]:
         """등록된 데이터 소스 목록."""
         return list(self._clients.keys())
+
+    @staticmethod
+    def _normalize_to_utc(dt: datetime | None) -> datetime | None:
+        """end_time을 UTC naive datetime으로 정규화.
+
+        Args:
+            dt: 입력 datetime
+                - None: None 반환
+                - timezone-aware: UTC로 변환 후 tzinfo 제거
+                - naive: UTC로 가정하고 그대로 반환
+
+        Returns:
+            UTC naive datetime 또는 None
+        """
+        if dt is None:
+            return None
+
+        if dt.tzinfo:
+            # timezone-aware → UTC로 변환 후 tzinfo 제거
+            utc_dt = dt.astimezone(UTC)
+            return utc_dt.replace(tzinfo=None)
+
+        # naive datetime은 UTC로 가정
+        return dt
 
     def _get_client(self, source: DataSource) -> CandleClient:
         """데이터 소스에 해당하는 클라이언트 반환.

@@ -58,14 +58,14 @@ class CandleMinute1(CandleBase, TimestampMixin):
     """1분봉 캔들 데이터 모델
 
     Attributes:
-        timestamp: 캔들 시각 (UTC, timezone-aware)
+        utc_time: 캔들 시각 (UTC, timezone-aware)
         local_time: 캔들 시각 (거래소 현지 시간, naive)
     """
 
     __tablename__ = "candle_minute_1"
 
     id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    utc_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     local_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
     __table_args__ = (
@@ -74,7 +74,7 @@ class CandleMinute1(CandleBase, TimestampMixin):
 
     def __repr__(self) -> str:
         """문자열 표현"""
-        return f"<CandleMinute1(ticker_id={self.ticker_id}, timestamp={self.timestamp}, close={self.close})>"
+        return f"<CandleMinute1(ticker_id={self.ticker_id}, utc_time={self.utc_time}, close={self.close})>"
 
 
 class CandleHour1(CandleBase):

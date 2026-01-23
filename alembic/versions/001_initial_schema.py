@@ -8,9 +8,8 @@ Create Date: 2025-12-03 14:40:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '001_initial'
@@ -37,16 +36,16 @@ def upgrade() -> None:
     op.create_table(
         'candle_minute_1',
         sa.Column('id', sa.BigInteger(), sa.Identity(always=True), nullable=False),
-        sa.Column('local_time', sa.DateTime(), nullable=False),
+        sa.Column('local_time', postgresql.TIMESTAMP(precision=0), nullable=False),
         sa.Column('ticker_id', sa.BigInteger(), nullable=False),
         sa.Column('open', sa.Float(), nullable=False),
         sa.Column('high', sa.Float(), nullable=False),
         sa.Column('low', sa.Float(), nullable=False),
         sa.Column('close', sa.Float(), nullable=False),
         sa.Column('volume', sa.Float(), nullable=False),
-        sa.Column('timestamp', postgresql.TIMESTAMP(timezone=True), nullable=False),
-        sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
-        sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('NOW()')),
+        sa.Column('utc_time', postgresql.TIMESTAMP(precision=0), nullable=False),
+        sa.Column('created_at', postgresql.TIMESTAMP, nullable=False, server_default=sa.text('NOW()')),
+        sa.Column('updated_at', postgresql.TIMESTAMP, nullable=False, server_default=sa.text('NOW()')),
         sa.PrimaryKeyConstraint('local_time', 'ticker_id'),  # TimescaleDB requirement
     )
 

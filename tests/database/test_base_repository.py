@@ -48,7 +48,7 @@ def test_save_creates_new_entity(candle_repo_impl, sample_tickers):
     # Given
     btc_ticker = sample_tickers["BTC"]
     candle = CandleMinute1(
-        timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
+        utc_time=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
         local_time=datetime(2024, 1, 1, 18, 0, 0),
         ticker_id=btc_ticker.id,
         open=50000000.0,
@@ -74,7 +74,7 @@ def test_find_all_returns_all_entities(candle_repo_impl, sample_tickers):
     btc_ticker = sample_tickers["BTC"]
     eth_ticker = sample_tickers["ETH"]
     candle1 = CandleMinute1(
-        timestamp=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
+        utc_time=datetime(2024, 1, 1, 9, 0, 0, tzinfo=UTC),
         local_time=datetime(2024, 1, 1, 18, 0, 0),
         ticker_id=btc_ticker.id,
         open=50000000.0,
@@ -84,7 +84,7 @@ def test_find_all_returns_all_entities(candle_repo_impl, sample_tickers):
         volume=100.0,
     )
     candle2 = CandleMinute1(
-        timestamp=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
+        utc_time=datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC),
         local_time=datetime(2024, 1, 1, 19, 0, 0),
         ticker_id=eth_ticker.id,
         open=3000000.0,

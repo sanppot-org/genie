@@ -16,7 +16,7 @@ class TestCandleMinute1Repository:
         # Given
         candles = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -26,7 +26,7 @@ class TestCandleMinute1Repository:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
@@ -36,7 +36,7 @@ class TestCandleMinute1Repository:
                 volume=12.3,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 2, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 2, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 2),
                 ticker_id=sample_ticker.id,
                 open=51000000,
@@ -58,8 +58,8 @@ class TestCandleMinute1Repository:
         # Then
         assert len(result) == 2
         # SQLite는 timezone 정보를 저장하지 않으므로 naive datetime으로 비교
-        assert result[0].timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 0, tzinfo=UTC)
-        assert result[1].timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 1, tzinfo=UTC)
+        assert result[0].utc_time.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 0, tzinfo=UTC)
+        assert result[1].utc_time.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 1, tzinfo=UTC)
 
     def test_get_latest_candle_returns_most_recent_candle(
             self, minute1_repo: CandleMinute1Repository, sample_ticker: Ticker
@@ -68,7 +68,7 @@ class TestCandleMinute1Repository:
         # Given
         candles = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -78,7 +78,7 @@ class TestCandleMinute1Repository:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
@@ -96,7 +96,7 @@ class TestCandleMinute1Repository:
         # Then
         assert result is not None
         # SQLite는 timezone 정보를 저장하지 않으므로 naive datetime으로 비교
-        assert result.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 1, tzinfo=UTC)
+        assert result.utc_time.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 1, tzinfo=UTC)
         assert result.close == 51000000
 
     def test_get_latest_candle_returns_none_when_no_data(
@@ -116,7 +116,7 @@ class TestCandleMinute1Repository:
         # Given
         candles = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -126,7 +126,7 @@ class TestCandleMinute1Repository:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
@@ -143,7 +143,7 @@ class TestCandleMinute1Repository:
 
         # Then
         assert result is not None
-        assert result.timestamp.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 0, tzinfo=UTC)
+        assert result.utc_time.replace(tzinfo=UTC) == datetime(2024, 1, 1, 9, 0, tzinfo=UTC)
         assert result.close == 50500000
 
     def test_get_oldest_candle_returns_none_when_no_data(
@@ -163,7 +163,7 @@ class TestCandleMinute1Repository:
         # Given
         candles = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -173,7 +173,7 @@ class TestCandleMinute1Repository:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 1, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 1),
                 ticker_id=sample_ticker.id,
                 open=50500000,
@@ -202,7 +202,7 @@ class TestCandleMinute1Repository:
         # Given
         existing = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -215,7 +215,7 @@ class TestCandleMinute1Repository:
         minute1_repo.bulk_upsert(existing)
 
         updated_candle = CandleMinute1(
-            timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+            utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
             local_time=datetime(2024, 1, 1, 18, 0),
             ticker_id=sample_ticker.id,
             open=50000000,
@@ -247,7 +247,7 @@ class TestCandleMinute1Repository:
         kst_now_1h = now.astimezone(ZoneInfo("Asia/Seoul")) - timedelta(hours=1)
         candles = [
             CandleMinute1(
-                timestamp=now - timedelta(hours=2),
+                utc_time=now - timedelta(hours=2),
                 local_time=kst_now_2h.replace(tzinfo=None),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -257,7 +257,7 @@ class TestCandleMinute1Repository:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=now - timedelta(hours=1),
+                utc_time=now - timedelta(hours=1),
                 local_time=kst_now_1h.replace(tzinfo=None),
                 ticker_id=sample_ticker.id,
                 open=50500000,
@@ -284,7 +284,7 @@ class TestCandleMinute1Repository:
         # Given - 동일한 (kst_time, ticker_id) 조합의 중복 데이터
         candles = [
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),
                 ticker_id=sample_ticker.id,
                 open=50000000,
@@ -294,7 +294,7 @@ class TestCandleMinute1Repository:
                 volume=10.5,
             ),
             CandleMinute1(
-                timestamp=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
+                utc_time=datetime(2024, 1, 1, 9, 0, tzinfo=UTC),
                 local_time=datetime(2024, 1, 1, 18, 0),  # 중복!
                 ticker_id=sample_ticker.id,
                 open=50000000,

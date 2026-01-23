@@ -217,13 +217,7 @@ class TestGetMinuteCandles:
         mock_get = mocker.patch("requests.get", return_value=mock_response)
 
         # When
-        api.get_minute_candles(
-            symbol="AAPL",
-            exchange_code=OverseasMarketCode.NYS,
-            minute_interval=OverseasMinuteInterval.MIN_5,
-            include_previous=True,
-            limit=60,
-        )
+        api.get_minute_candles(symbol="AAPL", exchange_code=OverseasMarketCode.NYS, minute_interval=OverseasMinuteInterval.MIN_5, limit=60)
 
         # Then
         call_params = mock_get.call_args[1]["params"]

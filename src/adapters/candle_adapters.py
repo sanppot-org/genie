@@ -88,7 +88,7 @@ class UpbitCandleAdapter(CandleDataAdapter):
                         low=float(row.low),  # type: ignore[arg-type]
                         close=float(row.close),  # type: ignore[arg-type]
                         volume=float(row.volume),  # type: ignore[arg-type]
-                        timestamp=utc_dt,
+                        utc_time=utc_dt,
                     )
                 )
             elif model_class == CandleDaily:
@@ -172,7 +172,7 @@ class BinanceCandleAdapter(CandleDataAdapter):
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
-                        timestamp=utc_dt,
+                        utc_time=utc_dt,
                         local_time=kst_time_dt,
                         ticker_id=ticker_id,
                         open=float(row.Open),  # type: ignore[arg-type]
@@ -283,7 +283,7 @@ class HantuCandleAdapter(CandleDataAdapter):
             if model_class == CandleMinute1:
                 models.append(
                     model_class(
-                        timestamp=utc_dt,
+                        utc_time=utc_dt,
                         local_time=kst_time_dt,
                         ticker_id=ticker_id,
                         open=float(row.open),  # type: ignore[arg-type]
@@ -371,7 +371,7 @@ class CommonCandleAdapter(CandleDataAdapter):
         models = []
         for row in df.itertuples():
             models.append(CandleMinute1(
-                timestamp=row.timestamp,
+                utc_time=row.timestamp,
                 local_time=row.local_time,
                 ticker_id=ticker_id,
                 open=float(row.open),  # type: ignore[arg-type]

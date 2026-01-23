@@ -90,8 +90,8 @@ class TestCommonCandleAdapterToMinute1Models:
         )
 
         # Then
-        assert models[0].timestamp == datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
-        assert models[1].timestamp == datetime(2024, 1, 1, 10, 1, tzinfo=UTC)
+        assert models[0].utc_time == datetime(2024, 1, 1, 10, 0, tzinfo=UTC)
+        assert models[1].utc_time == datetime(2024, 1, 1, 10, 1, tzinfo=UTC)
 
     def test_model_has_correct_local_time(
             self,

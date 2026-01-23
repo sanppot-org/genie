@@ -614,7 +614,9 @@ class UpbitAPI:
             CandleSchema 컬럼을 가진 DataFrame
         """
         if not response_data:
-            return pd.DataFrame()
+            return pd.DataFrame(
+                columns=["open", "high", "low", "close", "volume", "value", "timestamp"]
+            )
 
         df = pd.DataFrame(response_data)
 
@@ -727,7 +729,9 @@ class UpbitAPI:
                     break
 
             if not all_dataframes:
-                return pd.DataFrame()  # type: ignore
+                return pd.DataFrame(
+                    columns=["open", "high", "low", "close", "volume", "value", "timestamp"]
+                )  # type: ignore
 
             combined_df = pd.concat(all_dataframes)
             # 중복 제거 및 시간순 정렬 (과거 -> 최신)
@@ -740,7 +744,9 @@ class UpbitAPI:
 
         except Exception as e:
             logger.error(f"캔들 데이터 조회 실패: market={market}, interval={interval}, count={count}, error={e}")
-            return pd.DataFrame()  # type: ignore
+            return pd.DataFrame(
+                columns=["open", "high", "low", "close", "volume", "value", "timestamp"]
+            )  # type: ignore
 
     def _fetch_single_candles(
             self,

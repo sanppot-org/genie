@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import time
 
@@ -226,8 +227,8 @@ class HantuOverseasAPI(HantuBaseAPI):
             symbol: str,
             exchange_code: OverseasMarketCode = OverseasMarketCode.NAS,
             minute_interval: OverseasMinuteInterval = OverseasMinuteInterval.MIN_1,
-            include_previous: bool = False,
             limit: int = 120,
+            end_time: datetime | None = None
     ) -> OverseasMinuteCandleResponse:
         """해외 주식 분봉 데이터 조회
 
@@ -237,8 +238,8 @@ class HantuOverseasAPI(HantuBaseAPI):
             symbol: 종목코드 (예: TSLA, AAPL)
             exchange_code: 거래소코드 (기본값: NAS, OverseasMarketCode 사용)
             minute_interval: 분 간격 (기본값: MIN_1, OverseasMinuteInterval 사용)
-            include_previous: 전일 포함 여부 (기본값: False)
             limit: 요청 개수 (기본값: 120, 120개 초과 시 자동 페이징)
+            end_time: 조회 종료 시간 (datetime, 해당 시점 이전 데이터 조회)
 
         Returns:
             OverseasMinuteCandleResponse: 분봉 데이터 목록
@@ -250,33 +251,24 @@ class HantuOverseasAPI(HantuBaseAPI):
         if not symbol:
             raise ValueError("종목코드(symbol)는 필수입니다")
 
-        # API 호출당 최대 120개, target_count는 전체 요청 개수
-        per_page_limit = min(limit, 120)
-
-        result = self._get_minute_candles_recursive(
+        return self._get_minute_candles_recursive(
             symbol=symbol,
             exchange_code=exchange_code,
             minute_interval=minute_interval,
-            include_previous=include_previous,
-            per_page_limit=per_page_limit,
             target_count=limit,
+            end_time=end_time
         )
-        return result
 
     def _get_minute_candles_recursive(
             self,
             symbol: str,
             exchange_code: OverseasMarketCode,
             minute_interval: OverseasMinuteInterval,
-            include_previous: bool,
-            per_page_limit: int,
             target_count: int,
-            next_key: str = "",
-            key_buffer: str = "",
-            continuation_flag: str = "",
+            end_time: datetime | None = None,
             accumulated_output2: list[OverseasMinuteCandleData] | None = None,
             output1_metadata: dict[str, str] | None = None,
-            previous_key_buffer: str = "",
+            previous_end_time: datetime | None = None
     ) -> OverseasMinuteCandleResponse:
         """해외 주식 분봉 조회 (연속 조회 지원) - 내부 메서드
 
@@ -284,51 +276,43 @@ class HantuOverseasAPI(HantuBaseAPI):
             symbol: 종목코드
             exchange_code: 거래소코드 (OverseasMarketCode enum)
             minute_interval: 분 간격 (OverseasMinuteInterval enum)
-            include_previous: 전일 포함 여부
-            per_page_limit: 페이지당 요청 개수 (최대 120)
             target_count: 전체 요청 개수 (목표)
-            next_key: 다음 조회 키
-            key_buffer: 키 버퍼 (KEYB 파라미터)
-            continuation_flag: 연속 거래 여부
+            end_time: 조회 종료 시간 (datetime, 이 시간 이전 데이터 조회)
             accumulated_output2: 누적된 output2 (분봉 데이터)
             output1_metadata: output1 메타데이터
-            previous_key_buffer: 이전 호출의 key_buffer (무한 루프 방지)
+            previous_end_time: 이전 호출의 end_time (무한 루프 방지)
 
         Returns:
             OverseasMinuteCandleResponse: 분봉 응답 객체
         """
-        from datetime import datetime, timedelta
-        import logging
-
-        logger = logging.getLogger(__name__)
+        from datetime import timedelta
 
         if accumulated_output2 is None:
             accumulated_output2 = []
 
-        url = f"{self.url_base}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
-        tr_id = "HHDFS76950200"
+        # API 호출당 최대 120개
+        per_page_limit = min(target_count, 120)
 
+        url = f"{self.url_base}/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice"
         headers = {
             "authorization": f"Bearer {self._get_token()}",
             "appkey": self.app_key,
             "appsecret": self.app_secret,
-            "tr_id": tr_id,
-            "tr_cont": continuation_flag if continuation_flag else "",
+            "tr_id": "HHDFS76950200",
         }
 
-        # 연속조회 시 전일포함(PINC)은 반드시 "1"로 설정
-        pinc_value = "1" if (include_previous or key_buffer) else "0"
-
+        # end_time이 있으면 NEXT를 "1"로 설정 (연속조회 모드)
+        # API는 NEXT=""일 때 KEYB를 무시하므로, 시간 기준 조회 시 반드시 NEXT="1" 필요
         params = {
             "AUTH": "",
             "EXCD": exchange_code.value,
             "SYMB": symbol,
             "NMIN": minute_interval.value,
-            "PINC": pinc_value,
-            "NEXT": next_key,
+            "PINC": "1",
+            "NEXT": ("1" if end_time else ""),
             "NREC": str(per_page_limit),
             "FILL": "",
-            "KEYB": key_buffer,
+            "KEYB": end_time.strftime("%Y%m%d%H%M%S") if end_time else "",
         }
 
         res = requests.get(url, headers=headers, params=params)
@@ -349,7 +333,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             logger.debug(f"No more data available (empty response). Total: {len(accumulated_output2)} candles")
             return OverseasMinuteCandleResponse(output1=output1_metadata, output2=accumulated_output2)  # type: ignore
 
-        # 다음 KEYB 계산: 마지막(가장 오래된) 캔들에서 n분을 뺀 시간
+        # 다음 end_time 계산: 마지막(가장 오래된) 캔들에서 n분을 뺀 시간
         # output2[0]이 최신, output2[-1]이 가장 오래된 데이터
         last_candle = current_output2[-1]
         if isinstance(last_candle, dict):
@@ -359,21 +343,24 @@ class HantuOverseasAPI(HantuBaseAPI):
             oldest_xymd = getattr(last_candle, "xymd", "")
             oldest_xhms = getattr(last_candle, "xhms", "")
 
-        # n분 전 시간 계산 (YYYYMMDDHHMMSS 형식)
-        next_key_buffer = ""
+        # n분 전 시간 계산
+        next_end_time: datetime | None = None
         if oldest_xymd and oldest_xhms:
             try:
                 oldest_datetime = datetime.strptime(oldest_xymd + oldest_xhms, "%Y%m%d%H%M%S")
                 # n분 전 시간 계산 (minute_interval 값만큼)
-                prev_datetime = oldest_datetime - timedelta(minutes=int(minute_interval.value))
-                next_key_buffer = prev_datetime.strftime("%Y%m%d%H%M%S")
+                next_end_time = oldest_datetime - timedelta(minutes=int(minute_interval.value))
             except ValueError:
                 logger.warning(f"Failed to parse datetime: {oldest_xymd}{oldest_xhms}")
-                next_key_buffer = oldest_xymd + oldest_xhms
+                # 파싱 실패 시 문자열을 datetime으로 변환 시도
+                try:
+                    next_end_time = datetime.strptime(oldest_xymd + oldest_xhms, "%Y%m%d%H%M%S")
+                except ValueError:
+                    next_end_time = None
 
-        # 중복 응답 체크 (같은 KEYB로 조회하면 무한 루프)
-        if next_key_buffer and next_key_buffer == previous_key_buffer:
-            logger.debug(f"Duplicate key_buffer detected. Total: {len(accumulated_output2)} candles")
+        # 중복 응답 체크 (같은 end_time으로 조회하면 무한 루프)
+        if next_end_time and next_end_time == previous_end_time:
+            logger.debug(f"Duplicate end_time detected. Total: {len(accumulated_output2)} candles")
             return OverseasMinuteCandleResponse(output1=output1_metadata, output2=accumulated_output2)  # type: ignore
 
         # 데이터 누적
@@ -393,13 +380,8 @@ class HantuOverseasAPI(HantuBaseAPI):
                 output2=accumulated_output2[:target_count]
             )  # type: ignore
 
-        # 연속 조회 필요 여부 확인 (tr_cont 헤더 또는 output1.more 필드)
-        response_tr_cont = res.headers.get("tr_cont", "")
-        output1_more = response_body.get("output1", {}).get("more", "0")
-        has_more_from_api = response_tr_cont in ["M", "F"] or output1_more == "1"
-
-        # 목표 개수에 도달하지 않았으면 KEYB로 과거 데이터 조회 시도
-        logger.debug(f"Fetching older data with key_buffer: {next_key_buffer}, accumulated: {len(accumulated_output2)}, target: {target_count}")
+        # 목표 개수에 도달하지 않았으면 end_time으로 과거 데이터 조회 시도
+        logger.debug(f"Fetching older data with end_time: {next_end_time}, accumulated: {len(accumulated_output2)}, target: {target_count}")
 
         # API 호출 간격 (과부하 방지)
         time.sleep(0.1)
@@ -409,16 +391,12 @@ class HantuOverseasAPI(HantuBaseAPI):
             symbol=symbol,
             exchange_code=exchange_code,
             minute_interval=minute_interval,
-            include_previous=True,  # 연속조회 시 반드시 True
-            per_page_limit=per_page_limit,
             target_count=target_count,
-            next_key="1",  # 다음조회 시 반드시 "1" 입력
-            key_buffer=next_key_buffer,
-            continuation_flag="N" if has_more_from_api else "",
+            end_time=next_end_time,
             accumulated_output2=accumulated_output2,
             output1_metadata=output1_metadata,
-            previous_key_buffer=next_key_buffer,
-        )  # type: ignore  # type: ignore  # type: ignore  # type: ignore  # type: ignore
+            previous_end_time=next_end_time
+        )  # type: ignore
 
     def buy_market_order(self, ticker: str, quantity: int, exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD) -> overseas_order.ResponseBody:
         """시장가 매수 주문

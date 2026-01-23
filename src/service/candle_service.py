@@ -359,7 +359,7 @@ class CandleService:
 
         if mode == CollectMode.INCREMENTAL:
             latest = self._minute1_repo.get_latest_candle(ticker.id)
-            boundary_timestamp = latest.timestamp if latest else None
+            boundary_timestamp = latest.utc_time if latest else None
             if boundary_timestamp:
                 logger.info(f"Incremental 모드: {boundary_timestamp} 이후 데이터만 수집 (market={ticker.ticker})")
             else:
@@ -367,13 +367,11 @@ class CandleService:
         elif mode == CollectMode.BACKFILL:
             oldest = self._minute1_repo.get_oldest_candle(ticker.id)
             if oldest:
-                to_date = oldest.timestamp
-                logger.info(f"Backfill 모드: {oldest.timestamp} 이전 데이터만 수집 (market={ticker.ticker})")
+                to_date = oldest.utc_time
+                logger.info(f"Backfill 모드: {oldest.utc_time} 이전 데이터만 수집 (market={ticker.ticker})")
             else:
                 logger.info(f"DB에 데이터 없음: 전체 데이터 수집 (market={ticker.ticker})")
         else:  # FULL
             logger.info(f"Full 모드: 전체 데이터 수집 (market={ticker.ticker})")
 
         return boundary_timestamp, to_date
-
-
