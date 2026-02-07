@@ -12,7 +12,7 @@ from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.slack.client import SlackClient
-from src.constants import RESERVED_BALANCE
+from src.constants import MIN_ALLOCATED_BALANCE, RESERVED_BALANCE
 from src.container import ApplicationContainer
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
@@ -28,6 +28,11 @@ def run_strategies(
     try:
         balance = context.allocation_manager.get_allocated_amount()
         allocated_balance = (balance - RESERVED_BALANCE) / len(context.tickers)
+
+        if allocated_balance < MIN_ALLOCATED_BALANCE:
+            context.logger.info(f"잔고 부족으로 전략 실행 스킵. balance: {balance}, allocated: {allocated_balance}")
+            context.healthcheck_client.ping()
+            return
 
         for ticker in context.tickers:
             try:
