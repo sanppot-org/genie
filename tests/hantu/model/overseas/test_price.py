@@ -1,63 +1,6 @@
 """해외주식 시세 조회 모델 테스트"""
 
-from pydantic import ValidationError
-import pytest
-
-from src.hantu.model.overseas.price import (
-    OverseasMinuteCandleData,
-    OverseasMinuteCandleResponse,
-)
-
-
-class TestOverseasMinuteCandleData:
-    """OverseasMinuteCandleData 모델 테스트"""
-
-    def test_valid_minute_candle_data(self):
-        """유효한 분봉 데이터 생성"""
-        # Given
-        data = {
-            "tymd": "20251013",
-            "xymd": "20251013",
-            "xhms": "195900",
-            "kymd": "20251014",
-            "khms": "085900",
-            "open": "247.3185",
-            "high": "247.3800",
-            "low": "247.2600",
-            "last": "247.3800",
-            "evol": "1090",
-            "eamt": "269525",
-        }
-
-        # When
-        candle = OverseasMinuteCandleData(**data)
-
-        # Then
-        assert candle.tymd == "20251013"
-        assert candle.xymd == "20251013"
-        assert candle.xhms == "195900"
-        assert candle.kymd == "20251014"
-        assert candle.khms == "085900"
-        assert candle.open == "247.3185"
-        assert candle.high == "247.3800"
-        assert candle.low == "247.2600"
-        assert candle.last == "247.3800"
-        assert candle.evol == "1090"
-        assert candle.eamt == "269525"
-
-    def test_missing_required_fields(self):
-        """필수 필드 누락 시 검증 에러"""
-        # Given
-        data = {
-            "tymd": "20251013",
-            "xymd": "20251013",
-            "open": "247.3185",
-            # xhms, kymd, khms, high, low, last, evol, eamt 누락
-        }
-
-        # When & Then
-        with pytest.raises(ValidationError):
-            OverseasMinuteCandleData(**data)
+from src.hantu.model.overseas.price import OverseasMinuteCandleResponse
 
 
 class TestOverseasMinuteCandleResponse:

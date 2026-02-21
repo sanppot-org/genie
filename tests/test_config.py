@@ -1,12 +1,14 @@
-"""Config 클래스 테스트"""
+"""Config 및 상수 테스트"""
 
 import os
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 from pydantic import ValidationError
 import pytest
 
 from src.config import UpbitConfig
+from src.constants import TimeZone
 
 
 class TestConfig:
@@ -116,3 +118,13 @@ class TestConfig:
             assert len(config.upbit_access_key) > 0
             assert config.upbit_secret_key is not None
             assert len(config.upbit_secret_key) > 0
+
+
+class TestTimeZoneTz:
+    """TimeZone.tz 프로퍼티 테스트."""
+
+    def test_timezone_tz_returns_zoneinfo(self):
+        """TimeZone.tz가 올바른 ZoneInfo를 반환한다."""
+        assert TimeZone.SEOUL.tz == ZoneInfo("Asia/Seoul")
+        assert TimeZone.UTC.tz == ZoneInfo("UTC")
+        assert TimeZone.NEW_YORK.tz == ZoneInfo("America/New_York")

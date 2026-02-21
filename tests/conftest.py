@@ -1,59 +1,39 @@
-"""Pytest fixtures for database tests."""
+"""Pytest fixtures shared across all test modules."""
+
+from collections.abc import Generator
+from typing import Any
 
 import pytest
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.common.data_adapter import DataSource
-from src.config import DatabaseConfig
 from src.constants import AssetType
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
 from src.database.database import Database
-from src.database.models import Ticker
+from src.database.models import Base, Ticker
 from src.database.ticker_repository import TickerRepository
 
 
 @pytest.fixture
-def db_config() -> DatabaseConfig:
-    """테스트용 인메모리 데이터베이스 설정"""
-    # 인메모리 SQLite 사용 (빠른 테스트)
-    return DatabaseConfig(
-        postgres_db="test_db",
-        postgres_user="test",
-        postgres_password="test",  # 테스트에서는 실제로 사용 안 됨
-        postgres_host="localhost",
-        postgres_port=5432,
-    )
-
-
-@pytest.fixture
-def db() -> Database:
+def db() -> Generator[Database, Any, None]:
     """테스트용 데이터베이스 (SQLite 인메모리)"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-
-    from src.database.database import Database
-    from src.database.models import Base
-
-    # SQLite 인메모리 엔진 생성
     engine = create_engine("sqlite:///:memory:", echo=False)
 
-    # Database 객체 생성 (config 없이 직접 설정)
     database = Database.__new__(Database)
     database.engine = engine
     database.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-    # 테이블 생성
     Base.metadata.create_all(bind=engine)
 
     yield database
 
-    # 정리
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
 
 
 @pytest.fixture
-def session(db: Database) -> Session:
+def session(db: Database) -> Generator[Session, Any, None]:
     """테스트용 세션"""
     session = db.get_session()
     yield session
@@ -80,11 +60,7 @@ def ticker_repo(session: Session) -> TickerRepository:
 
 @pytest.fixture
 def sample_ticker(ticker_repo: TickerRepository) -> Ticker:
-    """테스트용 Ticker 엔티티 생성 fixture
-
-    Returns:
-        Ticker: id가 할당된 Ticker 엔티티
-    """
+    """테스트용 Ticker 엔티티 생성 fixture"""
     ticker = Ticker(ticker="KRW-BTC", asset_type=AssetType.CRYPTO, data_source=DataSource.UPBIT.value)
     ticker_repo.save(ticker)
     return ticker
