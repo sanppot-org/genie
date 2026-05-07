@@ -17,10 +17,6 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """FastAPI 앱 lifespan 이벤트 - 스케줄러 시작 및 종료 관리"""
 
-    # 시작: Upbit 상태 확인 및 스케줄러 설정
-    logger.info("API 서버 시작 - Upbit 상태 확인 중...")
-    check_upbit_status()
-
     # 스케줄러 설정 (BackgroundScheduler 사용)
     schedules = get_schedules()
 
