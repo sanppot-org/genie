@@ -27,22 +27,10 @@ def get_schedules() -> list[ScheduleConfig]:
             name="리포트 업데이트",
         ),
         ScheduleConfig(
-            func=update_upbit_krw,
-            trigger=CronTrigger(hour=23, minute=15),
-            id="update_upbit_krw",
-            name="Upbit KRW 잔고 업데이트",
-        ),
-        ScheduleConfig(
             func=update_bithumb_krw,
             trigger=CronTrigger(hour=23, minute=15),
             id="update_bithumb_krw",
             name="Bithumb KRW 잔고 업데이트",
-        ),
-        ScheduleConfig(
-            func=run_strategies,
-            trigger=IntervalTrigger(minutes=5),
-            id="crypto_trading",
-            name="암호화폐 자동 매매",
         ),
         ScheduleConfig(
             func=update_data,
