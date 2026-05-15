@@ -145,7 +145,7 @@ class OpenDartConfig(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=str(DEFAULT_ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
 
-    api_key: str = Field(..., min_length=1, description="DART OpenAPI 인증키", alias="OPENDART_API_KEY")
+    api_key: str = Field(..., min_length=1, description="DART OpenAPI 인증키", alias="DART_API_KEY")
 
 
 class LogtailConfig(BaseSettings):

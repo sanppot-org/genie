@@ -44,7 +44,7 @@
   [x] 실패 시 Slack 알림
 
 [x] OpenDartReader 연동 — 업종 메타데이터 보강 (1차)
-  [x] OpenDART 인증키 발급 후 `config/genie/.env`에 `OPENDART_API_KEY` 추가
+  [x] OpenDART 인증키 발급 후 `config/genie/.env`에 `DART_API_KEY` 추가
   [x] `opendartreader` 의존성 추가 (pyproject.toml + mypy override)
   [x] `tickers.industry_code` 컬럼 추가 (alembic migration 006, nullable)
   [x] KSIC 코드 → 업종명 정적 매핑 (`src/common/ksic.py` + `industry_name_of` 헬퍼)
