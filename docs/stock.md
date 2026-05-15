@@ -17,6 +17,9 @@
   - active: 활성화 여부. (True, False)
   - data_source: 데이터 소스. (pykrx, yahoo finance 등)
 
+## 화면
+- 종목 목록 조회
+
 
 ## TODO
 [ ] tickers 테이블 고도화

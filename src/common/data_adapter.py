@@ -24,6 +24,7 @@ class DataSource(str, Enum):
     BINANCE = ("binance", TimeZone.UTC)
     HANTU_D = ("hantu_domastic", TimeZone.SEOUL)
     HANTU_O = ("hantu_overseas", TimeZone.NEW_YORK)
+    PYKRX = ("pykrx", TimeZone.SEOUL)
 
     _timezone: TimeZone  # mypy를 위한 타입 힌트
 

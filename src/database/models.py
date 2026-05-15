@@ -2,7 +2,20 @@
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, Enum, Float, Identity, Integer, PrimaryKeyConstraint, String, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    Identity,
+    Integer,
+    PrimaryKeyConstraint,
+    String,
+    func,
+    true,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from src.common.data_adapter import DataSource
@@ -117,6 +130,12 @@ class CandleDaily(CandleBase):
         return f"<CandleDaily(ticker_id={self.ticker_id}, date={self.date}, close={self.close})>"
 
 
+def _default_name_from_ticker(context: object) -> str:
+    """`name` 미지정 시 `ticker` 값을 그대로 사용."""
+    name: str = context.get_current_parameters()["ticker"]  # type: ignore[attr-defined]
+    return name
+
+
 class Ticker(Base, TimestampMixin):
     """티커 마스터 테이블
 
@@ -133,8 +152,10 @@ class Ticker(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default=_default_name_from_ticker)
     asset_type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
     data_source: Mapped[DataSource] = mapped_column(Enum(DataSource, native_enum=False), nullable=False, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true(), default=True)
 
     def __repr__(self) -> str:
         """문자열 표현"""
