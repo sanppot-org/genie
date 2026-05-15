@@ -39,6 +39,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "pykrx>=1.2.8",
+    "opendartreader>=0.2.3",
 ]
 
 [tool.setuptools]
@@ -154,4 +155,9 @@ disable_error_code = ["has-type"]
 # pykrx 타입 무시
 [[tool.mypy.overrides]]
 module = "pykrx.*"
+ignore_missing_imports = true
+
+# opendartreader 타입 무시
+[[tool.mypy.overrides]]
+module = "opendartreader.*"
 ignore_missing_imports = true

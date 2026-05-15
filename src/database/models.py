@@ -156,6 +156,7 @@ class Ticker(Base, TimestampMixin):
     asset_type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
     data_source: Mapped[DataSource] = mapped_column(Enum(DataSource, native_enum=False), nullable=False, index=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true(), default=True)
+    industry_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
 
     def __repr__(self) -> str:
         """문자열 표현"""

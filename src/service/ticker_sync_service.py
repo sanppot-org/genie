@@ -1,10 +1,15 @@
 """pykrx 종목 동기화 서비스."""
 
 from dataclasses import dataclass
+import logging
 
 from src.common.data_adapter import DataSource
+from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
+from src.providers.dart_company_client import DartCompanyClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -30,11 +35,19 @@ class TickerSyncService:
     - 사라짐 (pykrx X, DB O, active=True) → UPDATE active=False
     - 이름 변경 (둘 다 O, name 다름) → UPDATE name
     - 재상장 (둘 다 O, DB.active=False) → UPDATE active=True
+
+    신규 INSERT 시점에만 DART에서 `industry_code`를 보강한다 (best-effort).
     """
 
-    def __init__(self, client: PykrxTickerClient, repository: TickerRepository) -> None:
+    def __init__(
+        self,
+        client: PykrxTickerClient,
+        repository: TickerRepository,
+        dart_client: DartCompanyClient,
+    ) -> None:
         self._client = client
         self._repo = repository
+        self._dart_client = dart_client
 
     def sync_pykrx(self) -> SyncResult:
         """pykrx 종목 정보로 DB를 동기화. 모든 변경을 한 트랜잭션에서 commit.
@@ -52,7 +65,9 @@ class TickerSyncService:
             existing = db_map.get(code)
 
             if info is not None and existing is None:
-                self._repo.session.add(info.to_entity())
+                entity = info.to_entity()
+                self._enrich_with_dart(entity)
+                self._repo.session.add(entity)
                 inserted += 1
                 continue
 
@@ -86,3 +101,16 @@ class TickerSyncService:
             reactivated=reactivated,
             unchanged=unchanged,
         )
+
+    def _enrich_with_dart(self, entity: Ticker) -> None:
+        """신규 ticker에 DART 메타데이터(`industry_code`)를 채운다.
+        best-effort — 예외/None 응답은 warning만 남기고 sync 진행을 막지 않는다.
+        """
+        try:
+            dart_info = self._dart_client.fetch_company_info(entity.ticker)
+        except Exception as e:
+            logger.warning("DART 메타데이터 조회 실패 (ticker=%s): %s", entity.ticker, e)
+            return
+        if dart_info is None:
+            return
+        entity.industry_code = dart_info.industry_code

@@ -1,7 +1,7 @@
-"""TickerSyncService 통합 테스트 — 인메모리 SQLite + pykrx mock."""
+"""TickerSyncService 통합 테스트 — 인메모리 SQLite + pykrx/DART mock."""
 
 from collections.abc import Generator
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy import create_engine
@@ -11,6 +11,7 @@ from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.models import Base, Ticker
 from src.database.ticker_repository import TickerRepository
+from src.providers.dart_company_client import DartCompanyClient, DartCompanyInfo
 from src.providers.pykrx_ticker_client import EmptyPykrxResponseError, PykrxTickerClient, PykrxTickerInfo
 from src.service.ticker_sync_service import SyncResult, TickerSyncService
 
@@ -34,6 +35,14 @@ def test_session() -> Generator[Session, None, None]:
     engine.dispose()
 
 
+@pytest.fixture
+def noop_dart_client() -> MagicMock:
+    """기본 DART mock — 모든 종목에 대해 None 반환 (메타데이터 미보강)."""
+    client = MagicMock(spec=DartCompanyClient)
+    client.fetch_company_info.return_value = None
+    return client
+
+
 def _seed_pykrx_ticker(
     session: Session,
     ticker: str,
@@ -54,7 +63,7 @@ def _seed_pykrx_ticker(
     )
 
 
-def test_sync_handles_all_four_branches(test_session: Session) -> None:
+def test_sync_handles_all_four_branches(test_session: Session, noop_dart_client: MagicMock) -> None:
     """신규/사라짐/이름변경/재상장 + 변동없음을 한 트랜잭션에서 처리한다."""
     # 시드: 5가지 케이스
     _seed_pykrx_ticker(test_session, "AAA", "에이", active=True)         # 변동 없음
@@ -73,7 +82,7 @@ def test_sync_handles_all_four_branches(test_session: Session) -> None:
     ]
 
     repo = TickerRepository(test_session)
-    service = TickerSyncService(PykrxTickerClient(), repo)
+    service = TickerSyncService(PykrxTickerClient(), repo, noop_dart_client)
 
     with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
         result = service.sync_pykrx()
@@ -95,13 +104,13 @@ def test_sync_handles_all_four_branches(test_session: Session) -> None:
     assert by_ticker["FFF"].active is False  # 이미 비활성, 변동 없음
 
 
-def test_sync_inserts_all_when_db_empty(test_session: Session) -> None:
+def test_sync_inserts_all_when_db_empty(test_session: Session, noop_dart_client: MagicMock) -> None:
     """DB가 비어 있으면 pykrx 결과를 모두 신규 INSERT한다."""
     pykrx_results = [
         PykrxTickerInfo(ticker="AAA", name="에이", asset_type=AssetType.KR_STOCK),
         PykrxTickerInfo(ticker="BBB", name="비", asset_type=AssetType.KR_ETF),
     ]
-    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session))
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), noop_dart_client)
 
     with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
         result = service.sync_pykrx()
@@ -109,14 +118,15 @@ def test_sync_inserts_all_when_db_empty(test_session: Session) -> None:
     assert result == SyncResult(inserted=2, deactivated=0, renamed=0, reactivated=0, unchanged=0)
     assert test_session.query(Ticker).count() == 2
 
-def test_sync_propagates_empty_pykrx_error_without_mutating_db(test_session: Session) -> None:
+
+def test_sync_propagates_empty_pykrx_error_without_mutating_db(test_session: Session, noop_dart_client: MagicMock) -> None:
     """pykrx 빈 응답 시 client가 raise하는 EmptyPykrxResponseError는 service가 그대로 전파.
     DB의 기존 ticker는 deactivate되지 않는다 (mass deactivate 방지)."""
     _seed_pykrx_ticker(test_session, "AAA", "에이", active=True)
     _seed_pykrx_ticker(test_session, "BBB", "비", active=True)
     test_session.commit()
 
-    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session))
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), noop_dart_client)
 
     with patch.object(PykrxTickerClient, "fetch_all", side_effect=EmptyPykrxResponseError("boom")):
         with pytest.raises(EmptyPykrxResponseError):
@@ -127,7 +137,7 @@ def test_sync_propagates_empty_pykrx_error_without_mutating_db(test_session: Ses
     assert by_ticker["BBB"].active is True
 
 
-def test_sync_handles_rename_and_reactivate_on_same_row(test_session: Session) -> None:
+def test_sync_handles_rename_and_reactivate_on_same_row(test_session: Session, noop_dart_client: MagicMock) -> None:
     """이름 변경과 재상장이 같은 row에서 동시 발생 — renamed/reactivated 모두 +1."""
     _seed_pykrx_ticker(test_session, "AAA", "옛이름", active=False)
     test_session.commit()
@@ -135,7 +145,7 @@ def test_sync_handles_rename_and_reactivate_on_same_row(test_session: Session) -
     pykrx_results = [
         PykrxTickerInfo(ticker="AAA", name="새이름", asset_type=AssetType.KR_STOCK),
     ]
-    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session))
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), noop_dart_client)
 
     with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
         result = service.sync_pykrx()
@@ -144,3 +154,36 @@ def test_sync_handles_rename_and_reactivate_on_same_row(test_session: Session) -
     row = test_session.query(Ticker).filter_by(ticker="AAA").one()
     assert row.name == "새이름"
     assert row.active is True
+
+
+def test_sync_enriches_inserted_tickers_with_dart_industry_code(test_session: Session) -> None:
+    """신규 INSERT 시 DART에서 industry_code를 채운다."""
+    dart_client = MagicMock(spec=DartCompanyClient)
+    dart_client.fetch_company_info.side_effect = lambda code: DartCompanyInfo(
+        stock_code=code, industry_code="26410"
+    )
+
+    pykrx_results = [PykrxTickerInfo(ticker="005930", name="삼성전자", asset_type=AssetType.KR_STOCK)]
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), dart_client)
+
+    with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
+        service.sync_pykrx()
+
+    row = test_session.query(Ticker).filter_by(ticker="005930").one()
+    assert row.industry_code == "26410"
+
+
+def test_sync_inserts_with_null_industry_when_dart_fails(test_session: Session) -> None:
+    """DART 호출이 예외를 던지거나 None을 반환해도 sync는 진행되며 industry_code는 None."""
+    dart_client = MagicMock(spec=DartCompanyClient)
+    dart_client.fetch_company_info.side_effect = RuntimeError("DART 장애")
+
+    pykrx_results = [PykrxTickerInfo(ticker="005930", name="삼성전자", asset_type=AssetType.KR_STOCK)]
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), dart_client)
+
+    with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
+        result = service.sync_pykrx()
+
+    assert result.inserted == 1
+    row = test_session.query(Ticker).filter_by(ticker="005930").one()
+    assert row.industry_code is None

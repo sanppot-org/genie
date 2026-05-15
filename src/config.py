@@ -140,6 +140,14 @@ class HealthcheckConfig(BaseSettings):
                                         alias="HEALTHCHECK_URL")
 
 
+class OpenDartConfig(BaseSettings):
+    """DART OpenAPI 인증키 설정"""
+
+    model_config = SettingsConfigDict(env_file=str(DEFAULT_ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
+
+    api_key: str = Field(..., min_length=1, description="DART OpenAPI 인증키", alias="OPENDART_API_KEY")
+
+
 class LogtailConfig(BaseSettings):
     """Better Stack (Logtail) 로깅 설정"""
 

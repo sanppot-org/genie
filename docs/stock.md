@@ -43,5 +43,15 @@
   [x] 휴장일 가드 (주말/공휴일에 호출 skip)
   [x] 실패 시 Slack 알림
 
+[x] OpenDartReader 연동 — 업종 메타데이터 보강 (1차)
+  [x] OpenDART 인증키 발급 후 `config/genie/.env`에 `OPENDART_API_KEY` 추가
+  [x] `opendartreader` 의존성 추가 (pyproject.toml + mypy override)
+  [x] `tickers.industry_code` 컬럼 추가 (alembic migration 006, nullable)
+  [x] KSIC 코드 → 업종명 정적 매핑 (`src/common/ksic.py` + `industry_name_of` 헬퍼)
+  [x] `DartCompanyClient` 구현 — `fetch_company_info(stock_code) -> DartCompanyInfo | None`, tenacity 재시도
+  [x] DI 컨테이너에 client 등록 + `TickerSyncService`에 주입
+  [x] sync 로직 확장 — 신규 ticker INSERT 시점에만 DART 조회 (best-effort, 실패 시 컬럼 None)
+  [x] 단위/통합 테스트 (DartCompanyClient mock, sync 성공/실패 케이스, KSIC 매핑)
+
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.

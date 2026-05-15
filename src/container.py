@@ -13,7 +13,7 @@ from src.common.data_adapter import DataSource
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.healthcheck.client import HealthcheckClient
 from src.common.slack.client import SlackClient
-from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, SlackConfig, UpbitConfig
+from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuConfig, HealthcheckConfig, OpenDartConfig, SlackConfig, UpbitConfig
 from src.constants import KST
 from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
@@ -21,6 +21,7 @@ from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
+from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
@@ -60,6 +61,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     bithumb_config = providers.Singleton(BithumbConfig)
     hantu_config = providers.Singleton(HantuConfig)
     healthcheck_config = providers.Singleton(HealthcheckConfig)
+    opendart_config = providers.Singleton(OpenDartConfig)
 
     # Clients
     slack_client = providers.Singleton(SlackClient, slack_config)
@@ -162,8 +164,10 @@ class ApplicationContainer(containers.DeclarativeContainer):
         repository=ticker_repository,
     )
     pykrx_ticker_client = providers.Singleton(PykrxTickerClient)
+    dart_company_client = providers.Singleton(DartCompanyClient, opendart_config)
     ticker_sync_service = providers.Factory(
         TickerSyncService,
         client=pykrx_ticker_client,
         repository=ticker_repository,
+        dart_client=dart_company_client,
     )
