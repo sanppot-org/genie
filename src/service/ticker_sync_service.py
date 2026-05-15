@@ -36,7 +36,9 @@ class TickerSyncService:
     - 이름 변경 (둘 다 O, name 다름) → UPDATE name
     - 재상장 (둘 다 O, DB.active=False) → UPDATE active=True
 
-    신규 INSERT 시점에만 DART에서 `industry_code`를 보강한다 (best-effort).
+    DART에서 `industry_code`를 보강한다 (best-effort):
+    - 신규 INSERT 시
+    - 기존 row 중 `industry_code`가 NULL인 경우 ("둘 다 존재" 분기에서 백필)
     """
 
     def __init__(
@@ -90,6 +92,9 @@ class TickerSyncService:
                 existing.active = True
                 reactivated += 1
                 changed = True
+            if existing.industry_code is None:
+                # 기존 row 백필 — DART 호출은 NULL인 경우에만, 채워지면 이후 sync에선 호출 안 함
+                self._enrich_with_dart(existing)
             if not changed:
                 unchanged += 1
 

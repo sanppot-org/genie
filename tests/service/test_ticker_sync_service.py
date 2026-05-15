@@ -173,6 +173,58 @@ def test_sync_enriches_inserted_tickers_with_dart_industry_code(test_session: Se
     assert row.industry_code == "26410"
 
 
+def test_sync_backfills_industry_code_for_existing_rows_with_null(test_session: Session) -> None:
+    """industry_code가 NULL인 기존 row는 다음 sync에서 자동 백필된다."""
+    _seed_pykrx_ticker(test_session, "005930", "삼성전자", active=True)
+    _seed_pykrx_ticker(test_session, "000660", "SK하이닉스", active=True)
+    test_session.commit()
+
+    dart_client = MagicMock(spec=DartCompanyClient)
+    dart_client.fetch_company_info.side_effect = lambda code: DartCompanyInfo(
+        stock_code=code, industry_code={"005930": "26410", "000660": "26110"}[code]
+    )
+
+    pykrx_results = [
+        PykrxTickerInfo(ticker="005930", name="삼성전자", asset_type=AssetType.KR_STOCK),
+        PykrxTickerInfo(ticker="000660", name="SK하이닉스", asset_type=AssetType.KR_STOCK),
+    ]
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), dart_client)
+
+    with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
+        result = service.sync_pykrx()
+
+    # 두 row 모두 industry_code가 채워짐 — pykrx 관점에서는 변동 없음(unchanged)
+    assert result.unchanged == 2
+    by_ticker = {t.ticker: t for t in test_session.query(Ticker).all()}
+    assert by_ticker["005930"].industry_code == "26410"
+    assert by_ticker["000660"].industry_code == "26110"
+    assert dart_client.fetch_company_info.call_count == 2
+
+
+def test_sync_does_not_recall_dart_for_rows_with_industry_code_already_set(test_session: Session) -> None:
+    """industry_code가 이미 있는 row는 DART 재호출 없음 (idempotent)."""
+    test_session.add(
+        Ticker(
+            ticker="005930",
+            name="삼성전자",
+            asset_type=AssetType.KR_STOCK,
+            data_source=DataSource.PYKRX.value,
+            active=True,
+            industry_code="26410",
+        )
+    )
+    test_session.commit()
+
+    dart_client = MagicMock(spec=DartCompanyClient)
+    pykrx_results = [PykrxTickerInfo(ticker="005930", name="삼성전자", asset_type=AssetType.KR_STOCK)]
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), dart_client)
+
+    with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
+        service.sync_pykrx()
+
+    dart_client.fetch_company_info.assert_not_called()
+
+
 def test_sync_inserts_with_null_industry_when_dart_fails(test_session: Session) -> None:
     """DART 호출이 예외를 던지거나 None을 반환해도 sync는 진행되며 industry_code는 None."""
     dart_client = MagicMock(spec=DartCompanyClient)
