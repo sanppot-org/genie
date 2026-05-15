@@ -3,8 +3,11 @@
 from datetime import date
 from unittest.mock import patch
 
+import pytest
+from tenacity import wait_none
+
 from src.constants import AssetType
-from src.providers.pykrx_ticker_client import PykrxTickerClient, PykrxTickerInfo
+from src.providers.pykrx_ticker_client import EmptyPykrxResponseError, PykrxTickerClient, PykrxTickerInfo
 
 
 class TestPykrxTickerClient:
@@ -82,6 +85,31 @@ class TestPykrxTickerClient:
         assert entity.name == "KODEX 200"
         assert entity.asset_type == AssetType.KR_ETF
         assert entity.data_source == "pykrx"
+
+    def test_fetch_all_retries_and_raises_on_persistent_empty_response(self) -> None:
+        """주식·ETF 모두 빈 응답이 지속되면 3회 재시도 후 EmptyPykrxResponseError raise."""
+        original_wait = PykrxTickerClient.fetch_all.retry.wait  # type: ignore[attr-defined]
+        PykrxTickerClient.fetch_all.retry.wait = wait_none()  # type: ignore[attr-defined]
+        try:
+            with (
+                patch(
+                    "src.providers.pykrx_ticker_client.stock.get_market_ticker_list",
+                    return_value=[],
+                ) as mock_market,
+                patch(
+                    "src.providers.pykrx_ticker_client.stock.get_etf_ticker_list",
+                    return_value=[],
+                ) as mock_etf,
+            ):
+                with pytest.raises(EmptyPykrxResponseError):
+                    PykrxTickerClient().fetch_all()
+
+            # 3회 재시도 × (KOSPI + KOSDAQ) = 6번 호출
+            assert mock_market.call_count == 6
+            # ETF도 3회 재시도 × 1번 = 3번
+            assert mock_etf.call_count == 3
+        finally:
+            PykrxTickerClient.fetch_all.retry.wait = original_wait  # type: ignore[attr-defined]
 
     def test_base_date_none_passes_through_to_pykrx(self) -> None:
         """base_date 미지정 시 None을 그대로 pykrx에 전달한다 (pykrx 자동 처리)."""

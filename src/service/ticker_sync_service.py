@@ -37,7 +37,11 @@ class TickerSyncService:
         self._repo = repository
 
     def sync_pykrx(self) -> SyncResult:
-        """pykrx 종목 정보로 DB를 동기화. 모든 변경을 한 트랜잭션에서 commit."""
+        """pykrx 종목 정보로 DB를 동기화. 모든 변경을 한 트랜잭션에서 commit.
+
+        pykrx 응답이 비어있으면 client가 재시도 후 `EmptyPykrxResponseError`를 raise하므로
+        여기서는 별도 가드를 두지 않는다 (호출자가 예외를 처리).
+        """
         pykrx_map = {info.ticker: info for info in self._client.fetch_all()}
         db_map = {t.ticker: t for t in self._repo.find_by_data_source(DataSource.PYKRX)}
 

@@ -2,14 +2,24 @@
 
 from dataclasses import dataclass
 from datetime import date
+import logging
 
 from dotenv import load_dotenv
 from pykrx import stock
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from src.common.data_adapter import DataSource
 from src.config import DEFAULT_ENV_FILE_PATH
 from src.constants import AssetType
 from src.database.models import Ticker
+
+logger = logging.getLogger(__name__)
 
 # pykrx는 종목 목록 조회 시 KRX 인증이 필요하고, KRX_ID/KRX_PW를 OS 환경 변수에서
 # 직접 읽는다. Pydantic Settings는 .env를 읽어도 os.environ으로 export하지 않으므로,
@@ -17,6 +27,12 @@ from src.database.models import Ticker
 load_dotenv(DEFAULT_ENV_FILE_PATH)
 
 _STOCK_MARKETS: tuple[str, ...] = ("KOSPI", "KOSDAQ")
+
+
+class EmptyPykrxResponseError(RuntimeError):
+    """pykrx 응답이 비어있을 때 발생. base_date=None이면 pykrx가 인접 영업일로 폴백하므로,
+    빈 응답은 휴장일이 아닌 외부 장애(KRX 서버/인증/네트워크)로 간주한다.
+    """
 
 
 @dataclass(frozen=True)
@@ -80,9 +96,23 @@ class PykrxTickerClient:
             for ticker in tickers
         ]
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=10, min=10, max=60),
+        retry=retry_if_exception_type(EmptyPykrxResponseError),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
     def fetch_all(self, base_date: date | None = None) -> list[PykrxTickerInfo]:
-        """주식 + ETF 통합 결과."""
-        return self.fetch_stock_tickers(base_date) + self.fetch_etf_tickers(base_date)
+        """주식 + ETF 통합 결과.
+
+        base_date=None이면 pykrx가 인접 영업일로 폴백하므로, 응답이 비어있다면
+        장애로 간주하고 텀을 두고 재시도한다. 최종 실패 시 `EmptyPykrxResponseError` 전파.
+        """
+        results = self.fetch_stock_tickers(base_date) + self.fetch_etf_tickers(base_date)
+        if not results:
+            raise EmptyPykrxResponseError("pykrx returned empty ticker list — possible KRX outage")
+        return results
 
 
 def _to_yyyymmdd(base_date: date | None) -> str | None:

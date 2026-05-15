@@ -3,6 +3,7 @@
 스케줄러에서 실행되는 모든 작업 함수들을 관리합니다.
 """
 
+import logging
 from time import sleep
 
 from dependency_injector.wiring import Provide, inject
@@ -16,8 +17,11 @@ from src.constants import MIN_ALLOCATED_BALANCE, RESERVED_BALANCE
 from src.container import ApplicationContainer
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.config import BaseStrategyConfig
 from src.upbit.upbit_api import UpbitAPI
+
+logger = logging.getLogger(__name__)
 
 
 @inject
@@ -117,3 +121,24 @@ def update_data(
         price_data_collector: GoogleSheetDataCollector = Provide[ApplicationContainer.price_data_collector]) -> None:
     """구글 시트 데이터 업데이트 - 의존성 자동 주입"""
     price_data_collector.collect_price()
+
+
+@inject
+def sync_kr_stock_tickers(
+        service: TickerSyncService = Provide[ApplicationContainer.ticker_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """한국 주식/ETF 종목 정보를 pykrx에서 가져와 DB와 동기화.
+
+    pykrx 빈 응답은 client가 재시도 후 예외를 raise하므로, 여기서는 예외 발생 시
+    Slack 알림만 처리한다.
+    """
+    try:
+        result = service.sync_pykrx()
+        logger.info(
+            "한국 주식 종목 동기화 완료: inserted=%d, deactivated=%d, renamed=%d, reactivated=%d, unchanged=%d",
+            result.inserted, result.deactivated, result.renamed, result.reactivated, result.unchanged,
+        )
+    except Exception as e:
+        logger.exception("한국 주식 종목 동기화 실패")
+        slack_client.send_status(f"한국 주식 종목 동기화 실패: {e}")

@@ -11,7 +11,7 @@ from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.models import Base, Ticker
 from src.database.ticker_repository import TickerRepository
-from src.providers.pykrx_ticker_client import PykrxTickerClient, PykrxTickerInfo
+from src.providers.pykrx_ticker_client import EmptyPykrxResponseError, PykrxTickerClient, PykrxTickerInfo
 from src.service.ticker_sync_service import SyncResult, TickerSyncService
 
 
@@ -108,6 +108,24 @@ def test_sync_inserts_all_when_db_empty(test_session: Session) -> None:
 
     assert result == SyncResult(inserted=2, deactivated=0, renamed=0, reactivated=0, unchanged=0)
     assert test_session.query(Ticker).count() == 2
+
+def test_sync_propagates_empty_pykrx_error_without_mutating_db(test_session: Session) -> None:
+    """pykrx 빈 응답 시 client가 raise하는 EmptyPykrxResponseError는 service가 그대로 전파.
+    DB의 기존 ticker는 deactivate되지 않는다 (mass deactivate 방지)."""
+    _seed_pykrx_ticker(test_session, "AAA", "에이", active=True)
+    _seed_pykrx_ticker(test_session, "BBB", "비", active=True)
+    test_session.commit()
+
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session))
+
+    with patch.object(PykrxTickerClient, "fetch_all", side_effect=EmptyPykrxResponseError("boom")):
+        with pytest.raises(EmptyPykrxResponseError):
+            service.sync_pykrx()
+
+    by_ticker = {t.ticker: t for t in test_session.query(Ticker).all()}
+    assert by_ticker["AAA"].active is True
+    assert by_ticker["BBB"].active is True
+
 
 def test_sync_handles_rename_and_reactivate_on_same_row(test_session: Session) -> None:
     """이름 변경과 재상장이 같은 row에서 동시 발생 — renamed/reactivated 모두 +1."""

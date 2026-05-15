@@ -38,7 +38,10 @@
   [x] active 보존을 위한 동기화 전용 서비스 메서드 (TickerCreate 우회)
   [x] 통합 테스트 (인메모리 DB)
 [x] 한국 주식 수동 동기화 API (POST /api/tickers/sync/kr-stock)
-[ ] 종목 정보 수집 스케줄러 구현
-  [ ] APScheduler 작업 등록 (장 마감 후 1회, 예: KST 17:00)
-  [ ] 휴장일 가드 (주말/공휴일에 호출 skip)
-  [ ] 실패 시 Slack 알림
+[x] 종목 정보 수집 스케줄러 구현
+  [x] APScheduler 작업 등록 (장 마감 후 1회, 예: KST 16:48)
+  [x] 휴장일 가드 (주말/공휴일에 호출 skip)
+  [x] 실패 시 Slack 알림
+
+## 추후 작업
+- 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.
