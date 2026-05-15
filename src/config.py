@@ -121,9 +121,20 @@ class SlackConfig(BaseSettings):
 
 
 class HealthcheckConfig(BaseSettings):
-    """Healthchecks.io 설정"""
+    """Healthchecks.io 설정
 
-    model_config = SettingsConfigDict(env_file=str(DEFAULT_ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
+    `.env.{ENV_PROFILE}`(dev/prod)도 함께 로드해 환경별로 활성/비활성을 분리한다.
+    예: `.env.prod`에만 HEALTHCHECK_URL을 두면 운영에서만 동작.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=[
+            str(DEFAULT_ENV_FILE_PATH),
+            str(CONFIG_DIR / f".env.{ENV_PROFILE}"),
+        ],
+        env_file_encoding=UTF_8,
+        extra="ignore",
+    )
 
     healthcheck_url: str | None = Field(default=None, description="Healthchecks.io ping URL (optional)",
                                         alias="HEALTHCHECK_URL")
@@ -172,9 +183,20 @@ class DatabaseConfig(BaseSettings):
 
 
 class AppConfig(BaseSettings):
-    """앱 실행 설정"""
+    """앱 실행 설정
 
-    model_config = SettingsConfigDict(env_file=str(DEFAULT_ENV_FILE_PATH), env_file_encoding=UTF_8, extra="ignore")
+    `.env.{ENV_PROFILE}`도 함께 로드해 환경별로 동작을 분리한다.
+    예: `.env.prod`에서만 `ENABLE_SCHEDULER=true`로 두면 운영에서만 스케줄러 활성.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=[
+            str(DEFAULT_ENV_FILE_PATH),
+            str(CONFIG_DIR / f".env.{ENV_PROFILE}"),
+        ],
+        env_file_encoding=UTF_8,
+        extra="ignore",
+    )
 
     enable_scheduler: bool = Field(
         default=True,
