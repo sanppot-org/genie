@@ -22,9 +22,9 @@
 
 
 ## TODO
-[ ] tickers 테이블 고도화
-  [ ] name, active 컬럼 추가
-  [ ] data_source eunm에 PYKRX 추가
+[x] tickers 테이블 고도화
+  [x] name, active 컬럼 추가
+  [x] data_source eunm에 PYKRX 추가
 [ ] pykrx 연동
 [ ] 종목 정보 데이터 수집
   - 종목 사라진 경우 active=False 처리
