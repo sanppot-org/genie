@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from src.api.exception_handlers import handle_exception
+from src.api.exception_handlers import handle_genie_error, handle_unhandled_exception
 from src.api.lifespan import lifespan
 from src.api.routes import candle, health, strategy, ticker
 from src.config import AppConfig
@@ -27,7 +27,8 @@ app = FastAPI(
 )
 
 # 예외 핸들러 등록
-app.add_exception_handler(GenieError, handle_exception)
+app.add_exception_handler(GenieError, handle_genie_error)
+app.add_exception_handler(Exception, handle_unhandled_exception)
 
 # 라우터 등록
 app.include_router(health.router)
