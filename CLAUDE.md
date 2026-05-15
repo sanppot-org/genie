@@ -87,3 +87,7 @@ docker-compose up -d timescaledb             # DB 실행
 - `config/` 내용은 외부 노출 금지 (거래소 키, DB 비번, Slack 웹훅 등).
 - 테스트에서도 실제 API 키 최소화, Mock 권장.
 - 환경 변수는 `config/genie/.env` (프로필별 `.env.dev`, `.env.prod`)에서 관리. 주요 키: Upbit/한투/Bithumb 인증, TimescaleDB 접속정보, Slack 웹훅, Google Sheets, Healthcheck, Logtail, `ENABLE_SCHEDULER`, `ENV_PROFILE`.
+
+## 작업규칙
+
+- 커밋은 임의로 하지 말고 사용자의 허락을 구한다. 
