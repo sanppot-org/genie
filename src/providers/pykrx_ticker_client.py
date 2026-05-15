@@ -7,8 +7,10 @@ from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from pykrx import stock
 
+from src.common.data_adapter import DataSource
 from src.config import DEFAULT_ENV_FILE_PATH
 from src.constants import AssetType
+from src.database.models import Ticker
 
 # pykrx는 종목 목록 조회 시 KRX 인증이 필요하고, KRX_ID/KRX_PW를 OS 환경 변수에서
 # 직접 읽는다. Pydantic Settings는 .env를 읽어도 os.environ으로 export하지 않으므로,
@@ -26,6 +28,19 @@ class PykrxTickerInfo:
     ticker: str
     name: str
     asset_type: AssetType
+
+    def to_entity(self) -> Ticker:
+        """SQLAlchemy Ticker 엔티티로 변환. data_source는 PYKRX 고정.
+
+        `active`는 명시적으로 설정하지 않는다 — 모델 기본값(True)에 맡긴다.
+        sync 로직(후속)이 기존 엔티티의 active를 보존할지 판단한다.
+        """
+        return Ticker(
+            ticker=self.ticker,
+            name=self.name,
+            asset_type=self.asset_type,
+            data_source=DataSource.PYKRX.value,
+        )
 
 
 class PykrxTickerClient:

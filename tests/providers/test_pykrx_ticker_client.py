@@ -61,6 +61,28 @@ class TestPykrxTickerClient:
         assert result[0].asset_type == AssetType.KR_STOCK
         assert result[-1] == PykrxTickerInfo(ticker="069500", name="KODEX 200", asset_type=AssetType.KR_ETF)
 
+    def test_to_entity_maps_stock_info(self) -> None:
+        """KR_STOCK PykrxTickerInfo가 Ticker 엔티티로 매핑된다."""
+        info = PykrxTickerInfo(ticker="005930", name="삼성전자", asset_type=AssetType.KR_STOCK)
+
+        entity = info.to_entity()
+
+        assert entity.ticker == "005930"
+        assert entity.name == "삼성전자"
+        assert entity.asset_type == AssetType.KR_STOCK
+        assert entity.data_source == "pykrx"
+
+    def test_to_entity_maps_etf_info(self) -> None:
+        """KR_ETF PykrxTickerInfo도 동일하게 매핑되며 asset_type만 달라진다."""
+        info = PykrxTickerInfo(ticker="069500", name="KODEX 200", asset_type=AssetType.KR_ETF)
+
+        entity = info.to_entity()
+
+        assert entity.ticker == "069500"
+        assert entity.name == "KODEX 200"
+        assert entity.asset_type == AssetType.KR_ETF
+        assert entity.data_source == "pykrx"
+
     def test_base_date_none_uses_today_kst(self) -> None:
         """base_date 미지정 시 KST 오늘 날짜를 YYYYMMDD로 pykrx에 전달한다."""
         from datetime import datetime

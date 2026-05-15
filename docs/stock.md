@@ -30,7 +30,7 @@
   [x] PykrxTickerClient 구현 (주식 + ETF 종목 코드/이름 조회)
   [x] 단위 테스트 (mock)
 [ ] 종목 정보 데이터 수집
-  [ ] PykrxTickerInfo → Ticker 엔티티 변환 로직
+  [x] PykrxTickerInfo → Ticker 엔티티 변환 로직
   [ ] 신규 종목 INSERT
   [ ] 사라진 종목 active=False (soft-delete)
   [ ] 이름이 변경된 경우 name 업데이트
