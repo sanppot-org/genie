@@ -69,6 +69,14 @@ fi
 echo "📦 의존성 설치 중..."
 uv sync
 
+# DB 마이그레이션 적용
+echo "🗄️  DB 마이그레이션 적용 중..."
+if ! uv run alembic upgrade head; then
+    echo "❌ DB 마이그레이션 실패!"
+    send_slack_notification "배포 실패 (마이그레이션 적용 실패: $CURRENT_VERSION)"
+    exit 1
+fi
+
 # systemd 서비스 설치
 echo "⚙️  systemd 서비스 설치 중..."
 sudo cp genie.service /etc/systemd/system/genie.service
