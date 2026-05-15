@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import logging
 
 from src.common.data_adapter import DataSource
+from src.constants import AssetType
 from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
 from src.providers.dart_company_client import DartCompanyClient
@@ -108,9 +109,13 @@ class TickerSyncService:
         )
 
     def _enrich_with_dart(self, entity: Ticker) -> None:
-        """신규 ticker에 DART 메타데이터(`industry_code`)를 채운다.
+        """ticker에 DART 메타데이터(`industry_code`)를 채운다.
+
+        ETF는 펀드라서 DART에 corp 등록이 없으므로 호출 자체를 skip한다.
         best-effort — 예외/None 응답은 warning만 남기고 sync 진행을 막지 않는다.
         """
+        if entity.asset_type != AssetType.KR_STOCK:
+            return
         try:
             dart_info = self._dart_client.fetch_company_info(entity.ticker)
         except Exception as e:

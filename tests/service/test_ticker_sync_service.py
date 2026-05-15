@@ -225,6 +225,28 @@ def test_sync_does_not_recall_dart_for_rows_with_industry_code_already_set(test_
     dart_client.fetch_company_info.assert_not_called()
 
 
+def test_sync_does_not_call_dart_for_etf_tickers(test_session: Session) -> None:
+    """ETF는 DART에 등록되지 않으므로 INSERT/백필 어느 분기에서도 호출되지 않는다."""
+    _seed_pykrx_ticker(test_session, "069500", "KODEX 200", active=True, asset_type=AssetType.KR_ETF)
+    test_session.commit()
+
+    dart_client = MagicMock(spec=DartCompanyClient)
+
+    pykrx_results = [
+        PykrxTickerInfo(ticker="069500", name="KODEX 200", asset_type=AssetType.KR_ETF),
+        PykrxTickerInfo(ticker="232080", name="TIGER 코스닥150", asset_type=AssetType.KR_ETF),  # 신규 ETF
+    ]
+    service = TickerSyncService(PykrxTickerClient(), TickerRepository(test_session), dart_client)
+
+    with patch.object(PykrxTickerClient, "fetch_all", return_value=pykrx_results):
+        service.sync_pykrx()
+
+    dart_client.fetch_company_info.assert_not_called()
+    by_ticker = {t.ticker: t for t in test_session.query(Ticker).all()}
+    assert by_ticker["069500"].industry_code is None
+    assert by_ticker["232080"].industry_code is None
+
+
 def test_sync_inserts_with_null_industry_when_dart_fails(test_session: Session) -> None:
     """DART 호출이 예외를 던지거나 None을 반환해도 sync는 진행되며 industry_code는 None."""
     dart_client = MagicMock(spec=DartCompanyClient)
