@@ -116,3 +116,13 @@ class QueryCandlesResponse(BaseModel):
     interval: CandleInterval
     count: int
     candles: list[CandleData]
+
+
+class SyncTickersResponse(BaseModel):
+    """pykrx 종목 동기화 응답"""
+
+    inserted: int
+    deactivated: int
+    renamed: int
+    reactivated: int
+    unchanged: int

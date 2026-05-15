@@ -1,12 +1,15 @@
 """Ticker CRUD API 엔드포인트"""
 # ruff: noqa: B008
 
+from dataclasses import asdict
+
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, status
 
-from src.api.schemas import GenieResponse, TickerCreate, TickerResponse
+from src.api.schemas import GenieResponse, SyncTickersResponse, TickerCreate, TickerResponse
 from src.container import ApplicationContainer
 from src.service.ticker_service import TickerService
+from src.service.ticker_sync_service import TickerSyncService
 
 router = APIRouter(tags=["tickers"])
 
@@ -20,6 +23,16 @@ def create_or_update_ticker(
     """Ticker 생성 또는 업데이트 (upsert)"""
     ticker = service.upsert(ticker_in)
     return GenieResponse(data=TickerResponse.from_ticker(ticker))
+
+
+@router.post("/tickers/sync/kr-stock", response_model=GenieResponse[SyncTickersResponse])
+@inject
+def sync_kr_stock_tickers(
+        service: TickerSyncService = Depends(Provide[ApplicationContainer.ticker_sync_service]),
+) -> GenieResponse[SyncTickersResponse]:
+    """한국 주식/ETF 종목 정보를 pykrx에서 가져와 DB와 수동 동기화 (~20초 소요)"""
+    result = service.sync_pykrx()
+    return GenieResponse(data=SyncTickersResponse(**asdict(result)))
 
 
 @router.get("/tickers", response_model=GenieResponse[list[TickerResponse]])

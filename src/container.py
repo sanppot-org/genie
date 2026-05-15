@@ -22,12 +22,14 @@ from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
+from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.ticker_service import TickerService
+from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -157,5 +159,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
     ticker_service = providers.Factory(
         TickerService,
+        repository=ticker_repository,
+    )
+    pykrx_ticker_client = providers.Singleton(PykrxTickerClient)
+    ticker_sync_service = providers.Factory(
+        TickerSyncService,
+        client=pykrx_ticker_client,
         repository=ticker_repository,
     )

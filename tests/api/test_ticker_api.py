@@ -12,6 +12,7 @@ from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.models import Ticker
 from src.service.ticker_service import TickerService
+from src.service.ticker_sync_service import SyncResult, TickerSyncService
 
 
 def _create_mock_ticker(
@@ -226,3 +227,46 @@ class TestDeleteTickerAPI:
         # Then
         assert response.status_code == 204
         mock_ticker_service.delete.assert_called_once_with(1)
+
+
+@pytest.fixture
+def mock_ticker_sync_service() -> MagicMock:
+    """Mock TickerSyncService 픽스처"""
+    return MagicMock(spec=TickerSyncService)
+
+
+@pytest.fixture
+def client_with_sync_mock(mock_ticker_sync_service: MagicMock) -> Generator[TestClient, None, None]:
+    """ticker_sync_service DI override가 적용된 TestClient"""
+    container.ticker_sync_service.override(mock_ticker_sync_service)
+    yield TestClient(app)
+    container.ticker_sync_service.reset_override()
+
+
+class TestSyncTickersAPI:
+    """POST /api/tickers/sync 테스트"""
+
+    def test_sync_결과가_응답으로_매핑된다(
+            self,
+            client_with_sync_mock: TestClient,
+            mock_ticker_sync_service: MagicMock,
+    ) -> None:
+        """sync_pykrx 결과의 5개 카운트가 응답 JSON에 그대로 매핑된다."""
+        # Given
+        mock_ticker_sync_service.sync_pykrx.return_value = SyncResult(
+            inserted=5, deactivated=2, renamed=1, reactivated=0, unchanged=100,
+        )
+
+        # When
+        response = client_with_sync_mock.post("/api/tickers/sync/kr-stock")
+
+        # Then
+        assert response.status_code == 200
+        assert response.json()["data"] == {
+            "inserted": 5,
+            "deactivated": 2,
+            "renamed": 1,
+            "reactivated": 0,
+            "unchanged": 100,
+        }
+        mock_ticker_sync_service.sync_pykrx.assert_called_once_with()
