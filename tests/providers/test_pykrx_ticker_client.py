@@ -83,19 +83,14 @@ class TestPykrxTickerClient:
         assert entity.asset_type == AssetType.KR_ETF
         assert entity.data_source == "pykrx"
 
-    def test_base_date_none_uses_today_kst(self) -> None:
-        """base_date 미지정 시 KST 오늘 날짜를 YYYYMMDD로 pykrx에 전달한다."""
-        from datetime import datetime
-        from zoneinfo import ZoneInfo
-
-        expected_yyyymmdd = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y%m%d")
-
+    def test_base_date_none_passes_through_to_pykrx(self) -> None:
+        """base_date 미지정 시 None을 그대로 pykrx에 전달한다 (pykrx 자동 처리)."""
         with (
             patch("src.providers.pykrx_ticker_client.stock.get_market_ticker_list", return_value=[]) as mock_list,
             patch("src.providers.pykrx_ticker_client.stock.get_market_ticker_name"),
         ):
             PykrxTickerClient().fetch_stock_tickers()
 
-        # 두 번 호출됨 (KOSPI, KOSDAQ). 첫 인자가 오늘 날짜인지 확인.
+        # KOSPI, KOSDAQ 두 시장 호출. 첫 인자가 None인지 확인.
         for call_args in mock_list.call_args_list:
-            assert call_args.args[0] == expected_yyyymmdd
+            assert call_args.args[0] is None

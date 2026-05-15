@@ -2,6 +2,7 @@
 
 from sqlalchemy import func
 
+from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.base_repository import BaseRepository
 from src.database.models import Ticker
@@ -44,6 +45,17 @@ class TickerRepository(BaseRepository[Ticker, int]):
             해당 자산 유형의 모든 Ticker 목록
         """
         return self.session.query(Ticker).filter_by(asset_type=asset_type.value).all()
+
+    def find_by_data_source(self, data_source: DataSource) -> list[Ticker]:
+        """데이터 소스로 필터링.
+
+        Args:
+            data_source: 데이터 소스 (UPBIT, PYKRX 등)
+
+        Returns:
+            해당 데이터 소스의 모든 Ticker 목록
+        """
+        return self.session.query(Ticker).filter_by(data_source=data_source.value).all()
 
     def exists(self, ticker: str) -> bool:
         """티커 존재 여부 확인.

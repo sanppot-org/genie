@@ -1,8 +1,7 @@
 """pykrx를 통한 한국 주식/ETF 종목 목록 조회 래퍼."""
 
 from dataclasses import dataclass
-from datetime import date, datetime
-from zoneinfo import ZoneInfo
+from datetime import date
 
 from dotenv import load_dotenv
 from pykrx import stock
@@ -17,7 +16,6 @@ from src.database.models import Ticker
 # 본 모듈을 로드하는 시점에 .env 값을 OS env로 push한다 (이미 설정된 값은 보존).
 load_dotenv(DEFAULT_ENV_FILE_PATH)
 
-_KST = ZoneInfo("Asia/Seoul")
 _STOCK_MARKETS: tuple[str, ...] = ("KOSPI", "KOSDAQ")
 
 
@@ -87,12 +85,11 @@ class PykrxTickerClient:
         return self.fetch_stock_tickers(base_date) + self.fetch_etf_tickers(base_date)
 
 
-def _to_yyyymmdd(base_date: date | None) -> str:
-    """pykrx 호출용 날짜 포맷. None이면 KST 기준 오늘.
+def _to_yyyymmdd(base_date: date | None) -> str | None:
+    """pykrx 호출용 날짜 포맷. None이면 None을 그대로 pass-through.
 
-    주의: pykrx는 휴장일(주말/공휴일)을 호출하면 빈 리스트를 반환한다.
-    호출자(스케줄러/동기화 서비스)가 영업일 보정 책임을 진다.
-    필요 시 `pykrx.stock.get_nearest_business_day_in_a_week()`로 최근 영업일을 구해 인자로 전달.
+    pykrx의 `get_market_ticker_list(date=None, ...)` 등은 date 미지정 시
+    내부적으로 적절한 영업일을 알아서 사용한다 (실측 확인). 따라서 base_date가
+    None이면 우리도 None을 그대로 전달해 pykrx의 기본 동작에 맡긴다.
     """
-    target = base_date if base_date is not None else datetime.now(_KST).date()
-    return target.strftime("%Y%m%d")
+    return base_date.strftime("%Y%m%d") if base_date is not None else None
