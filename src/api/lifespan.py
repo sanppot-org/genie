@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 
 from src.scheduled_tasks.schedules import get_schedules
-from src.scheduled_tasks.tasks import check_upbit_status, run_strategies
+from src.scheduled_tasks.tasks import run_strategies
 
 logger = logging.getLogger(__name__)
 

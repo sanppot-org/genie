@@ -5,10 +5,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from src.scheduled_tasks.tasks import (
     report,
-    run_strategies,
     update_bithumb_krw,
     update_data,
-    update_upbit_krw,
 )
 from src.scheduler_config import ScheduleConfig
 
