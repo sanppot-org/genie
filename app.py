@@ -1,6 +1,7 @@
 """FastAPI 서버 - Genie Trading Strategy API"""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.exception_handlers import handle_genie_error, handle_unhandled_exception
 from src.api.lifespan import lifespan
@@ -24,6 +25,15 @@ app = FastAPI(
     title="Genie Trading Strategy API",
     version="1.0.0",
     lifespan=lifespan if app_config.enable_scheduler else None,
+)
+
+# CORS — 프론트(web/) dev/배포 origin 허용
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=app_config.cors_allow_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
 )
 
 # 예외 핸들러 등록

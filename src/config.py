@@ -211,3 +211,16 @@ class AppConfig(BaseSettings):
         description="스케줄러 활성화 여부",
         alias="ENABLE_SCHEDULER"
     )
+
+    cors_allow_origins: list[str] = Field(
+        default=["http://localhost:3000"],
+        description="CORS 허용 origin 목록 (쉼표 구분 환경변수 지원)",
+        alias="CORS_ALLOW_ORIGINS",
+    )
+
+    @field_validator("cors_allow_origins", mode="before")
+    @classmethod
+    def _split_origins(cls, v: str | list[str]) -> list[str]:
+        if isinstance(v, str):
+            return [s.strip() for s in v.split(",") if s.strip()]
+        return v
