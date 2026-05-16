@@ -9,7 +9,9 @@ from sqlalchemy import (
     DateTime,
     Enum,
     Float,
+    ForeignKey,
     Identity,
+    Index,
     Integer,
     PrimaryKeyConstraint,
     String,
@@ -161,3 +163,33 @@ class Ticker(Base, TimestampMixin):
     def __repr__(self) -> str:
         """문자열 표현"""
         return f"<Ticker(ticker={self.ticker}, asset_type={self.asset_type}, data_source={self.data_source})>"
+
+
+class StockFundamental(Base, TimestampMixin):
+    """일자별 종목 펀더멘털 (pykrx get_market_fundamental).
+
+    KR_STOCK 대상. 동일 (date, ticker_id) 재호출 시 UPSERT.
+    financial metric은 pykrx 빈 셀/적자 종목 대응을 위해 nullable.
+    """
+
+    __tablename__ = "stock_fundamentals"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_fundamentals_ticker_id"), nullable=False
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False, comment="펀더멘털 기준 영업일")
+    per: Mapped[float | None] = mapped_column(Float, nullable=True, comment="주가수익률 = 주가 / EPS, 적자면 None")
+    eps: Mapped[float | None] = mapped_column(Float, nullable=True, comment="주당순이익 (Earnings Per Share)")
+    bps: Mapped[float | None] = mapped_column(Float, nullable=True, comment="주당순자산가치 (Book-value Per Share)")
+    pbr: Mapped[float | None] = mapped_column(Float, nullable=True, comment="주가순자산배수 = 주가 / BPS")
+    div: Mapped[float | None] = mapped_column(Float, nullable=True, comment="배당수익률(%) = DPS / 주가")
+    dps: Mapped[float | None] = mapped_column(Float, nullable=True, comment="주당배당금 (Dividend Per Share)")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("date", "ticker_id"),
+        Index("ix_stock_fundamentals_ticker_id_date", "ticker_id", "date"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockFundamental(ticker_id={self.ticker_id}, date={self.date}, per={self.per})>"

@@ -17,6 +17,7 @@ from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuCo
 from src.constants import KST
 from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
+from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.providers import HantuOverseasCandleClient
@@ -77,6 +78,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
     candle_hour1_repository = providers.Factory(CandleHour1Repository, session=database.provided.get_session.call())
     candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
     ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
+    stock_fundamental_repository = providers.Factory(
+        StockFundamentalRepository, session=database.provided.get_session.call()
+    )
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")

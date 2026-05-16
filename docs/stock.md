@@ -53,5 +53,34 @@
   [x] sync 로직 확장 — 신규 ticker INSERT 시점에만 DART 조회 (best-effort, 실패 시 컬럼 None)
   [x] 단위/통합 테스트 (DartCompanyClient mock, sync 성공/실패 케이스, KSIC 매핑)
 
+[ ] 종목 펀더멘털 데이터 수집 — `pykrx.stock.get_market_fundamental`
+  - **목표**: 일자별 BPS/PER/PBR/EPS/DIV/DPS 시계열 적재 (밸류에이션·스크리닝·백테스팅 입력용)
+  - **수집 방식**: `get_market_fundamental(date, market="ALL")` 1회 호출로 전 종목 일괄 조회 (per-ticker 루프 X)
+  - **대상**: KR_STOCK만 (ETF는 펀드라 PER/PBR 등 의미 없음 → 응답에 섞여 있어도 ticker 매칭 시 자연히 제외됨)
+  - **빈 응답 가드**: 휴장일이 아닌데 비어 있으면 `PykrxTickerClient`와 동일하게 `EmptyPykrxResponseError` 재시도
+
+  [x] 테이블 추가: `stock_fundamentals`
+    - 컬럼: `id`(BigInteger Identity), `ticker_id`(Integer FK → tickers.id), `date`, `bps/per/pbr/eps/div/dps`(Float, nullable), `created_at/updated_at`
+    - 수치형: `Float` (코드베이스 컨벤션 — candle도 Float 사용)
+    - PK: `(date, ticker_id)` — 멱등 UPSERT 키 (CandleDaily와 동일 패턴)
+    - Index: `(ticker_id, date)` — 종목별 시계열 조회용 (date 단독 인덱스는 PK 첫 컬럼이라 불필요)
+  [x] Alembic migration 007 (`007_add_stock_fundamentals_table.py`)
+  [x] `src/database/models.py`에 `StockFundamental` 모델 + `src/database/stock_fundamental_repository.py` (bulk_upsert, find_by_ticker, find_by_date) + DI 등록
+  [ ] `PykrxFundamentalClient` 구현 (별도 파일) — `fetch_by_date(date) -> list[FundamentalSnapshot]`, tenacity 재시도
+  [ ] `FundamentalSyncService.sync(date)` — bulk fetch → ticker 매핑 → UPSERT (트랜잭션 1회 commit)
+    - pykrx 티커 → `tickers.id` 매핑은 한 번 로드 후 in-memory dict
+    - 미매핑 ticker는 skip + warning (신규 상장 등)
+  [ ] DI 컨테이너 등록
+  [ ] 수동 동기화 API: `POST /api/fundamentals/sync/kr-stock?date=YYYYMMDD` (date 생략 시 최근 영업일)
+  [ ] 스케줄러 등록 — 장 마감 후 (티커 동기화 16:48 직후, 예: KST 17:00, 평일)
+  [ ] 휴장일/빈응답 처리 + Slack 실패 알림
+  [ ] 백필 스크립트 — `scripts/backfill_fundamentals.py` (date range 받아 일자별 sync 반복)
+  [ ] 테스트
+    - PykrxFundamentalClient: bulk 응답 파싱, 빈 응답 재시도
+    - FundamentalSyncService: 신규 INSERT, 같은 date 재호출 시 UPSERT(중복 없음), 미매핑 ticker skip
+    - 통합 테스트 (인메모리 DB)
+
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.
+- 펀더멘털 데이터 활용: 섹터(industry_code) × PER/PBR 평균, 저평가 스크리닝 API
+- 분기/연간 재무제표 — DART OpenAPI `finstate` endpoint (TTM PER 계산 등)
