@@ -72,13 +72,13 @@
     - 미매핑 코드(신규상장 등)는 `skipped_unmapped`로 집계
   [x] DI 컨테이너 등록 (`pykrx_fundamental_client` Singleton + `fundamental_sync_service` Factory)
   [x] 수동 동기화 API: `POST /api/fundamentals/sync/kr-stock?date=YYYYMMDD` (date 생략 시 오늘 KST)
-  [ ] 스케줄러 등록 — 장 마감 후 (티커 동기화 16:48 직후, 예: KST 17:00, 평일)
-  [ ] 휴장일/빈응답 처리 + Slack 실패 알림
-  [ ] 백필 스크립트 — `scripts/backfill_fundamentals.py` (date range 받아 일자별 sync 반복)
-  [ ] 테스트
-    - PykrxFundamentalClient: bulk 응답 파싱, 빈 응답 재시도
-    - FundamentalSyncService: 신규 INSERT, 같은 date 재호출 시 UPSERT(중복 없음), 미매핑 ticker skip
-    - 통합 테스트 (인메모리 DB)
+  [x] 스케줄러 등록 — `sync_kr_stock_fundamentals` cron 17:00 mon-fri (티커 동기화 16:48 + 12분 여유)
+  [x] 휴장일/빈응답 처리 + Slack 실패 알림 — `EmptyPykrxResponseError`는 info log only (휴장일 추정), 그 외 예외만 Slack
+  [x] 백필 스크립트 — `scripts/backfill_fundamentals.py` (`--start --end YYYYMMDD`, 휴장일·실패 일자별 분류)
+  [x] 테스트
+    - PykrxFundamentalClient: bulk 응답 파싱, 빈 응답 재시도, NaN 정규화 (3 케이스)
+    - FundamentalSyncService: 신규 + ETF skip, 미매핑 skip, 멱등성 (3 케이스, 인메모리 SQLite)
+    - 스케줄 task 분기 (정상/휴장/예외→Slack) — 3 케이스
 
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.

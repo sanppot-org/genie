@@ -5,6 +5,7 @@ from datetime import date
 import logging
 import math
 
+import pandas as pd
 from pykrx import stock
 from tenacity import (
     before_sleep_log,
@@ -17,6 +18,14 @@ from tenacity import (
 from src.providers.pykrx_ticker_client import EmptyPykrxResponseError, _to_yyyymmdd
 
 logger = logging.getLogger(__name__)
+
+
+class KrxClosedDayError(RuntimeError):
+    """휴장일 패턴 감지 — pykrx가 row를 내려주지만 모든 BPS가 0/NaN.
+
+    재시도해도 동일 응답이므로 retry 대상에서 제외하고 즉시 raise.
+    호출자는 silent skip 처리 (Slack 알림 X).
+    """
 
 
 @dataclass(frozen=True)
@@ -36,7 +45,8 @@ class PykrxFundamentalClient:
     """pykrx `stock.get_market_fundamental(date, market='ALL')` 래퍼.
 
     - 일자 1회 호출로 전 종목(KOSPI+KOSDAQ+ETF) 스냅샷 반환
-    - 빈 응답은 휴장일이 아닌 외부 장애로 간주, 재시도 후 `EmptyPykrxResponseError`
+    - 빈 응답: 외부 장애로 간주 → `EmptyPykrxResponseError` 재시도
+    - 휴장일(모든 BPS=0): `KrxClosedDayError`, 재시도 안 함
     - NaN은 None으로 치환 (적자 종목 PER 등)
     - ETF/ETN 필터링은 서비스 계층에서 (KR_STOCK ticker 매핑으로 자연 제외)
     """
@@ -55,6 +65,13 @@ class PykrxFundamentalClient:
         if df is None or df.empty:
             raise EmptyPykrxResponseError(
                 "pykrx get_market_fundamental returned empty — possible KRX outage"
+            )
+        bps_max = df["BPS"].max()
+        if pd.isna(bps_max) or bps_max == 0:
+            # 휴장일에 pykrx는 row를 내려주지만 모든 값이 0. BPS는 회사 청산가치라
+            # 정상 거래일에는 항상 양수 → 전체 0/NaN이면 휴장일로 확정.
+            raise KrxClosedDayError(
+                f"휴장일 추정 (전체 BPS=0/NaN), date={yyyymmdd}"
             )
         return [
             PykrxFundamentalSnapshot(

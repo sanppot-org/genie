@@ -3,6 +3,7 @@
 스케줄러에서 실행되는 모든 작업 함수들을 관리합니다.
 """
 
+from datetime import datetime
 import logging
 from time import sleep
 
@@ -13,10 +14,13 @@ from src.collector.price_data_collector import GoogleSheetDataCollector
 from src.common.google_sheet.cell_update import CellUpdate
 from src.common.google_sheet.client import GoogleSheetClient
 from src.common.slack.client import SlackClient
-from src.constants import MIN_ALLOCATED_BALANCE, RESERVED_BALANCE
+from src.constants import KST, MIN_ALLOCATED_BALANCE, RESERVED_BALANCE
 from src.container import ApplicationContainer
+from src.providers.pykrx_fundamental_client import KrxClosedDayError
+from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.config import BaseStrategyConfig
 from src.upbit.upbit_api import UpbitAPI
@@ -142,3 +146,27 @@ def sync_kr_stock_tickers(
     except Exception as e:
         logger.exception("한국 주식 종목 동기화 실패")
         slack_client.send_status(f"한국 주식 종목 동기화 실패: {e}")
+
+
+@inject
+def sync_kr_stock_fundamentals(
+        service: FundamentalSyncService = Provide[ApplicationContainer.fundamental_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """일자별 KR 주식 펀더멘털 동기화 (장 마감 후, 평일).
+
+    휴장일은 pykrx가 빈 응답 → `EmptyPykrxResponseError`로 도착 → info 로그만 남기고 종료.
+    그 외 예외만 Slack 알림.
+    """
+    target_date = datetime.now(KST).date()
+    try:
+        result = service.sync(target_date)
+        logger.info(
+            "펀더멘털 동기화 완료 date=%s received=%d upserted=%d skipped_unmapped=%d",
+            target_date, result.received, result.upserted, result.skipped_unmapped,
+        )
+    except (KrxClosedDayError, EmptyPykrxResponseError) as e:
+        logger.info("펀더멘털 동기화 skip date=%s reason=%s", target_date, e)
+    except Exception as e:
+        logger.exception("펀더멘털 동기화 실패")
+        slack_client.send_status(f"펀더멘털 동기화 실패 ({target_date}): {e}")

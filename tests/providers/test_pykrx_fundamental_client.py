@@ -8,6 +8,7 @@ import pytest
 from tenacity import wait_none
 
 from src.providers.pykrx_fundamental_client import (
+    KrxClosedDayError,
     PykrxFundamentalClient,
     PykrxFundamentalSnapshot,
 )
@@ -50,9 +51,26 @@ class TestPykrxFundamentalClient:
         ), pytest.raises(EmptyPykrxResponseError):
             client.fetch_by_date(date(2024, 1, 1))
 
+    def test_holiday_pattern_all_zero_bps_raises_immediately(self) -> None:
+        """휴장일 패턴(모든 BPS=0)은 KrxClosedDayError, 재시도 없이 즉시 raise."""
+        df = _df({
+            "005930": {"BPS": 0, "PER": 0, "PBR": 0, "EPS": 0, "DIV": 0, "DPS": 0},
+            "000660": {"BPS": 0, "PER": 0, "PBR": 0, "EPS": 0, "DIV": 0, "DPS": 0},
+        })
+        client = PykrxFundamentalClient()
+        with patch(
+            "src.providers.pykrx_fundamental_client.stock.get_market_fundamental",
+            return_value=df,
+        ) as mocked, pytest.raises(KrxClosedDayError):
+            client.fetch_by_date(date(2024, 5, 5))  # 어린이날
+        # 재시도 안 함 (단 1회 호출)
+        assert mocked.call_count == 1
+
     def test_nan_values_become_none(self) -> None:
         """적자/빈 셀(NaN)은 snapshot 필드에서 None으로 정규화."""
+        # 휴장일 검사를 통과시키기 위해 정상 BPS row 1개 + NaN row 1개
         df = _df({
+            "005930": {"BPS": 50000, "PER": 12.5, "PBR": 1.4, "EPS": 4000, "DIV": 2.5, "DPS": 1250},
             "999999": {"BPS": float("nan"), "PER": float("nan"), "PBR": 1.0,
                        "EPS": float("nan"), "DIV": 0.0, "DPS": 0.0},
         })
@@ -60,6 +78,7 @@ class TestPykrxFundamentalClient:
         with patch("src.providers.pykrx_fundamental_client.stock.get_market_fundamental", return_value=df):
             result = client.fetch_by_date(date(2024, 1, 2))
 
-        assert result[0] == PykrxFundamentalSnapshot(
+        by_ticker = {s.ticker: s for s in result}
+        assert by_ticker["999999"] == PykrxFundamentalSnapshot(
             ticker="999999", bps=None, per=None, pbr=1.0, eps=None, div=0.0, dps=0.0,
         )
