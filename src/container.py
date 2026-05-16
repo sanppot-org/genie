@@ -24,12 +24,14 @@ from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
+from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
+from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.cache.cache_manager import CacheManager
@@ -50,6 +52,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.routes.strategy",  # strategy 라우터 추가
             "src.api.routes.ticker",  # ticker 라우터 추가
             "src.api.routes.candle",  # candle 라우터 추가
+            "src.api.routes.fundamental",  # fundamental 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
     )
@@ -174,4 +177,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
         client=pykrx_ticker_client,
         repository=ticker_repository,
         dart_client=dart_company_client,
+    )
+    pykrx_fundamental_client = providers.Singleton(PykrxFundamentalClient)
+    fundamental_sync_service = providers.Factory(
+        FundamentalSyncService,
+        client=pykrx_fundamental_client,
+        ticker_repository=ticker_repository,
+        fundamental_repository=stock_fundamental_repository,
     )

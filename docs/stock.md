@@ -66,12 +66,12 @@
     - Index: `(ticker_id, date)` — 종목별 시계열 조회용 (date 단독 인덱스는 PK 첫 컬럼이라 불필요)
   [x] Alembic migration 007 (`007_add_stock_fundamentals_table.py`)
   [x] `src/database/models.py`에 `StockFundamental` 모델 + `src/database/stock_fundamental_repository.py` (bulk_upsert, find_by_ticker, find_by_date) + DI 등록
-  [ ] `PykrxFundamentalClient` 구현 (별도 파일) — `fetch_by_date(date) -> list[FundamentalSnapshot]`, tenacity 재시도
-  [ ] `FundamentalSyncService.sync(date)` — bulk fetch → ticker 매핑 → UPSERT (트랜잭션 1회 commit)
-    - pykrx 티커 → `tickers.id` 매핑은 한 번 로드 후 in-memory dict
-    - 미매핑 ticker는 skip + warning (신규 상장 등)
-  [ ] DI 컨테이너 등록
-  [ ] 수동 동기화 API: `POST /api/fundamentals/sync/kr-stock?date=YYYYMMDD` (date 생략 시 최근 영업일)
+  [x] `PykrxFundamentalClient` 구현 (`src/providers/pykrx_fundamental_client.py`) — `fetch_by_date(date)`, tenacity 재시도, NaN→None 정규화, `EmptyPykrxResponseError` 재사용
+  [x] `FundamentalSyncService.sync(date)` — bulk fetch → KR_STOCK ticker 매핑 → bulk_upsert (트랜잭션 1회 commit)
+    - pykrx 티커 → `tickers.id` 매핑: `find_by_data_source(PYKRX)` 로드 후 in-memory dict (KR_STOCK만 포함, ETF/ETN 자연 제외)
+    - 미매핑 코드(신규상장 등)는 `skipped_unmapped`로 집계
+  [x] DI 컨테이너 등록 (`pykrx_fundamental_client` Singleton + `fundamental_sync_service` Factory)
+  [x] 수동 동기화 API: `POST /api/fundamentals/sync/kr-stock?date=YYYYMMDD` (date 생략 시 오늘 KST)
   [ ] 스케줄러 등록 — 장 마감 후 (티커 동기화 16:48 직후, 예: KST 17:00, 평일)
   [ ] 휴장일/빈응답 처리 + Slack 실패 알림
   [ ] 백필 스크립트 — `scripts/backfill_fundamentals.py` (date range 받아 일자별 sync 반복)

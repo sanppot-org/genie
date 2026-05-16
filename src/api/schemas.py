@@ -1,5 +1,5 @@
 """API 스키마 정의"""
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -126,3 +126,12 @@ class SyncTickersResponse(BaseModel):
     renamed: int
     reactivated: int
     unchanged: int
+
+
+class SyncFundamentalsResponse(BaseModel):
+    """pykrx 펀더멘털 동기화 응답"""
+
+    date: date
+    received: int
+    upserted: int
+    skipped_unmapped: int
