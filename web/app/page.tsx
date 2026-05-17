@@ -7,6 +7,7 @@ import { useDeferredValue, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { apiGet } from "@/lib/api";
 import type { CandleSeries, FundamentalSeries, GenieResponse, Ticker } from "@/lib/types";
+import { useRecentTickers } from "@/lib/use-recent-tickers";
 
 const CandleChart = dynamic(
   () => import("@/components/candle-chart").then((m) => m.CandleChart),
@@ -35,6 +36,7 @@ export default function Home() {
   const deferredQ = useDeferredValue(q);
   const [selected, setSelected] = useState<Ticker | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
+  const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
 
   // 종목 변경 시 1Y로 리셋 (렌더 중 state 조정 — React 권장 패턴, effect 불필요).
   const [prevTicker, setPrevTicker] = useState(selected?.ticker);
@@ -112,6 +114,7 @@ export default function Home() {
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
                       setSelected(t);
+                      addRecent(t);
                       setSearchFocused(false);
                       (document.activeElement as HTMLElement | null)?.blur();
                     }}
@@ -129,6 +132,37 @@ export default function Home() {
           </section>
         )}
       </div>
+
+      {recent.length > 0 && (
+        <div className="flex max-w-3xl flex-wrap gap-2">
+          {recent.map((t) => (
+            <span
+              key={t.id}
+              className="inline-flex items-center rounded-full border bg-background pl-3 text-sm"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected(t);
+                  addRecent(t);
+                }}
+                className="py-1 hover:text-foreground"
+              >
+                <span className="font-mono">{t.ticker}</span>
+                <span className="ml-1.5">{t.name}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`${t.name} 최근 검색 삭제`}
+                onClick={() => removeRecent(t.ticker)}
+                className="px-2 py-1 text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {selected && (
         <section className="space-y-2 border-t pt-4">
