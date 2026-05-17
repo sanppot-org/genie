@@ -80,6 +80,8 @@
     - FundamentalSyncService: 신규 + ETF skip, 미매핑 skip, 멱등성 (3 케이스, 인메모리 SQLite)
     - 스케줄 task 분기 (정상/휴장/예외→Slack) — 3 케이스
 
+[ ] 주가 데이터(일봉) 수집
+
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.
 - 펀더멘털 데이터 활용: 섹터(industry_code) × PER/PBR 평균, 저평가 스크리닝 API
