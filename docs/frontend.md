@@ -67,8 +67,10 @@ genie/
 [ ] 차트 zoom/pan
 [ ] 키보드 단축키 (종목 빠른 전환)
 
-## 배포 (외부 공개 검토 시)
+## 배포
 
-- Vercel 무료 플랜으로 `web/` 서브폴더 배포
-- 백엔드는 현재 systemd → 도메인·HTTPS·인증(NextAuth 또는 단순 password gate) 추가 검토
-- 그 전엔 localhost만 사용 (인증 layer 보류)
+- 태그 `v*.*.*` push → GitHub Actions가 `web/`을 정적 export(`output: 'export'`) 빌드 → `out/`을 서버 `/var/www/genie/`로 scp → 백엔드 `deploy.sh` 실행
+- nginx가 `/`는 정적 파일 서빙, `/api/*`는 `127.0.0.1:8000`(uvicorn) reverse proxy → **same-origin**이라 CORS 불필요
+- 빌드 시 `NEXT_PUBLIC_API_BASE_URL=""`로 박힘 → `lib/api.ts`가 상대 경로 fetch
+- 접근: `http://150.230.252.125/` (도메인 없음, IP 직접). HTTPS/도메인은 추후.
+- nginx config: `infra/nginx/genie.conf` (서버 1회 수동 반영, 절차는 `docs/infra.md`)

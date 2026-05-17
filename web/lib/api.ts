@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// 운영 빌드에서는 NEXT_PUBLIC_API_BASE_URL=""로 두고 nginx가 same-origin proxy.
+// dev에서는 .env.local의 "http://localhost:8000"를 사용.
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -10,13 +12,22 @@ export class ApiError extends Error {
 type QueryValue = string | number | boolean | null | undefined;
 
 function buildUrl(path: string, params?: Record<string, QueryValue>): string {
-  const url = new URL(path, BASE_URL);
+  const search = new URLSearchParams();
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v === undefined || v === null) continue;
-      url.searchParams.set(k, String(v));
+      search.set(k, String(v));
     }
   }
+  const qs = search.toString();
+  const query = qs ? `?${qs}` : "";
+
+  if (!BASE_URL) {
+    // same-origin 상대 경로 — nginx가 /api/*를 백엔드로 proxy
+    return `${path}${query}`;
+  }
+  const url = new URL(path, BASE_URL);
+  if (qs) url.search = qs;
   return url.toString();
 }
 
