@@ -3,6 +3,7 @@
 import logging
 
 from dependency_injector import containers, providers
+from sqlalchemy.orm import Session
 
 from src.adapters.adapter_factory import CandleAdapterFactory
 from src.allocation_manager import AllocatedBalanceProvider
@@ -17,6 +18,7 @@ from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuCo
 from src.constants import KST
 from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
+from src.database.request_scope import current_request_token
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.ticker_repository import TickerRepository
@@ -45,6 +47,18 @@ from src.strategy.order.order_executor import OrderExecutor
 from src.strategy.strategy_context import StrategyContext
 from src.upbit.upbit_api import UpbitAPI
 from util.binance.binance_api import BinanceAPI
+
+
+def _resolve_session(db: Database) -> Session:
+    """리포지토리용 세션 해석.
+
+    요청 스코프 활성 시 scoped_session 레지스트리의 세션을 공유(같은 요청의
+    모든 리포가 동일 Session, 미들웨어가 요청 끝에 `.remove()`로 정리 → 누수
+    없음). 비요청(스케줄러·CLI)은 레거시 `get_session()` 폴백(Phase 3 대상).
+    """
+    if current_request_token() is not None:
+        return db.RequestSession()
+    return db.get_session()
 
 
 class ApplicationContainer(containers.DeclarativeContainer):
@@ -82,16 +96,14 @@ class ApplicationContainer(containers.DeclarativeContainer):
 
     # Database
     database = providers.Singleton(Database, database_config)
-    candle_minute1_repository = providers.Factory(CandleMinute1Repository, session=database.provided.get_session.call())
-    candle_hour1_repository = providers.Factory(CandleHour1Repository, session=database.provided.get_session.call())
-    candle_daily_repository = providers.Factory(CandleDailyRepository, session=database.provided.get_session.call())
-    ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
-    stock_fundamental_repository = providers.Factory(
-        StockFundamentalRepository, session=database.provided.get_session.call()
-    )
-    stock_daily_candle_repository = providers.Factory(
-        StockDailyCandleRepository, session=database.provided.get_session.call()
-    )
+    # 요청 스코프 세션 공유(없으면 레거시 폴백) — DB 커넥션 누수 차단(Phase 1).
+    _session = providers.Callable(_resolve_session, database)
+    candle_minute1_repository = providers.Factory(CandleMinute1Repository, session=_session)
+    candle_hour1_repository = providers.Factory(CandleHour1Repository, session=_session)
+    candle_daily_repository = providers.Factory(CandleDailyRepository, session=_session)
+    ticker_repository = providers.Factory(TickerRepository, session=_session)
+    stock_fundamental_repository = providers.Factory(StockFundamentalRepository, session=_session)
+    stock_daily_candle_repository = providers.Factory(StockDailyCandleRepository, session=_session)
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")

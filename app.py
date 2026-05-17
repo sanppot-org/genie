@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.exception_handlers import handle_genie_error, handle_unhandled_exception
 from src.api.lifespan import lifespan
+from src.api.middleware import DBSessionMiddleware
 from src.api.routes import candle, fundamental, health, strategy, ticker
 from src.config import AppConfig
 from src.container import ApplicationContainer
@@ -35,6 +36,10 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# 요청 스코프 DB 세션 (커넥션 누수 차단, Phase 1) — container.database는
+# override 가능한 provider라 테스트와 일관.
+app.add_middleware(DBSessionMiddleware, database_provider=container.database)
 
 # 예외 핸들러 등록
 app.add_exception_handler(GenieError, handle_genie_error)

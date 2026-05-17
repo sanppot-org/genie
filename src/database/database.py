@@ -1,10 +1,23 @@
 """Database connection and session management."""
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, scoped_session, sessionmaker
 
 from src.config import DatabaseConfig
 from src.database.models import Base
+from src.database.request_scope import current_request_token
+
+
+def make_request_session(session_factory: sessionmaker[Session]) -> scoped_session[Session]:
+    """요청 스코프 세션 레지스트리 (SQLAlchemy 공식 scoped_session 패턴).
+
+    scopefunc=`current_request_token` → 같은 요청의 모든 리포지토리가 동일
+    Session 공유. 요청 끝에 미들웨어가 `.remove()`(close+rollback+폐기) 호출.
+    """
+    return scoped_session(session_factory, scopefunc=current_request_token)
 
 
 class Database:
@@ -38,6 +51,8 @@ class Database:
             autoflush=False,
             bind=self.engine,
         )
+        # 요청 스코프 세션 레지스트리 (커넥션 누수 차단, Phase 1).
+        self.RequestSession = make_request_session(self.SessionLocal)
 
     def create_tables(self) -> None:
         """모든 테이블 생성
@@ -71,3 +86,26 @@ class Database:
             >>>     session.close()
         """
         return self.SessionLocal()
+
+    @contextmanager
+    def session_scope(self) -> Iterator[Session]:
+        """요청/작업 단위 세션 스코프.
+
+        정상 종료 시 commit(읽기 전용이어도 트랜잭션을 닫아 Postgres
+        idle-in-transaction 잔존 방지), 예외 시 rollback, 항상 close하여
+        커넥션을 풀에 반환한다.
+
+        Yields:
+            SQLAlchemy 세션
+        """
+        session = self.SessionLocal()
+        try:
+            yield session
+            if session.in_transaction():
+                session.commit()
+        except Exception:
+            if session.in_transaction():
+                session.rollback()
+            raise
+        finally:
+            session.close()

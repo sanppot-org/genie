@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.candle_repositories import CandleDailyRepository, CandleMinute1Repository
-from src.database.database import Database
+from src.database.database import Database, make_request_session
 from src.database.models import Base, Ticker
 from src.database.ticker_repository import TickerRepository
 
@@ -23,6 +23,7 @@ def db() -> Generator[Database, Any, None]:
     database = Database.__new__(Database)
     database.engine = engine
     database.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    database.RequestSession = make_request_session(database.SessionLocal)
 
     Base.metadata.create_all(bind=engine)
 
