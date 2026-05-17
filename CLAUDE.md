@@ -80,6 +80,7 @@ docker-compose up -d timescaledb             # DB 실행
 - **deploy.sh**: uv sync → systemd 재시작, 실패 시 자동 롤백, Slack 알림.
 - **systemd**: `genie.service` (`uv run uvicorn app:app ...`).
 - **DB**: TimescaleDB (Docker Compose, `--profile admin`으로 pgAdmin 포함).
+- [인프라 정보](./docs/infra.md)
 
 ## 보안
 
