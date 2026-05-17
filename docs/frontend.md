@@ -57,15 +57,8 @@ genie/
 [ ] 캔들 + 거래량 동기화 표시
 [ ] 종목 상세 페이지에 캔들 탭/섹션 추가
 
-### Phase 4. 섹터 분석
-[ ] `GET /api/fundamentals/sector-summary?date=` (섹터별 평균/중앙값 PER·PBR)
-[ ] 섹터 스캐터 또는 박스플롯 (Recharts)
-[ ] 저평가 스크리닝 필터 UI
-
-### Phase 5. 운영성
-[ ] CSV/PNG export 버튼
-[ ] 차트 zoom/pan
-[ ] 키보드 단축키 (종목 빠른 전환)
+[ ] per 차트 기간 선택
+[ ] 검색 창 고도화
 
 ## 배포
 

@@ -39,8 +39,6 @@ sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-`ecrick.com` server block은 별도라 영향 없음. IP 직접 접근(150.230.252.125)만 genie가 받음.
-
 ## 사용 포트
 
 - 80, 443: nginx (외부 노출, ufw Nginx Full)
