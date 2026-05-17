@@ -41,19 +41,19 @@ def get_schedules() -> list[ScheduleConfig]:
         ),
         ScheduleConfig(
             func=sync_kr_stock_tickers,
-            trigger=CronTrigger(hour=16, minute=48, day_of_week="mon-fri"),
+            trigger=CronTrigger(hour=16, minute=42, day_of_week="mon-fri"),
             id="sync_kr_stock_tickers",
             name="한국 주식 종목 정보 동기화",
         ),
         ScheduleConfig(
             func=sync_kr_stock_fundamentals,
-            trigger=CronTrigger(hour=17, minute=0, day_of_week="mon-fri"),
+            trigger=CronTrigger(hour=16, minute=50, day_of_week="mon-fri"),
             id="sync_kr_stock_fundamentals",
             name="한국 주식 펀더멘털 동기화",
         ),
         ScheduleConfig(
             func=sync_kr_stock_daily_candles,
-            trigger=CronTrigger(hour=17, minute=10, day_of_week="mon-fri"),
+            trigger=CronTrigger(hour=16, minute=58, day_of_week="mon-fri"),
             id="sync_kr_stock_daily_candles",
             name="한국 주식 일봉 동기화",
         ),
