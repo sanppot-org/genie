@@ -20,6 +20,7 @@ from src.providers.pykrx_fundamental_client import KrxClosedDayError
 from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.config import BaseStrategyConfig
@@ -170,3 +171,28 @@ def sync_kr_stock_fundamentals(
     except Exception as e:
         logger.exception("펀더멘털 동기화 실패")
         slack_client.send_status(f"펀더멘털 동기화 실패 ({target_date}): {e}")
+
+
+@inject
+def sync_kr_stock_daily_candles(
+        service: DailyCandleSyncService = Provide[ApplicationContainer.daily_candle_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """일자별 KR 주식 일봉 동기화 (장 마감 후, 평일).
+
+    휴장일은 pykrx 빈 응답/거래량 0 → `KrxClosedDayError`/`EmptyPykrxResponseError`로
+    도착 → info 로그만 남기고 종료. 그 외 예외만 Slack 알림.
+    """
+    target_date = datetime.now(KST).date()
+    try:
+        result = service.sync(target_date)
+        logger.info(
+            "일봉 동기화 완료 date=%s received=%d upserted=%d skipped_unmapped=%d skipped_no_trade=%d",
+            target_date, result.received, result.upserted,
+            result.skipped_unmapped, result.skipped_no_trade,
+        )
+    except (KrxClosedDayError, EmptyPykrxResponseError) as e:
+        logger.info("일봉 동기화 skip date=%s reason=%s", target_date, e)
+    except Exception as e:
+        logger.exception("일봉 동기화 실패")
+        slack_client.send_status(f"일봉 동기화 실패 ({target_date}): {e}")

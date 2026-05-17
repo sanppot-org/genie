@@ -80,7 +80,7 @@
     - FundamentalSyncService: 신규 + ETF skip, 미매핑 skip, 멱등성 (3 케이스, 인메모리 SQLite)
     - 스케줄 task 분기 (정상/휴장/예외→Slack) — 3 케이스
 
-[~] 주가 데이터(일봉) 수집 — `pykrx.stock.get_market_ohlcv`
+[x] 주가 데이터(일봉) 수집 — `pykrx.stock.get_market_ohlcv`
   - **목표**: 일자별 OHLCV+거래대금 시계열 적재 (차트·백테스팅 입력용)
   - **수집 방식**: `get_market_ohlcv(date, market="ALL")` 1회 호출로 전 종목 일괄 (per-ticker 루프 X)
   - **대상**: KR_STOCK만 (ETF 자연 제외), 거래정지(volume=0) skip
@@ -93,7 +93,7 @@
   [x] 수동 동기화 API `POST /api/candles/sync/kr-stock?date=YYYYMMDD` (생략 시 오늘 KST)
   [x] 백필 스크립트 `scripts/backfill_daily_candles.py` (`--start --end YYYYMMDD`, 휴장일·실패 일자별 분류)
   [x] 테스트 — `DailyCandleSyncService` 3케이스(매핑/미매핑/no_trade, 휴장일 전파, 멱등) + API 2케이스
-  [ ] 스케줄러 등록 (장 마감 후 cron) — 다음 PR (펀더멘털 17:00 cron 옆에 추가)
+  [x] 스케줄러 등록 — `sync_kr_stock_daily_candles` cron 17:10 mon-fri (ticker 16:48 → fundamental 17:00 → 일봉 17:10)
 
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.
