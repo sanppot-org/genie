@@ -85,9 +85,9 @@ jobs:
             echo "📌 태그 체크아웃: $VERSION"
             git checkout "tags/$VERSION"
 
-            # 서브모듈 업데이트
+            # 서브모듈 업데이트 (config만 — open-trading-api는 로컬 MCP 전용, prod 런타임 무관)
             echo "📦 서브모듈 업데이트 중..."
-            git submodule update --init --recursive
+            git submodule update --init --recursive config
 
             # 배포 스크립트 실행
             echo "⚙️  배포 스크립트 실행 중..."
