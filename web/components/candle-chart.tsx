@@ -37,7 +37,9 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   const perRef = useRef<ISeriesApi<"Line"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const didFitRef = useRef(false);
-  const loadingRef = useRef(false);
+  // 초기값 true: 첫 데이터+fitContent 완료(Effect B 끝에서 해제) 전까지
+  // 마운트·리사이즈·fitContent 정착 중 허위 확장 트리거를 차단.
+  const loadingRef = useRef(true);
   const onNeedMoreRef = useRef<(() => void) | undefined>(undefined);
   const hasMoreRef = useRef(false);
 

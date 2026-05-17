@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { useDeferredValue, useState } from "react";
 
@@ -61,6 +61,8 @@ export default function Home() {
         to,
       }).then((r) => r.data),
     enabled: Boolean(selected),
+    // stepIdx 변경 시 이전 데이터 유지 → CandleChart 언마운트 방지(구간 보존 동작).
+    placeholderData: keepPreviousData,
   });
 
   const candles = useQuery({
@@ -72,6 +74,7 @@ export default function Home() {
         to,
       }).then((r) => r.data),
     enabled: Boolean(selected),
+    placeholderData: keepPreviousData,
   });
 
   return (
@@ -137,11 +140,15 @@ export default function Home() {
               PER 조회 실패: {(fundamentals.error as Error).message}
             </p>
           )}
-          {candles.data && (
+          {candles.data && candles.data.ticker === selected.ticker && (
             <CandleChart
               key={selected.ticker}
               points={candles.data.points}
-              perPoints={fundamentals.data?.points}
+              perPoints={
+                fundamentals.data?.ticker === selected.ticker
+                  ? fundamentals.data.points
+                  : undefined
+              }
               hasMore={stepIdx < STEPS.length}
               onNeedMore={() => setStepIdx((i) => Math.min(i + 1, STEPS.length))}
             />
