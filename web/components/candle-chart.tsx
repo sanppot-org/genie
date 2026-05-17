@@ -13,13 +13,36 @@ import {
   type LogicalRange,
   type WhitespaceData,
 } from "lightweight-charts";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import type { CandlePoint, FundamentalPoint } from "@/lib/types";
 
 // 거래량 막대 색 (캔들 방향 일치, 반투명): 상승=빨강 / 하락=파랑
 const VOL_UP = "rgba(210,79,69,0.55)";
 const VOL_DOWN = "rgba(18,97,196,0.55)";
+
+// 이동평균선 (한국 HTS 표준 기간·구분색). 종가 기반 SMA, 클라 계산.
+const MA = [5, 20, 60, 120] as const;
+type MaPeriod = (typeof MA)[number];
+const MA_COLOR: Record<MaPeriod, string> = {
+  5: "#e91e63",
+  20: "#ff9800",
+  60: "#4caf50",
+  120: "#9c27b0",
+};
+
+/** 단순이동평균 (러닝썸 O(N)). 앞 n-1봉은 생략 → 선이 그 지점부터 시작. */
+function sma(points: CandlePoint[], n: number): LineData[] {
+  const out: LineData[] = [];
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    sum += points[i].close;
+    if (i >= n) sum -= points[i - n].close;
+    if (i >= n - 1) out.push({ time: points[i].date, value: sum / n });
+  }
+  return out;
+}
 
 interface Props {
   points: CandlePoint[];
@@ -36,6 +59,13 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const perRef = useRef<ISeriesApi<"Line"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const maRefs = useRef<(ISeriesApi<"Line"> | null)[]>([]);
+  const [maOn, setMaOn] = useState<Record<MaPeriod, boolean>>({
+    5: true,
+    20: true,
+    60: true,
+    120: true,
+  });
   const didFitRef = useRef(false);
   // 초기값 true: 첫 데이터+fitContent 완료(Effect B 끝에서 해제) 전까지
   // 마운트·리사이즈·fitContent 정착 중 허위 확장 트리거를 차단.
@@ -89,6 +119,17 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     volRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
     candleRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.25 } });
 
+    // 이동평균선: 캔들과 동일 가격축(pane 0). 데이터는 Effect B, 표시여부는 Effect D.
+    maRefs.current = MA.map((n) =>
+      chart.addSeries(LineSeries, {
+        color: MA_COLOR[n],
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      }),
+    );
+
     // 왼쪽 끝(첫 바)보다 더 끌면 barsBefore < 0 → 과거 더 요청.
     // 초기 fitContent 직후엔 barsBefore≈0이라 오발동 없음.
     const onRange = (lr: LogicalRange | null) => {
@@ -118,6 +159,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
       candleRef.current = null;
       perRef.current = null;
       volRef.current = null;
+      maRefs.current = [];
       didFitRef.current = false;
     };
     // 마운트당 1회만. points 변경은 Effect B가 처리.
@@ -147,6 +189,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
         color: p.close >= p.open ? VOL_UP : VOL_DOWN,
       })),
     );
+    MA.forEach((n, k) => maRefs.current[k]?.setData(sma(points, n)));
     if (!didFitRef.current) {
       chart.timeScale().fitContent();
       didFitRef.current = true;
@@ -185,8 +228,30 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     );
   }, [perPoints]);
 
+  // Effect D: 이평선 표시여부. 시리즈 1회 생성 후 visible만 토글.
+  useEffect(() => {
+    MA.forEach((n, k) => maRefs.current[k]?.applyOptions({ visible: maOn[n] }));
+  }, [maOn]);
+
   if (points.length === 0) {
     return <p className="text-sm text-muted-foreground">데이터 없음</p>;
   }
-  return <div ref={ref} className="w-full" style={{ height: 480 }} />;
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1">
+        {MA.map((n) => (
+          <Button
+            key={n}
+            type="button"
+            size="sm"
+            variant={maOn[n] ? "default" : "outline"}
+            onClick={() => setMaOn((s) => ({ ...s, [n]: !s[n] }))}
+          >
+            <span style={{ color: MA_COLOR[n] }}>●</span> MA{n}
+          </Button>
+        ))}
+      </div>
+      <div ref={ref} className="w-full" style={{ height: 480 }} />
+    </div>
+  );
 }
