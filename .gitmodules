@@ -1,3 +1,6 @@
 [submodule "config"]
 	path = config
 	url = git@github.com:sanppot-org/config.git
+[submodule "open-trading-api"]
+	path = open-trading-api
+	url = git@github.com:koreainvestment/open-trading-api.git
