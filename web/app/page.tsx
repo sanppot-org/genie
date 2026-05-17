@@ -31,6 +31,7 @@ function rangeFor(stepIdx: number): { from?: string; to?: string } {
 
 export default function Home() {
   const [q, setQ] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const deferredQ = useDeferredValue(q);
   const [selected, setSelected] = useState<Ticker | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
@@ -81,41 +82,53 @@ export default function Home() {
     <main className="w-full p-6 space-y-6">
       <h1 className="text-2xl font-semibold">Genie — 종목 차트</h1>
 
-      <Input
-        className="max-w-3xl"
-        placeholder="ticker 또는 종목명 (예: 005930, 삼성)"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="relative max-w-3xl">
+        <Input
+          placeholder="ticker 또는 종목명 (예: 005930, 삼성)"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+        />
 
-      {deferredQ.trim().length > 0 && (
-        <section className="max-w-3xl space-y-1">
-          {tickers.isLoading && <p className="text-sm text-muted-foreground">불러오는 중...</p>}
-          {tickers.isError && (
-            <p className="text-sm text-red-600">검색 실패: {(tickers.error as Error).message}</p>
-          )}
-          {tickers.data && tickers.data.length === 0 && (
-            <p className="text-sm text-muted-foreground">결과 없음</p>
-          )}
-          <ul className="space-y-1">
-            {tickers.data?.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelected(t)}
-                  className={`w-full text-left rounded-md border px-3 py-2 hover:bg-muted ${
-                    selected?.id === t.id ? "bg-muted" : ""
-                  }`}
-                >
-                  <span className="font-mono text-sm">{t.ticker}</span>
-                  <span className="ml-2">{t.name}</span>
-                  <span className="ml-2 text-xs text-muted-foreground">{t.asset_type}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {searchFocused && deferredQ.trim().length > 0 && (
+          <section className="absolute inset-x-0 top-full z-20 mt-1 max-h-80 overflow-auto rounded-md border bg-background p-1 shadow-lg">
+            {tickers.isLoading && (
+              <p className="px-3 py-2 text-sm text-muted-foreground">불러오는 중...</p>
+            )}
+            {tickers.isError && (
+              <p className="px-3 py-2 text-sm text-red-600">
+                검색 실패: {(tickers.error as Error).message}
+              </p>
+            )}
+            {tickers.data && tickers.data.length === 0 && (
+              <p className="px-3 py-2 text-sm text-muted-foreground">결과 없음</p>
+            )}
+            <ul>
+              {tickers.data?.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setSelected(t);
+                      setSearchFocused(false);
+                      (document.activeElement as HTMLElement | null)?.blur();
+                    }}
+                    className={`w-full rounded-md px-3 py-2 text-left hover:bg-muted ${
+                      selected?.id === t.id ? "bg-muted" : ""
+                    }`}
+                  >
+                    <span className="font-mono text-sm">{t.ticker}</span>
+                    <span className="ml-2">{t.name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">{t.asset_type}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
 
       {selected && (
         <section className="space-y-2 border-t pt-4">

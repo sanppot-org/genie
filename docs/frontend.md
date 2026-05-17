@@ -69,8 +69,8 @@ genie/
     [ ] 동적? (기간 사용자 설정 — 보류) 
   [x] per 합치기 — lightweight-charts v5 멀티 페인. 캔들(pane 0) 아래 PER 라인(pane 1) 동기화, 주가:PER=3:1
 [ ] 검색 창 고도화
-  [ ] 검색 결과 티커 보이게. 지금은 asset_type만 보임
-  [ ] 검색 목록 리스트는 검색창에 커서가 있을 때만 보이게하기.
+  [x] 검색 목록 리스트는 검색창에 커서가 있을 때만 보이게하기 — onFocus/onBlur 게이트, 결과 클릭은 onMouseDown preventDefault로 보존
+  [x] 검색창 연결형 드롭다운 (구글/네이버식) — relative 래퍼 + absolute 패널(콘텐츠 안 밀고 덮음, 그림자), 선택 시 닫힘(focus 해제)
 [ ] 최근 검색어 저장 (브라우저)
 
 ## 배포
