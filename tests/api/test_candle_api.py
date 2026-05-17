@@ -1,6 +1,6 @@
 """Candle API 테스트"""
 
-from datetime import UTC
+from datetime import UTC, date
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -11,6 +11,7 @@ from src.constants import AssetType
 from src.database.models import Ticker
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService, CollectMode
+from src.service.daily_candle_sync_service import DailyCandleSyncResult, DailyCandleSyncService
 from src.service.exceptions import GenieError
 from src.service.ticker_service import TickerService
 
@@ -408,3 +409,48 @@ def test_조회_실패_존재하지_않는_ticker_id(
     assert response.status_code == 404
     container.candle_query_service.reset_override()
     container.ticker_service.reset_override()
+
+
+# ----- POST /candles/sync/kr-stock -----
+
+@pytest.fixture
+def mock_daily_candle_sync_service() -> MagicMock:
+    """Mock DailyCandleSyncService 픽스처"""
+    return MagicMock(spec=DailyCandleSyncService)
+
+
+@pytest.fixture
+def sync_client(mock_daily_candle_sync_service: MagicMock) -> TestClient:
+    """daily_candle_sync_service DI override가 적용된 TestClient."""
+    container.daily_candle_sync_service.override(mock_daily_candle_sync_service)
+    yield TestClient(app)
+    container.daily_candle_sync_service.reset_override()
+
+
+def test_kr_stock_일봉_동기화_정상(
+        sync_client: TestClient,
+        mock_daily_candle_sync_service: MagicMock,
+) -> None:
+    """date 쿼리로 KR 주식 일봉 동기화 → 200 + 응답 구조."""
+    mock_daily_candle_sync_service.sync.return_value = DailyCandleSyncResult(
+        received=2700, upserted=2400, skipped_unmapped=290, skipped_no_trade=10,
+    )
+
+    response = sync_client.post("/api/candles/sync/kr-stock?date=20240102")
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body == {
+        "date": "2024-01-02",
+        "received": 2700,
+        "upserted": 2400,
+        "skipped_unmapped": 290,
+        "skipped_no_trade": 10,
+    }
+    mock_daily_candle_sync_service.sync.assert_called_once_with(date(2024, 1, 2))
+
+
+def test_kr_stock_일봉_동기화_잘못된_date_format(sync_client: TestClient) -> None:
+    """date 패턴 불일치 시 422."""
+    response = sync_client.post("/api/candles/sync/kr-stock?date=2024-01-02")
+    assert response.status_code == 422

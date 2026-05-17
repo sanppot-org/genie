@@ -193,3 +193,33 @@ class StockFundamental(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<StockFundamental(ticker_id={self.ticker_id}, date={self.date}, per={self.per})>"
+
+
+class StockDailyCandle(Base, TimestampMixin):
+    """KR 주식 일자별 OHLCV (pykrx get_market_ohlcv).
+
+    KR_STOCK 대상. 동일 (date, ticker_id) 재호출 시 UPSERT.
+    기존 candle_daily(MATERIALIZED VIEW)는 candle_minute_1 집계용이라 직접 INSERT 불가 → 별도 테이블.
+    """
+
+    __tablename__ = "stock_daily_candles"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_daily_candles_ticker_id"), nullable=False
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False, comment="거래 영업일")
+    open: Mapped[float] = mapped_column(Float, nullable=False, comment="시가")
+    high: Mapped[float] = mapped_column(Float, nullable=False, comment="고가")
+    low: Mapped[float] = mapped_column(Float, nullable=False, comment="저가")
+    close: Mapped[float] = mapped_column(Float, nullable=False, comment="종가")
+    volume: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="거래량(주)")
+    trade_value: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="거래대금(원)")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("date", "ticker_id"),
+        Index("ix_stock_daily_candles_ticker_id_date", "ticker_id", "date"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockDailyCandle(ticker_id={self.ticker_id}, date={self.date}, close={self.close})>"

@@ -17,6 +17,7 @@ from src.config import BithumbConfig, DatabaseConfig, GoogleSheetConfig, HantuCo
 from src.constants import KST
 from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
@@ -24,6 +25,7 @@ from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
+from src.providers.pykrx_daily_candle_client import PykrxDailyCandleClient
 from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
@@ -31,6 +33,7 @@ from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
+from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_service import TickerService
@@ -84,6 +87,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
     ticker_repository = providers.Factory(TickerRepository, session=database.provided.get_session.call())
     stock_fundamental_repository = providers.Factory(
         StockFundamentalRepository, session=database.provided.get_session.call()
+    )
+    stock_daily_candle_repository = providers.Factory(
+        StockDailyCandleRepository, session=database.provided.get_session.call()
     )
 
     # Google Sheet Clients
@@ -190,4 +196,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
         FundamentalService,
         ticker_repository=ticker_repository,
         fundamental_repository=stock_fundamental_repository,
+    )
+    pykrx_daily_candle_client = providers.Singleton(PykrxDailyCandleClient)
+    daily_candle_sync_service = providers.Factory(
+        DailyCandleSyncService,
+        client=pykrx_daily_candle_client,
+        ticker_repository=ticker_repository,
+        daily_candle_repository=stock_daily_candle_repository,
     )

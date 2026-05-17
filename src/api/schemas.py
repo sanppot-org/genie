@@ -159,3 +159,13 @@ class SyncFundamentalsResponse(BaseModel):
     received: int
     upserted: int
     skipped_unmapped: int
+
+
+class SyncDailyCandlesResponse(BaseModel):
+    """pykrx KR 주식 일봉 동기화 응답"""
+
+    date: date
+    received: int
+    upserted: int
+    skipped_unmapped: int
+    skipped_no_trade: int

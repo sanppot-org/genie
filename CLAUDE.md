@@ -91,4 +91,5 @@ docker-compose up -d timescaledb             # DB 실행
 
 ## 작업규칙
 
-- 커밋은 임의로 하지 말고 사용자의 허락을 구한다. 
+- 커밋은 임의로 하지 말고 사용자의 허락을 구한다.
+- **DB 쓰기 명령(특히 `alembic upgrade/downgrade`, `psql` 변경 쿼리) 실행 전에는 반드시 호스트를 먼저 확인하고 사용자 승인을 받는다.** `.env.dev`/`.env.prod`가 prod IP(`140.245.67.107` 등)를 가리킬 수 있어, 무심코 prod DB에 마이그레이션이 적용될 수 있다. 점검 순서: ① `uv run python -c "from src.config import DatabaseConfig; print(DatabaseConfig().database_url)"` 로 대상 확인 → ② 사용자에게 대상 명시하며 승인 요청 → ③ 실행. 로컬 docker 대상이면 `ENV_PROFILE=local` 또는 `POSTGRES_HOST=localhost`로 명시. 

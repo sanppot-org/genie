@@ -1,5 +1,7 @@
 """Candle 데이터 API 엔드포인트"""
 # ruff: noqa: B008
+from dataclasses import asdict
+from datetime import datetime
 from typing import Annotated
 
 from dependency_injector.wiring import Provide, inject
@@ -12,10 +14,13 @@ from src.api.schemas import (
     GenieResponse,
     QueryCandlesRequest,
     QueryCandlesResponse,
+    SyncDailyCandlesResponse,
 )
+from src.constants import KST
 from src.container import ApplicationContainer
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
+from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.ticker_service import TickerService
 
 router = APIRouter(tags=["candles"])
@@ -105,3 +110,15 @@ def query_candles(
             candles=candles,
         )
     )
+
+
+@router.post("/candles/sync/kr-stock", response_model=GenieResponse[SyncDailyCandlesResponse])
+@inject
+def sync_kr_stock_daily_candles(
+        date_str: str | None = Query(default=None, alias="date", pattern=r"^\d{8}$"),
+        service: DailyCandleSyncService = Depends(Provide[ApplicationContainer.daily_candle_sync_service]),
+) -> GenieResponse[SyncDailyCandlesResponse]:
+    """일자별 KR 주식 일봉을 pykrx에서 가져와 DB에 수동 동기화. date 미지정 시 오늘(KST)."""
+    target_date = datetime.strptime(date_str, "%Y%m%d").date() if date_str else datetime.now(KST).date()
+    result = service.sync(target_date)
+    return GenieResponse(data=SyncDailyCandlesResponse(date=target_date, **asdict(result)))
