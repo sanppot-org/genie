@@ -95,6 +95,10 @@
   [x] 테스트 — `DailyCandleSyncService` 3케이스(매핑/미매핑/no_trade, 휴장일 전파, 멱등) + API 2케이스
   [x] 스케줄러 등록 — `sync_kr_stock_daily_candles` cron 17:10 mon-fri (ticker 16:48 → fundamental 17:00 → 일봉 17:10)
 
+[ ] 액면분할 후 주가
+[x] 로컬에서 better stack 비활성화
+[ ] 프로파일에 따라서 스케줄러 비활성화
+
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.
 - 펀더멘털 데이터 활용: 섹터(industry_code) × PER/PBR 평균, 저평가 스크리닝 API
