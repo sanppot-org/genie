@@ -51,14 +51,18 @@ genie/
 [x] 인라인 Loading/Error/Empty 상태 (별도 컴포넌트 없이 텍스트)
 [~] 라우팅 분리(`/stocks/[ticker]`), 기간 필터(1M/3M/1Y/ALL), Skeleton/Alert 컴포넌트화 — 보류 (추후 필요해지면 도입)
 
-### Phase 3. 일봉 캔들
-[ ] `GET /api/candles?ticker=&from=&to=&interval=1d` 추가 (또는 기존 엔드포인트 확인)
-[ ] TradingView Lightweight Charts 도입
-[ ] 캔들 + 거래량 동기화 표시
-[ ] 종목 상세 페이지에 캔들 탭/섹션 추가
+### Phase 3. 일봉 캔들 (심플 1차 — 단일 페이지 통합)
+[x] `GET /api/candles/kr-stock?ticker=&from=&to=` 추가 (stock_daily_candles read, `GET /fundamentals` 미러)
+[x] TradingView Lightweight Charts(v5) 도입 — `components/candle-chart.tsx` (`addSeries(CandlestickSeries)`, ssr:false)
+[x] 단일 페이지 `/`에 PER 차트 아래 일봉 candlestick 섹션 추가 (최근 1년 고정, 한국식 색상)
+[~] 캔들 + 거래량 동기화 표시 — 보류 (심플 우선, 추후)
+[~] 종목 상세 페이지 라우팅 분리(`/stocks/[ticker]`) — 보류 (Phase 2와 동일 방침)
 
-[ ] per 차트 기간 선택
+[ ] 차트 기간 선택
 [ ] 검색 창 고도화
+  [ ] 검색 결과 티커 보이게. 지금은 asset_type만 보임
+  [ ] 검색 목록 리스트는 검색창에 커서가 있을 때만 보이게하기.
+[ ] 최근 검색어 저장 (브라우저)
 
 ## 배포
 

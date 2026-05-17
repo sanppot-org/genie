@@ -6,12 +6,20 @@ import { useDeferredValue, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { apiGet } from "@/lib/api";
-import type { FundamentalSeries, GenieResponse, Ticker } from "@/lib/types";
+import type { CandleSeries, FundamentalSeries, GenieResponse, Ticker } from "@/lib/types";
 
 const PerChart = dynamic(() => import("@/components/per-chart").then((m) => m.PerChart), {
   ssr: false,
   loading: () => <p className="text-sm text-muted-foreground">차트 로딩 중...</p>,
 });
+
+const CandleChart = dynamic(
+  () => import("@/components/candle-chart").then((m) => m.CandleChart),
+  {
+    ssr: false,
+    loading: () => <p className="text-sm text-muted-foreground">차트 로딩 중...</p>,
+  },
+);
 
 function lastYearRange(): { from: string; to: string } {
   const to = new Date();
@@ -48,18 +56,30 @@ export default function Home() {
     enabled: Boolean(selected),
   });
 
+  const candles = useQuery({
+    queryKey: ["candles", selected?.ticker, from, to],
+    queryFn: () =>
+      apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
+        ticker: selected!.ticker,
+        from,
+        to,
+      }).then((r) => r.data),
+    enabled: Boolean(selected),
+  });
+
   return (
-    <main className="mx-auto max-w-3xl p-6 space-y-6">
-      <h1 className="text-2xl font-semibold">Genie — 종목 PER 차트</h1>
+    <main className="w-full p-6 space-y-6">
+      <h1 className="text-2xl font-semibold">Genie — 종목 차트</h1>
 
       <Input
+        className="max-w-3xl"
         placeholder="ticker 또는 종목명 (예: 005930, 삼성)"
         value={q}
         onChange={(e) => setQ(e.target.value)}
       />
 
       {deferredQ.trim().length > 0 && (
-        <section className="space-y-1">
+        <section className="max-w-3xl space-y-1">
           {tickers.isLoading && <p className="text-sm text-muted-foreground">불러오는 중...</p>}
           {tickers.isError && (
             <p className="text-sm text-red-600">검색 실패: {(tickers.error as Error).message}</p>
@@ -101,6 +121,13 @@ export default function Home() {
             </p>
           )}
           {fundamentals.data && <PerChart points={fundamentals.data.points} />}
+
+          <p className="pt-2 text-xs text-muted-foreground">최근 1년 일봉</p>
+          {candles.isLoading && <p className="text-sm text-muted-foreground">불러오는 중...</p>}
+          {candles.isError && (
+            <p className="text-sm text-red-600">조회 실패: {(candles.error as Error).message}</p>
+          )}
+          {candles.data && <CandleChart points={candles.data.points} />}
         </section>
       )}
     </main>

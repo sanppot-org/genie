@@ -14,6 +14,8 @@ from src.api.schemas import (
     GenieResponse,
     QueryCandlesRequest,
     QueryCandlesResponse,
+    StockDailyCandlePoint,
+    StockDailyCandleSeriesResponse,
     SyncDailyCandlesResponse,
 )
 from src.constants import KST
@@ -21,6 +23,7 @@ from src.container import ApplicationContainer
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
+from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
 
 router = APIRouter(tags=["candles"])
@@ -122,3 +125,24 @@ def sync_kr_stock_daily_candles(
     target_date = datetime.strptime(date_str, "%Y%m%d").date() if date_str else datetime.now(KST).date()
     result = service.sync(target_date)
     return GenieResponse(data=SyncDailyCandlesResponse(date=target_date, **asdict(result)))
+
+
+@router.get("/candles/kr-stock", response_model=GenieResponse[StockDailyCandleSeriesResponse])
+@inject
+def get_kr_stock_daily_candles(
+        ticker: str = Query(min_length=1, max_length=20, description="ticker 코드"),
+        from_: str | None = Query(default=None, alias="from", pattern=r"^\d{8}$"),
+        to: str | None = Query(default=None, pattern=r"^\d{8}$"),
+        service: StockDailyCandleService = Depends(Provide[ApplicationContainer.stock_daily_candle_service]),
+) -> GenieResponse[StockDailyCandleSeriesResponse]:
+    """KR 주식 일봉 시계열 (date 오름차순). 종목 미발견 시 404."""
+    from_date = datetime.strptime(from_, "%Y%m%d").date() if from_ else None
+    to_date = datetime.strptime(to, "%Y%m%d").date() if to else None
+    t, rows = service.get_time_series(ticker, from_date, to_date)
+    return GenieResponse(
+        data=StockDailyCandleSeriesResponse(
+            ticker=t.ticker,
+            name=t.name,
+            points=[StockDailyCandlePoint.model_validate(r) for r in rows],
+        )
+    )

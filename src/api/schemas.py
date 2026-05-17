@@ -169,3 +169,25 @@ class SyncDailyCandlesResponse(BaseModel):
     upserted: int
     skipped_unmapped: int
     skipped_no_trade: int
+
+
+class StockDailyCandlePoint(BaseModel):
+    """일자별 KR 주식 일봉 단일 스냅샷."""
+
+    date: date
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+    trade_value: int | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StockDailyCandleSeriesResponse(BaseModel):
+    """ticker별 KR 주식 일봉 시계열."""
+
+    ticker: str
+    name: str
+    points: list[StockDailyCandlePoint]

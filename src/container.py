@@ -36,6 +36,7 @@ from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
+from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.cache.cache_manager import CacheManager
@@ -196,6 +197,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
         FundamentalService,
         ticker_repository=ticker_repository,
         fundamental_repository=stock_fundamental_repository,
+    )
+    stock_daily_candle_service = providers.Factory(
+        StockDailyCandleService,
+        ticker_repository=ticker_repository,
+        daily_candle_repository=stock_daily_candle_repository,
     )
     pykrx_daily_candle_client = providers.Singleton(PykrxDailyCandleClient)
     daily_candle_sync_service = providers.Factory(

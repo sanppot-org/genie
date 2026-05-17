@@ -23,4 +23,20 @@ export interface FundamentalSeries {
   points: FundamentalPoint[];
 }
 
+export interface CandlePoint {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  trade_value: number | null;
+}
+
+export interface CandleSeries {
+  ticker: string;
+  name: string;
+  points: CandlePoint[];
+}
+
 export type GenieResponse<T> = { data: T };

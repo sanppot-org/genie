@@ -13,6 +13,7 @@ from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService, CollectMode
 from src.service.daily_candle_sync_service import DailyCandleSyncResult, DailyCandleSyncService
 from src.service.exceptions import GenieError
+from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
 
 
@@ -453,4 +454,66 @@ def test_kr_stock_일봉_동기화_정상(
 def test_kr_stock_일봉_동기화_잘못된_date_format(sync_client: TestClient) -> None:
     """date 패턴 불일치 시 422."""
     response = sync_client.post("/api/candles/sync/kr-stock?date=2024-01-02")
+    assert response.status_code == 422
+
+
+# ----- GET /candles/kr-stock (read) -----
+
+@pytest.fixture
+def mock_stock_daily_candle_service() -> MagicMock:
+    return MagicMock(spec=StockDailyCandleService)
+
+
+@pytest.fixture
+def read_client(mock_stock_daily_candle_service: MagicMock) -> TestClient:
+    """stock_daily_candle_service DI override가 적용된 TestClient."""
+    container.stock_daily_candle_service.override(mock_stock_daily_candle_service)
+    yield TestClient(app, raise_server_exceptions=False)
+    container.stock_daily_candle_service.reset_override()
+
+
+def test_kr_stock_일봉_조회_정상(
+        read_client: TestClient,
+        mock_stock_daily_candle_service: MagicMock,
+) -> None:
+    """ticker 정상 조회 → 200 + ticker/name/points."""
+    ticker = MagicMock(spec=Ticker, ticker="005930")
+    ticker.name = "삼성전자"  # MagicMock name kwarg reserved → 명시적 set
+    row = MagicMock(
+        spec=["date", "open", "high", "low", "close", "volume", "trade_value"],
+        date=date(2024, 1, 2), open=70000.0, high=71000.0, low=69500.0,
+        close=70500.0, volume=12_000_000, trade_value=850_000_000_000,
+    )
+    mock_stock_daily_candle_service.get_time_series.return_value = (ticker, [row])
+
+    response = read_client.get("/api/candles/kr-stock?ticker=005930&from=20240101&to=20240131")
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["ticker"] == "005930"
+    assert body["name"] == "삼성전자"
+    assert len(body["points"]) == 1
+    assert body["points"][0]["date"] == "2024-01-02"
+    assert body["points"][0]["close"] == 70500.0
+    assert body["points"][0]["trade_value"] == 850_000_000_000
+    mock_stock_daily_candle_service.get_time_series.assert_called_once_with(
+        "005930", date(2024, 1, 1), date(2024, 1, 31),
+    )
+
+
+def test_kr_stock_일봉_조회_미발견_404(
+        read_client: TestClient,
+        mock_stock_daily_candle_service: MagicMock,
+) -> None:
+    """ticker 없으면 404."""
+    mock_stock_daily_candle_service.get_time_series.side_effect = GenieError.not_found(0)
+
+    response = read_client.get("/api/candles/kr-stock?ticker=999999")
+
+    assert response.status_code == 404
+
+
+def test_kr_stock_일봉_조회_잘못된_from_422(read_client: TestClient) -> None:
+    """from 패턴 불일치 시 422."""
+    response = read_client.get("/api/candles/kr-stock?ticker=005930&from=2024-01-01")
     assert response.status_code == 422
