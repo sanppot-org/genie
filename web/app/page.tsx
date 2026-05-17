@@ -8,11 +8,6 @@ import { Input } from "@/components/ui/input";
 import { apiGet } from "@/lib/api";
 import type { CandleSeries, FundamentalSeries, GenieResponse, Ticker } from "@/lib/types";
 
-const PerChart = dynamic(() => import("@/components/per-chart").then((m) => m.PerChart), {
-  ssr: false,
-  loading: () => <p className="text-sm text-muted-foreground">차트 로딩 중...</p>,
-});
-
 const CandleChart = dynamic(
   () => import("@/components/candle-chart").then((m) => m.CandleChart),
   {
@@ -113,21 +108,21 @@ export default function Home() {
             {selected.name}{" "}
             <span className="font-mono text-sm text-muted-foreground">({selected.ticker})</span>
           </h2>
-          <p className="text-xs text-muted-foreground">최근 1년 PER</p>
-          {fundamentals.isLoading && <p className="text-sm text-muted-foreground">불러오는 중...</p>}
-          {fundamentals.isError && (
-            <p className="text-sm text-red-600">
-              조회 실패: {(fundamentals.error as Error).message}
-            </p>
+          <p className="text-xs text-muted-foreground">최근 1년 주가 + PER</p>
+          {(candles.isLoading || fundamentals.isLoading) && (
+            <p className="text-sm text-muted-foreground">불러오는 중...</p>
           )}
-          {fundamentals.data && <PerChart points={fundamentals.data.points} />}
-
-          <p className="pt-2 text-xs text-muted-foreground">최근 1년 일봉</p>
-          {candles.isLoading && <p className="text-sm text-muted-foreground">불러오는 중...</p>}
           {candles.isError && (
             <p className="text-sm text-red-600">조회 실패: {(candles.error as Error).message}</p>
           )}
-          {candles.data && <CandleChart points={candles.data.points} />}
+          {fundamentals.isError && (
+            <p className="text-sm text-red-600">
+              PER 조회 실패: {(fundamentals.error as Error).message}
+            </p>
+          )}
+          {candles.data && (
+            <CandleChart points={candles.data.points} perPoints={fundamentals.data?.points} />
+          )}
         </section>
       )}
     </main>
