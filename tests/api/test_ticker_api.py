@@ -19,12 +19,14 @@ def _create_mock_ticker(
         ticker_id: int,
         ticker_code: str,
         asset_type: AssetType,
+        name: str = "dummy",
         data_source: str = DataSource.UPBIT.value,
 ) -> MagicMock:
     """Mock Ticker 생성 헬퍼"""
     mock_ticker = MagicMock(spec=Ticker)
     mock_ticker.id = ticker_id
     mock_ticker.ticker = ticker_code
+    mock_ticker.name = name
     mock_ticker.asset_type = asset_type
     mock_ticker.data_source = data_source
 

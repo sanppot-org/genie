@@ -2,6 +2,7 @@
 from sqlalchemy.exc import IntegrityError
 
 from src.api.schemas import TickerCreate
+from src.constants import AssetType
 from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
 from src.service.exceptions import GenieError
@@ -39,6 +40,15 @@ class TickerService:
             모든 Ticker 목록 (id 오름차순)
         """
         return self._repo.find_all()
+
+    def search(
+            self,
+            query: str | None,
+            asset_type: AssetType | None,
+            limit: int,
+    ) -> list[Ticker]:
+        """ticker/종목명 검색 + asset_type 필터 (active=True 한정)."""
+        return self._repo.search(query=query, asset_type=asset_type, limit=limit)
 
     def get_by_id(self, ticker_id: int) -> Ticker:
         """ID로 ticker 조회.

@@ -40,6 +40,7 @@ class TickerResponse(BaseModel):
 
     id: int
     ticker: str
+    name: str
     asset_type: AssetType
     data_source: DataSource
     timezone: str | None = None
@@ -54,10 +55,33 @@ class TickerResponse(BaseModel):
         return cls(
             id=ticker.id,
             ticker=ticker.ticker,
+            name=ticker.name,
             asset_type=ticker.asset_type,
             data_source=source,
             timezone=source.timezone,
         )
+
+
+class FundamentalPoint(BaseModel):
+    """일자별 펀더멘털 단일 스냅샷."""
+
+    date: date
+    per: float | None = None
+    pbr: float | None = None
+    bps: float | None = None
+    eps: float | None = None
+    div: float | None = None
+    dps: float | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FundamentalSeriesResponse(BaseModel):
+    """ticker별 펀더멘털 시계열."""
+
+    ticker: str
+    name: str
+    points: list[FundamentalPoint]
 
 
 class GenieResponse[T](BaseModel):

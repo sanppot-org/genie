@@ -4,9 +4,10 @@
 from dataclasses import asdict
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
 from src.api.schemas import GenieResponse, SyncTickersResponse, TickerCreate, TickerResponse
+from src.constants import AssetType
 from src.container import ApplicationContainer
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
@@ -37,11 +38,17 @@ def sync_kr_stock_tickers(
 
 @router.get("/tickers", response_model=GenieResponse[list[TickerResponse]])
 @inject
-def get_all_tickers(
+def get_tickers(
+        q: str | None = Query(default=None, max_length=50, description="ticker/종목명 부분일치"),
+        asset_type: AssetType | None = Query(default=None),
+        limit: int = Query(default=10, ge=1, le=100),
         service: TickerService = Depends(Provide[ApplicationContainer.ticker_service]),
 ) -> GenieResponse[list[TickerResponse]]:
-    """전체 ticker 조회"""
-    tickers = service.get_all()
+    """ticker 목록. q/asset_type 미지정 시 전체. 지정 시 ILIKE 검색(active=True 한정)."""
+    if q is None and asset_type is None:
+        tickers = service.get_all()
+    else:
+        tickers = service.search(query=q, asset_type=asset_type, limit=limit)
     return GenieResponse(data=[TickerResponse.from_ticker(t) for t in tickers])
 
 

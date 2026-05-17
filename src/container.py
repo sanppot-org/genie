@@ -31,6 +31,7 @@ from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
+from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
@@ -182,6 +183,11 @@ class ApplicationContainer(containers.DeclarativeContainer):
     fundamental_sync_service = providers.Factory(
         FundamentalSyncService,
         client=pykrx_fundamental_client,
+        ticker_repository=ticker_repository,
+        fundamental_repository=stock_fundamental_repository,
+    )
+    fundamental_service = providers.Factory(
+        FundamentalService,
         ticker_repository=ticker_repository,
         fundamental_repository=stock_fundamental_repository,
     )

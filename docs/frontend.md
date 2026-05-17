@@ -43,14 +43,13 @@ genie/
 [x] `.env.local` (NEXT_PUBLIC_API_BASE_URL) + `.env.example`
 [x] `web/README.md` 작성 (실행 방법, 구조, 스크립트)
 
-### Phase 2. 차트 뷰어 MVP
-[ ] 읽기 전용 API 추가 (필요한 만큼만)
-  [ ] `GET /api/fundamentals?ticker=&from=&to=` (PER/PBR/BPS/EPS 시계열)
-  [ ] `GET /api/tickers?q=` (종목 검색, name/ticker prefix)
-[ ] 종목 검색 페이지 (`/`) — 입력 → 결과 리스트 → 클릭 시 상세 이동
-[ ] 종목 상세 페이지 (`/stocks/[ticker]`) — Recharts 라인 차트(PER 시계열)
-[ ] 차트 위 기간 필터 (1M/3M/1Y/ALL)
-[ ] Loading/Error/Empty 상태 UI 통일 (shadcn Skeleton/Alert)
+### Phase 2. 차트 뷰어 MVP (심플 1차 — 단일 페이지 통합, 최근 1년 PER만)
+[x] 읽기 전용 API 추가
+  [x] `GET /api/fundamentals?ticker=&from=&to=` — 시계열 + 종목 미발견 시 404
+  [x] `GET /api/tickers?q=&asset_type=&limit=` — ILIKE 검색, active=True 한정 (기존 GET /tickers 후방호환)
+[x] 단일 페이지(`/`) — 검색창 + 결과 리스트 + 선택 시 아래에 PER 라인 차트 (최근 1년 고정)
+[x] 인라인 Loading/Error/Empty 상태 (별도 컴포넌트 없이 텍스트)
+[~] 라우팅 분리(`/stocks/[ticker]`), 기간 필터(1M/3M/1Y/ALL), Skeleton/Alert 컴포넌트화 — 보류 (추후 필요해지면 도입)
 
 ### Phase 3. 일봉 캔들
 [ ] `GET /api/candles?ticker=&from=&to=&interval=1d` 추가 (또는 기존 엔드포인트 확인)

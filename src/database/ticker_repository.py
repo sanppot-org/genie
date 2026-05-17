@@ -1,6 +1,6 @@
 """Ticker repository for database operations."""
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from src.common.data_adapter import DataSource
 from src.constants import AssetType
@@ -11,7 +11,7 @@ from src.database.models import Ticker
 class TickerRepository(BaseRepository[Ticker, int]):
     """Ticker 엔티티를 위한 Repository.
 
-    기본 CRUD 외에 ticker 코드로 조회, asset_type으로 필터링 기능 제공.
+    기본 CRUD 외에 ticker 코드로 조회, asset_type으로 필터링, ILIKE 검색 기능 제공.
     """
 
     def _get_model_class(self) -> type[Ticker]:
@@ -21,6 +21,21 @@ class TickerRepository(BaseRepository[Ticker, int]):
     def _get_unique_constraint_fields(self) -> tuple[str, ...]:
         """Get unique constraint field names for upsert logic."""
         return ("ticker",)
+
+    def search(
+            self,
+            query: str | None = None,
+            asset_type: AssetType | None = None,
+            limit: int = 10,
+    ) -> list[Ticker]:
+        """ticker 코드/종목명 ILIKE 검색 + asset_type 필터 (active=True 한정)."""
+        q = self.session.query(Ticker).filter(Ticker.active.is_(True))
+        if query:
+            pattern = f"%{query}%"
+            q = q.filter(or_(Ticker.ticker.ilike(pattern), Ticker.name.ilike(pattern)))
+        if asset_type is not None:
+            q = q.filter(Ticker.asset_type == asset_type.value)
+        return q.order_by(Ticker.ticker.asc()).limit(min(limit, 100)).all()
 
     def find_by_ticker(self, ticker: str) -> Ticker | None:
         """티커 코드로 조회.

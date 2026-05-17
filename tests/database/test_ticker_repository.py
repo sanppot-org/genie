@@ -167,3 +167,55 @@ class TestTickerRepository:
 
         # Then
         assert len(result) == 3
+
+
+class TestTickerRepositorySearch:
+    """TickerRepository.search 테스트 — ILIKE + asset_type + active 한정."""
+
+    def _save(self, repo: TickerRepository, ticker: str, name: str,
+              asset_type: AssetType, active: bool = True) -> None:
+        repo.save(Ticker(
+            ticker=ticker, name=name, asset_type=asset_type,
+            data_source=DataSource.UPBIT.value, active=active,
+        ))
+
+    def test_ticker_부분일치(self, ticker_repo: TickerRepository) -> None:
+        """ticker 코드 부분일치 (ILIKE %q%)."""
+        self._save(ticker_repo, "005930", "삼성전자", AssetType.KR_STOCK)
+        self._save(ticker_repo, "000660", "SK하이닉스", AssetType.KR_STOCK)
+
+        result = ticker_repo.search(query="005")
+
+        assert len(result) == 1
+        assert result[0].ticker == "005930"
+
+    def test_name_부분일치(self, ticker_repo: TickerRepository) -> None:
+        """종목명 부분일치."""
+        self._save(ticker_repo, "005930", "삼성전자", AssetType.KR_STOCK)
+        self._save(ticker_repo, "207940", "삼성바이오로직스", AssetType.KR_STOCK)
+        self._save(ticker_repo, "000660", "SK하이닉스", AssetType.KR_STOCK)
+
+        result = ticker_repo.search(query="삼성")
+
+        assert len(result) == 2
+        assert {t.ticker for t in result} == {"005930", "207940"}
+
+    def test_inactive_제외(self, ticker_repo: TickerRepository) -> None:
+        """active=False 종목은 검색 결과에서 제외."""
+        self._save(ticker_repo, "005930", "삼성전자", AssetType.KR_STOCK, active=True)
+        self._save(ticker_repo, "999999", "구상장폐지", AssetType.KR_STOCK, active=False)
+
+        result = ticker_repo.search(query=None)
+
+        assert len(result) == 1
+        assert result[0].ticker == "005930"
+
+    def test_asset_type_필터(self, ticker_repo: TickerRepository) -> None:
+        """asset_type만 지정해도 필터링."""
+        self._save(ticker_repo, "005930", "삼성전자", AssetType.KR_STOCK)
+        self._save(ticker_repo, "069500", "KODEX 200", AssetType.KR_ETF)
+
+        result = ticker_repo.search(query=None, asset_type=AssetType.KR_ETF)
+
+        assert len(result) == 1
+        assert result[0].ticker == "069500"
