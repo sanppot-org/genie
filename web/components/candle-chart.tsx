@@ -3,8 +3,10 @@
 import {
   CandlestickSeries,
   ColorType,
+  HistogramSeries,
   LineSeries,
   createChart,
+  type HistogramData,
   type IChartApi,
   type ISeriesApi,
   type LineData,
@@ -14,6 +16,10 @@ import {
 import { useEffect, useRef } from "react";
 
 import type { CandlePoint, FundamentalPoint } from "@/lib/types";
+
+// 거래량 막대 색 (캔들 방향 일치, 반투명): 상승=빨강 / 하락=파랑
+const VOL_UP = "rgba(210,79,69,0.55)";
+const VOL_DOWN = "rgba(18,97,196,0.55)";
 
 interface Props {
   points: CandlePoint[];
@@ -29,6 +35,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const perRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const didFitRef = useRef(false);
   const loadingRef = useRef(false);
   const onNeedMoreRef = useRef<(() => void) | undefined>(undefined);
@@ -70,6 +77,16 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
       wickDownColor: "#1261c4",
     });
 
+    // 거래량: 캔들 패인 하단 20% 오버레이 (전용 가격축으로 캔들과 분리)
+    volRef.current = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: "volume" },
+      priceScaleId: "vol",
+      priceLineVisible: false,
+      lastValueVisible: false,
+    });
+    volRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    candleRef.current.priceScale().applyOptions({ scaleMargins: { top: 0.05, bottom: 0.25 } });
+
     // 왼쪽 끝(첫 바)보다 더 끌면 barsBefore < 0 → 과거 더 요청.
     // 초기 fitContent 직후엔 barsBefore≈0이라 오발동 없음.
     const onRange = (lr: LogicalRange | null) => {
@@ -98,6 +115,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
       chartRef.current = null;
       candleRef.current = null;
       perRef.current = null;
+      volRef.current = null;
       didFitRef.current = false;
     };
     // 마운트당 1회만. points 변경은 Effect B가 처리.
@@ -118,6 +136,13 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
         high: p.high,
         low: p.low,
         close: p.close,
+      })),
+    );
+    volRef.current?.setData(
+      points.map<HistogramData>((p) => ({
+        time: p.date,
+        value: p.volume,
+        color: p.close >= p.open ? VOL_UP : VOL_DOWN,
       })),
     );
     if (!didFitRef.current) {
