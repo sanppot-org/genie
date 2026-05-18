@@ -95,7 +95,8 @@ class DividendSyncService:
 def _build_entity(row: DividendOutput, label: str, ticker_id: int) -> StockDividend | None:
     record_date = _parse_kis_date(row.record_date)
     dps = _parse_float(row.per_sto_divi_amt)
-    if record_date is None or dps is None:
+    # dps=0은 "무배당 결의" 이력 — 현금배당 이벤트가 아니므로 적재하지 않는다.
+    if record_date is None or dps is None or dps <= 0:
         return None
     return StockDividend(
         ticker_id=ticker_id,

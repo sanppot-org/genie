@@ -110,6 +110,23 @@ class TestDividendSyncService:
         assert result.upserted == 0
         assert result.skipped_invalid == 2
 
+    def test_sync_skips_zero_dps_no_dividend_resolution(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """dps=0인 KSD 무배당 결의 이력은 적재하지 않는다."""
+        by_kind = {
+            DividendKind.SETTLE: [
+                DividendOutput(sht_cd="005930", record_date="19991231", per_sto_divi_amt="0"),
+            ],
+            DividendKind.INTERIM: [],
+        }
+        service = _make_service(session, by_kind)
+
+        result = service.sync(date(1999, 1, 1), date(1999, 12, 31))
+
+        assert result.upserted == 0
+        assert result.skipped_invalid == 1
+
     def test_sync_parses_slash_formatted_pay_date(
             self, session: Session, kr_stock_ticker: Ticker,
     ) -> None:
