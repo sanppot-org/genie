@@ -223,6 +223,36 @@ class StockDividend(Base, TimestampMixin):
         return f"<StockDividend(ticker_id={self.ticker_id}, record_date={self.record_date}, kind={self.kind}, dps={self.dps})>"
 
 
+class StockTreasuryStock(Base, TimestampMixin):
+    """DART `stockTotqySttus`(주식의 총수 현황) 기반 자사주 보유 비율 시계열.
+
+    KR_STOCK 대상. 자사주 보유 비율 점수 산출용.
+    정기보고서(사업/반기/Q1/Q3) 기준이라 결산일별 1 row.
+    동일 (ticker_id, stlm_dt) 재호출 시 UPSERT(가장 최근 보고서로 덮어쓰기).
+    """
+
+    __tablename__ = "stock_treasury_stocks"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_treasury_stocks_ticker_id"), nullable=False
+    )
+    stlm_dt: Mapped[date] = mapped_column(Date, nullable=False, comment="결산일")
+    reprt_code: Mapped[str] = mapped_column(String(5), nullable=False, comment="11011 사업/11012 반기/11013 Q1/11014 Q3")
+    issued_shares: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="발행주식 총수 (보통주+우선주 합계)")
+    treasury_shares: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="자기주식 수 (보통주+우선주 합계)")
+    treasury_ratio: Mapped[float] = mapped_column(Float, nullable=False, comment="자사주 보유 비율(%) = treasury_shares / issued_shares * 100")
+    rcept_no: Mapped[str | None] = mapped_column(String(14), nullable=True, comment="DART 접수번호")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("ticker_id", "stlm_dt"),
+        Index("ix_stock_treasury_stocks_ticker_id_stlm_dt", "ticker_id", "stlm_dt"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockTreasuryStock(ticker_id={self.ticker_id}, stlm_dt={self.stlm_dt}, ratio={self.treasury_ratio:.2f}%)>"
+
+
 class StockDailyCandle(Base, TimestampMixin):
     """KR 주식 일자별 OHLCV (pykrx get_market_ohlcv).
 

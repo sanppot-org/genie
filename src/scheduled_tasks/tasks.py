@@ -24,6 +24,7 @@ from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_sync_service import TickerSyncService
+from src.service.treasury_stock_sync_service import TreasuryStockSyncService
 from src.strategy.config import BaseStrategyConfig
 from src.upbit.upbit_api import UpbitAPI
 
@@ -197,6 +198,29 @@ def sync_kr_stock_dividends(
     except Exception as e:
         logger.exception("배당 동기화 실패")
         slack_client.send_status(f"배당 동기화 실패 ({from_date}~{to_date}): {e}")
+
+
+@inject
+def sync_kr_stock_treasury_stocks(
+        service: TreasuryStockSyncService = Provide[ApplicationContainer.treasury_stock_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """KR 주식 자사주 보유 비율 동기화 (월 2회, 매월 1일/16일 18:00 KST).
+
+    DART 정기보고서(사업/반기/Q1/Q3) 기반이라 갱신은 분기 1회뿐.
+    월 2회 폴링으로 보고서 제출 지연 시 누락 방지.
+    """
+    target_date = datetime.now(KST).date()
+    try:
+        result = service.sync(target_date)
+        logger.info(
+            "자사주 동기화 완료 bsns_year=%d reprt_code=%s tickers=%d upserted=%d skipped_no_data=%d skipped_failure=%d",
+            result.bsns_year, result.reprt_code, result.tickers,
+            result.upserted, result.skipped_no_data, result.skipped_failure,
+        )
+    except Exception as e:
+        logger.exception("자사주 동기화 실패")
+        slack_client.send_status(f"자사주 동기화 실패: {e}")
 
 
 @inject

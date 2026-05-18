@@ -22,6 +22,7 @@ from src.database.request_scope import current_request_token
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
+from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
 from src.providers import HantuOverseasCandleClient
@@ -44,6 +45,7 @@ from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
+from src.service.treasury_stock_sync_service import TreasuryStockSyncService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -108,6 +110,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     stock_fundamental_repository = providers.Factory(StockFundamentalRepository, session=_session)
     stock_daily_candle_repository = providers.Factory(StockDailyCandleRepository, session=_session)
     stock_dividend_repository = providers.Factory(StockDividendRepository, session=_session)
+    stock_treasury_stock_repository = providers.Factory(StockTreasuryStockRepository, session=_session)
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -235,4 +238,10 @@ class ApplicationContainer(containers.DeclarativeContainer):
     dividend_service = providers.Factory(
         DividendService,
         dividend_repository=stock_dividend_repository,
+    )
+    treasury_stock_sync_service = providers.Factory(
+        TreasuryStockSyncService,
+        client=dart_company_client,
+        ticker_repository=ticker_repository,
+        treasury_stock_repository=stock_treasury_stock_repository,
     )
