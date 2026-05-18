@@ -20,6 +20,7 @@ from src.providers.pykrx_fundamental_client import KrxClosedDayError
 from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.buyback_sync_service import BuybackSyncService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_sync_service import FundamentalSyncService
@@ -198,6 +199,30 @@ def sync_kr_stock_dividends(
     except Exception as e:
         logger.exception("배당 동기화 실패")
         slack_client.send_status(f"배당 동기화 실패 ({from_date}~{to_date}): {e}")
+
+
+@inject
+def sync_kr_stock_buybacks(
+        service: BuybackSyncService = Provide[ApplicationContainer.buyback_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """KR 주식 자기주식 취득·처분 공시 동기화 (주 1회, 매주 월요일 18:30 KST).
+
+    DART 공시는 수시 발생 → 분기 폴링은 너무 느림. 주 1회 충분.
+    최근 90일을 안전 buffer로 매번 호출 (수정·정정 공시 반영).
+    """
+    today = datetime.now(KST).date()
+    from_date = today - timedelta(days=90)
+    try:
+        result = service.sync(from_date, today)
+        logger.info(
+            "자사주 공시 동기화 완료 from=%s to=%s tickers=%d received=%d upserted=%d skipped_failure=%d",
+            from_date, today, result.tickers, result.received,
+            result.upserted, result.skipped_failure,
+        )
+    except Exception as e:
+        logger.exception("자사주 공시 동기화 실패")
+        slack_client.send_status(f"자사주 공시 동기화 실패 ({from_date}~{today}): {e}")
 
 
 @inject

@@ -253,6 +253,37 @@ class StockTreasuryStock(Base, TimestampMixin):
         return f"<StockTreasuryStock(ticker_id={self.ticker_id}, stlm_dt={self.stlm_dt}, ratio={self.treasury_ratio:.2f}%)>"
 
 
+class StockBuybackEvent(Base, TimestampMixin):
+    """DART 자기주식 취득·처분 결정 공시 이벤트.
+
+    KR_STOCK 대상. 점수표 "정기적 자사주 매입·소각 (최소 연 1회 이상)" 판정용.
+    PK는 (ticker_id, rcept_no) — DART 접수번호가 종목별 유일하므로 동일 공시 재호출은 UPSERT.
+    """
+
+    __tablename__ = "stock_buyback_events"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_buyback_events_ticker_id"), nullable=False
+    )
+    rcept_no: Mapped[str] = mapped_column(String(14), nullable=False, comment="DART 접수번호")
+    event_type: Mapped[str] = mapped_column(String(16), nullable=False, comment="ACQUISITION 취득결정 / DISPOSAL 처분결정")
+    resolution_date: Mapped[date] = mapped_column(Date, nullable=False, comment="이사회 결의일 (aq_dd / dp_dd)")
+    planned_shares: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="예정 보통주 수량")
+    planned_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="예정 보통주 금액(원)")
+    period_start: Mapped[date | None] = mapped_column(Date, nullable=True, comment="취득/처분 예정 시작일")
+    period_end: Mapped[date | None] = mapped_column(Date, nullable=True, comment="취득/처분 예정 종료일")
+    purpose: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="aq_pp / dp_pp 취득·처분 목적(자유 텍스트)")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("ticker_id", "rcept_no"),
+        Index("ix_stock_buyback_events_ticker_id_resolution_date", "ticker_id", "resolution_date"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockBuybackEvent(ticker_id={self.ticker_id}, type={self.event_type}, resolution_date={self.resolution_date})>"
+
+
 class StockDailyCandle(Base, TimestampMixin):
     """KR 주식 일자별 OHLCV (pykrx get_market_ohlcv).
 

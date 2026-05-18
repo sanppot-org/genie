@@ -5,6 +5,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from src.scheduled_tasks.tasks import (
     report,
+    sync_kr_stock_buybacks,
     sync_kr_stock_daily_candles,
     sync_kr_stock_dividends,
     sync_kr_stock_fundamentals,
@@ -70,5 +71,11 @@ def get_schedules() -> list[ScheduleConfig]:
             trigger=CronTrigger(day="1,16", hour=18, minute=0),
             id="sync_kr_stock_treasury_stocks",
             name="한국 주식 자사주 보유 비율 동기화",
+        ),
+        ScheduleConfig(
+            func=sync_kr_stock_buybacks,
+            trigger=CronTrigger(day_of_week="mon", hour=18, minute=30),
+            id="sync_kr_stock_buybacks",
+            name="한국 주식 자사주 매입·처분 공시 동기화",
         ),
     ]

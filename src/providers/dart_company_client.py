@@ -48,6 +48,28 @@ class TreasuryStockStatus:
     rcept_no: str | None
 
 
+@dataclass(frozen=True)
+class BuybackEvent:
+    """DART 자기주식 취득·처분 결정 공시에서 추출한 이벤트."""
+
+    stock_code: str
+    rcept_no: str
+    event_type: str          # ACQUISITION / DISPOSAL
+    resolution_date: date    # 이사회 결의일
+    planned_shares: int | None
+    planned_amount: int | None
+    period_start: date | None
+    period_end: date | None
+    purpose: str | None
+
+
+# DART event() 키워드 → 이벤트 타입 라벨
+_BUYBACK_KEYWORD_MAP: tuple[tuple[str, str], ...] = (
+    ("자기주식취득", "ACQUISITION"),
+    ("자기주식처분", "DISPOSAL"),
+)
+
+
 class DartCompanyClient:
     """OpenDartReader 래퍼 — 종목코드 기반 DART OpenAPI 호출."""
 
@@ -145,6 +167,79 @@ class DartCompanyClient:
         )
 
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        retry=retry_if_exception_type(requests.RequestException),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    def fetch_buyback_events(
+            self, stock_code: str, from_date: date, to_date: date,
+    ) -> list[BuybackEvent]:
+        """자기주식 취득·처분 결정 공시 일괄 조회.
+
+        OpenDartReader `event()`로 `자기주식취득`, `자기주식처분` 두 종류를 호출 후 합쳐서 반환.
+        corp_code 매핑 실패 / 응답 없음은 빈 리스트.
+
+        Args:
+            stock_code: 종목코드 (예: '005930')
+            from_date: 시작 접수일 (포함)
+            to_date: 종료 접수일 (포함)
+
+        Returns:
+            취득·처분 이벤트 리스트. 결의일·접수번호 모두 정상인 row만 포함.
+        """
+        start = from_date.strftime("%Y%m%d")
+        end = to_date.strftime("%Y%m%d")
+        results: list[BuybackEvent] = []
+
+        for keyword, event_type in _BUYBACK_KEYWORD_MAP:
+            try:
+                df = self._reader.event(stock_code, keyword, start, end)
+            except ValueError:
+                # corp_code 매핑 실패 — 두 keyword 모두 동일하게 실패하므로 즉시 종료
+                return []
+
+            if df is None or df.empty:
+                continue
+
+            for _, row in df.iterrows():
+                rcept_no = str(row.get("rcept_no") or "").strip()
+                resolution_date = _parse_kor_date(
+                    row.get("aq_dd") if event_type == "ACQUISITION" else row.get("dp_dd")
+                )
+                if not rcept_no or resolution_date is None:
+                    continue
+
+                if event_type == "ACQUISITION":
+                    planned_shares = _parse_int(row.get("aqpln_stk_ostk"))
+                    planned_amount = _parse_int(row.get("aqpln_prc_ostk"))
+                    period_start = _parse_kor_date(row.get("aqexpd_bgd"))
+                    period_end = _parse_kor_date(row.get("aqexpd_edd"))
+                    purpose = _normalize_text(row.get("aq_pp"))
+                else:
+                    planned_shares = _parse_int(row.get("dppln_stk_ostk"))
+                    planned_amount = _parse_int(row.get("dppln_prc_ostk"))
+                    period_start = _parse_kor_date(row.get("dpprpd_bgd"))
+                    period_end = _parse_kor_date(row.get("dpprpd_edd"))
+                    purpose = _normalize_text(row.get("dp_pp"))
+
+                results.append(BuybackEvent(
+                    stock_code=stock_code,
+                    rcept_no=rcept_no,
+                    event_type=event_type,
+                    resolution_date=resolution_date,
+                    planned_shares=planned_shares,
+                    planned_amount=planned_amount,
+                    period_start=period_start,
+                    period_end=period_end,
+                    purpose=purpose,
+                ))
+
+        return results
+
+
 def _parse_int(value: object) -> int | None:
     """콤마 포함 숫자 문자열을 int로. 빈 값/`-`는 None."""
     if value is None:
@@ -166,3 +261,26 @@ def _parse_dart_date(value: object) -> date | None:
         return datetime.strptime(str(value).strip(), "%Y-%m-%d").date()
     except (ValueError, TypeError):
         return None
+
+
+def _parse_kor_date(value: object) -> date | None:
+    """DART 한글 날짜 문자열(`YYYY년 MM월 DD일`) → date. 빈 값/`-`는 None."""
+    if not value:
+        return None
+    text = str(value).strip()
+    if not text or text == "-":
+        return None
+    try:
+        return datetime.strptime(text, "%Y년 %m월 %d일").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_text(value: object) -> str | None:
+    """공백·줄바꿈 정리 후 255자 잘라 반환. 빈 값/`-`는 None."""
+    if value is None:
+        return None
+    text = " ".join(str(value).split())
+    if not text or text == "-":
+        return None
+    return text[:255]

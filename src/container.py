@@ -19,6 +19,7 @@ from src.constants import KST
 from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.request_scope import current_request_token
+from src.database.stock_buyback_event_repository import StockBuybackEventRepository
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
@@ -35,6 +36,8 @@ from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.service.buyback_service import BuybackService
+from src.service.buyback_sync_service import BuybackSyncService
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
@@ -111,6 +114,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     stock_daily_candle_repository = providers.Factory(StockDailyCandleRepository, session=_session)
     stock_dividend_repository = providers.Factory(StockDividendRepository, session=_session)
     stock_treasury_stock_repository = providers.Factory(StockTreasuryStockRepository, session=_session)
+    stock_buyback_event_repository = providers.Factory(StockBuybackEventRepository, session=_session)
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -244,4 +248,14 @@ class ApplicationContainer(containers.DeclarativeContainer):
         client=dart_company_client,
         ticker_repository=ticker_repository,
         treasury_stock_repository=stock_treasury_stock_repository,
+    )
+    buyback_sync_service = providers.Factory(
+        BuybackSyncService,
+        client=dart_company_client,
+        ticker_repository=ticker_repository,
+        buyback_event_repository=stock_buyback_event_repository,
+    )
+    buyback_service = providers.Factory(
+        BuybackService,
+        buyback_event_repository=stock_buyback_event_repository,
     )
