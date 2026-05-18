@@ -1,32 +1,11 @@
 # CLAUDE.md
 
-Claude Code를 위한 프로젝트 가이드.
-
 ## 프로젝트 개요
 
-`genie`는 FastAPI 기반 멀티 거래소(Upbit, 한국투자증권, Bithumb, Binance) 자동매매 시스템. 변동성 돌파 등 전략 실행, 백테스팅(backtrader), 캔들 수집/저장(TimescaleDB), REST API 제공. Python 3.12+, uv, Pydantic, SQLAlchemy, APScheduler 기반.
+`genie`는 FastAPI 기반 멀티 거래소(Upbit, 한국투자증권, Bithumb, Binance) 자동매매 시스템. 
+변동성 돌파 등 전략 실행, 백테스팅(backtrader), 캔들 수집/저장(TimescaleDB), REST API 제공. Python 3.12+, uv, Pydantic, SQLAlchemy, APScheduler 기반.
 
-## 코드 구조
-
-```
-src/
-├── api/              # FastAPI 라우터, lifespan, 스키마
-├── strategy/         # 자동매매 전략 (변동성 돌파 등)
-├── service/          # 비즈니스 로직 (candle, ticker)
-├── database/         # SQLAlchemy 모델 + 리포지토리
-├── upbit/ hantu/ bithumb/   # 거래소 API 클라이언트
-├── providers/ adapters/ collector/   # 캔들 데이터 수집
-├── backtest/         # backtrader 기반 백테스팅
-├── common/           # Slack, Google Sheet, healthcheck, http 등
-├── scheduled_tasks/  # APScheduler 작업
-├── config.py         # 설정 (Pydantic Settings)
-└── container.py      # DI 컨테이너 (dependency-injector)
-
-app.py                # FastAPI 엔트리포인트
-alembic/              # DB 마이그레이션
-config/               # git submodule (민감 설정)
-tests/                # 구조는 src/ 미러링
-```
+프론트엔드는 `web/` 디렉토리에 분리 (Next.js 16 + React 19 + Tailwind v4 + shadcn/ui + TanStack Query, pnpm). FastAPI 백엔드의 JSON API를 소비하는 대시보드·차트(`lightweight-charts`, `recharts`) UI.
 
 ## 개발 명령어
 
@@ -39,10 +18,15 @@ uv run mypy src/                             # 타입 체크
 uv run alembic upgrade head                  # 마이그레이션 적용
 uv run alembic revision --autogenerate -m "설명"   # 새 마이그레이션
 git submodule update --init --recursive      # config submodule 초기화
-docker-compose up -d timescaledb             # DB 실행
+
+# 프론트엔드 (web/)
+pnpm --dir web install                       # 의존성 설치
+pnpm --dir web dev                           # 개발 서버 (http://localhost:3000)
+pnpm --dir web build                         # 프로덕션 빌드
+pnpm --dir web lint                          # ESLint
 ```
 
-**코드 수정 후 체크리스트:** ruff → mypy → pytest 순서.
+**코드 수정 후 체크리스트:** ruff → mypy → pytest 순서. (프론트엔드는 `pnpm --dir web lint` + `pnpm --dir web build`.)
 
 ## 개발 가이드라인
 
