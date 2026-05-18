@@ -110,6 +110,27 @@ class TestDividendSyncService:
         assert result.upserted == 0
         assert result.skipped_invalid == 2
 
+    def test_sync_parses_slash_formatted_pay_date(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """KIS가 divi_pay_dt를 'YYYY/MM/DD'로 보내도 pay_date에 정상 적재."""
+        by_kind = {
+            DividendKind.SETTLE: [
+                DividendOutput(
+                    sht_cd="005930", record_date="20241231", divi_pay_dt="2025/04/18",
+                    per_sto_divi_amt="363",
+                ),
+            ],
+            DividendKind.INTERIM: [],
+        }
+        service = _make_service(session, by_kind)
+
+        result = service.sync(date(2024, 1, 1), date(2024, 12, 31))
+
+        assert result.upserted == 1
+        rows = StockDividendRepository(session).find_by_ticker(kr_stock_ticker.id)
+        assert rows[0].pay_date == date(2025, 4, 18)
+
     def test_sync_is_idempotent(
             self, session: Session, kr_stock_ticker: Ticker,
     ) -> None:

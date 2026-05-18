@@ -53,7 +53,6 @@ class StockDividendRepository(BaseRepository[StockDividend, int]):
                 "pay_date": e.pay_date,
                 "dps": e.dps,
                 "kind": e.kind,
-                "dividend_yield": e.dividend_yield,
                 "fiscal_year": e.fiscal_year,
             }
 
@@ -63,7 +62,6 @@ class StockDividendRepository(BaseRepository[StockDividend, int]):
             set_={
                 "pay_date": stmt.excluded.pay_date,
                 "dps": stmt.excluded.dps,
-                "dividend_yield": stmt.excluded.dividend_yield,
                 "fiscal_year": stmt.excluded.fiscal_year,
             },
         )

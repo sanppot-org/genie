@@ -37,21 +37,20 @@ class TestStockDividendRepository:
         first = StockDividend(
             ticker_id=stock_ticker.id, record_date=date(2024, 12, 27),
             pay_date=date(2025, 4, 17), dps=361.0, kind="SETTLE",
-            dividend_yield=0.46, fiscal_year=2024,
+            fiscal_year=2024,
         )
         dividend_repo.bulk_upsert([first])
 
         second = StockDividend(
             ticker_id=stock_ticker.id, record_date=date(2024, 12, 27),
             pay_date=date(2025, 4, 17), dps=400.0, kind="SETTLE",
-            dividend_yield=0.50, fiscal_year=2024,
+            fiscal_year=2024,
         )
         dividend_repo.bulk_upsert([second])
 
         rows = dividend_repo.find_by_ticker(stock_ticker.id)
         assert len(rows) == 1
         assert rows[0].dps == 400.0
-        assert rows[0].dividend_yield == 0.50
 
     def test_find_by_ticker_returns_range_ordered_ascending(
             self, dividend_repo: StockDividendRepository, stock_ticker: Ticker,

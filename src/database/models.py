@@ -210,9 +210,8 @@ class StockDividend(Base, TimestampMixin):
     )
     record_date: Mapped[date] = mapped_column(Date, nullable=False, comment="배당 기준일")
     pay_date: Mapped[date | None] = mapped_column(Date, nullable=True, comment="배당 지급일")
-    dps: Mapped[float] = mapped_column(Float, nullable=False, comment="주당 배당금 (원)")
+    dps: Mapped[float] = mapped_column(Float, nullable=False, comment="주당 배당금 (원, 단건)")
     kind: Mapped[str] = mapped_column(String(16), nullable=False, comment="SETTLE: 결산, INTERIM: 중간/분기")
-    dividend_yield: Mapped[float | None] = mapped_column(Float, nullable=True, comment="시가배당률(%)")
     fiscal_year: Mapped[int] = mapped_column(Integer, nullable=False, comment="회계연도 (record_date 기준)")
 
     __table_args__ = (

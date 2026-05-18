@@ -93,28 +93,37 @@ class DividendSyncService:
 
 
 def _build_entity(row: DividendOutput, label: str, ticker_id: int) -> StockDividend | None:
-    record_date = _parse_yyyymmdd(row.record_date)
+    record_date = _parse_kis_date(row.record_date)
     dps = _parse_float(row.per_sto_divi_amt)
     if record_date is None or dps is None:
         return None
     return StockDividend(
         ticker_id=ticker_id,
         record_date=record_date,
-        pay_date=_parse_yyyymmdd(row.divi_pay_dt),
+        pay_date=_parse_kis_date(row.divi_pay_dt),
         dps=dps,
         kind=label,
-        dividend_yield=_parse_float(row.divi_rate),
         fiscal_year=_parse_fiscal_year(row.divi_aplc_yymm) or record_date.year,
     )
 
 
-def _parse_yyyymmdd(value: str | None) -> date | None:
+_KIS_DATE_FORMATS = ("%Y%m%d", "%Y/%m/%d", "%Y-%m-%d")
+
+
+def _parse_kis_date(value: str | None) -> date | None:
+    """KIS 응답 날짜 — `YYYYMMDD`, `YYYY/MM/DD`, `YYYY-MM-DD` 모두 허용.
+
+    필드마다 포맷이 다르다: record_date는 `YYYYMMDD`, divi_pay_dt는 `YYYY/MM/DD`로 옴.
+    """
     if not value or not value.strip():
         return None
-    try:
-        return datetime.strptime(value.strip(), "%Y%m%d").date()
-    except ValueError:
-        return None
+    text = value.strip()
+    for fmt in _KIS_DATE_FORMATS:
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _parse_float(value: str | None) -> float | None:
