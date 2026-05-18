@@ -37,6 +37,25 @@ class StockDividendRepository(BaseRepository[StockDividend, int]):
             query = query.filter(StockDividend.record_date <= to_date)
         return query.order_by(StockDividend.record_date.asc()).all()
 
+    def find_by_tickers(
+            self,
+            ticker_ids: list[int],
+            from_date: date | None = None,
+            to_date: date | None = None,
+    ) -> list[StockDividend]:
+        """여러 종목을 한 쿼리로 조회 (ticker_id, record_date 오름차순).
+
+        스크리닝 등 다건 일괄 조회용. 빈 리스트면 즉시 [] 반환.
+        """
+        if not ticker_ids:
+            return []
+        query = self.session.query(StockDividend).filter(StockDividend.ticker_id.in_(ticker_ids))
+        if from_date is not None:
+            query = query.filter(StockDividend.record_date >= from_date)
+        if to_date is not None:
+            query = query.filter(StockDividend.record_date <= to_date)
+        return query.order_by(StockDividend.ticker_id.asc(), StockDividend.record_date.asc()).all()
+
     def bulk_upsert(self, entities: list[StockDividend]) -> None:
         """Postgres ON CONFLICT로 (ticker_id, record_date, kind) 키 일괄 UPSERT.
 

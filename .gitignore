@@ -13,3 +13,6 @@ timescale_data/
 pgadmin_data/
 
 .omc
+
+# OpenDartReader 회사코드 캐시
+docs_cache/

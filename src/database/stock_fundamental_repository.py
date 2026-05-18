@@ -3,6 +3,7 @@
 from datetime import date
 import logging
 
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database.base_repository import BaseRepository
@@ -45,6 +46,11 @@ class StockFundamentalRepository(BaseRepository[StockFundamental, int]):
             .filter(StockFundamental.date == target_date)
             .all()
         )
+
+    def find_latest_date(self) -> date | None:
+        """적재된 펀더멘털 중 가장 최근 영업일 반환. 데이터 없으면 None."""
+        result: date | None = self.session.query(func.max(StockFundamental.date)).scalar()
+        return result
 
     def bulk_upsert(self, entities: list[StockFundamental]) -> None:
         """Postgres ON CONFLICT로 (date, ticker_id) 키 일괄 UPSERT.

@@ -191,3 +191,37 @@ class StockDailyCandleSeriesResponse(BaseModel):
     ticker: str
     name: str
     points: list[StockDailyCandlePoint]
+
+
+class ScreeningScoreBreakdown(BaseModel):
+    """5개 지표별 점수 (PER 20 + PBR 5 + 배당수익률 10 + 분기 5 + 연속 5 = 45)."""
+
+    per: int
+    pbr: int
+    dividend_yield: int
+    quarterly_dividend: int
+    consecutive_increase_years: int
+
+
+class ScreeningRowResponse(BaseModel):
+    """스크리닝 결과 1종목."""
+
+    ticker: str
+    name: str
+    per: float | None = None
+    pbr: float | None = None
+    dividend_yield: float | None = None
+    quarterly_dividend: bool
+    consecutive_increase_years: int
+    scores: ScreeningScoreBreakdown
+    total_score: int
+
+
+class ScreeningResponse(BaseModel):
+    """KR_STOCK 점수 스크리닝 응답."""
+
+    target_date: date | None
+    total: int
+    limit: int
+    offset: int
+    rows: list[ScreeningRowResponse]

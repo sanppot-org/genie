@@ -1,0 +1,187 @@
+"""KR 주식 스크리닝 — 5개 지표 점수 합산 랭킹.
+
+점수표(`docs/종목_선정_점수표.md`) 중 자동 수집된 5개:
+- PER (20점), PBR (5점), 배당수익률 (10점), 분기 배당 (5점), 연속 인상 (5점) — 합계 45점.
+
+쿼리 4회로 전체 KR_STOCK을 메모리 join 후 정렬·페이지네이션한다.
+"""
+
+from dataclasses import dataclass
+from datetime import date
+
+from src.constants import AssetType
+from src.database.stock_fundamental_repository import StockFundamentalRepository
+from src.database.ticker_repository import TickerRepository
+from src.service.dividend_service import DividendService
+
+
+def score_per(per: float | None) -> int:
+    """PER 점수: <5→20, <8→15, <10→10, ≥10→5. 적자/결측은 0."""
+    if per is None or per <= 0:
+        return 0
+    if per < 5:
+        return 20
+    if per < 8:
+        return 15
+    if per < 10:
+        return 10
+    return 5
+
+
+def score_pbr(pbr: float | None) -> int:
+    """PBR 점수: <0.3→5, <0.6→4, <1.0→3, ≥1.0→0. 결측은 0."""
+    if pbr is None or pbr <= 0:
+        return 0
+    if pbr < 0.3:
+        return 5
+    if pbr < 0.6:
+        return 4
+    if pbr < 1.0:
+        return 3
+    return 0
+
+
+def score_dividend_yield(div: float | None) -> int:
+    """배당수익률(%) 점수: >7→10, >5→7, >3→5, ≤3→2. 결측/0은 0."""
+    if div is None or div <= 0:
+        return 0
+    if div > 7:
+        return 10
+    if div > 5:
+        return 7
+    if div > 3:
+        return 5
+    return 2
+
+
+def score_quarterly_dividend(is_quarterly: bool) -> int:
+    """분기 배당 실시 여부: 예→5, 아니오→0."""
+    return 5 if is_quarterly else 0
+
+
+def score_consecutive_increase(years: int) -> int:
+    """배당 연속 인상 연수: ≥10→5, ≥5→4, ≥3→3, 그 외→0."""
+    if years >= 10:
+        return 5
+    if years >= 5:
+        return 4
+    if years >= 3:
+        return 3
+    return 0
+
+
+@dataclass(frozen=True)
+class ScoreBreakdown:
+    per: int
+    pbr: int
+    dividend_yield: int
+    quarterly_dividend: int
+    consecutive_increase_years: int
+
+
+@dataclass(frozen=True)
+class ScreeningRow:
+    ticker: str
+    name: str
+    per: float | None
+    pbr: float | None
+    dividend_yield: float | None
+    quarterly_dividend: bool
+    consecutive_increase_years: int
+    scores: ScoreBreakdown
+    total_score: int
+
+
+@dataclass(frozen=True)
+class ScreeningResult:
+    target_date: date | None
+    total: int
+    limit: int
+    offset: int
+    rows: list[ScreeningRow]
+
+
+class ScreeningService:
+    """KR_STOCK 스크리닝 점수 합산 + 정렬·페이지네이션."""
+
+    def __init__(
+            self,
+            ticker_repository: TickerRepository,
+            fundamental_repository: StockFundamentalRepository,
+            dividend_service: DividendService,
+    ) -> None:
+        self._tickers = ticker_repository
+        self._fundamentals = fundamental_repository
+        self._dividends = dividend_service
+
+    def score_kr_stocks(
+            self,
+            target_date: date | None = None,
+            limit: int = 50,
+            offset: int = 0,
+            today: date | None = None,
+    ) -> ScreeningResult:
+        """전체 KR_STOCK을 점수 합산해 total_score DESC, ticker ASC로 정렬.
+
+        target_date 미지정 시 `stock_fundamentals` 최신 일자 사용. 데이터 없으면 빈 결과.
+        today는 분기배당 판정 기준(테스트 결정성 확보용). 기본 None → date.today().
+        """
+        resolved_date = target_date or self._fundamentals.find_latest_date()
+        if resolved_date is None:
+            return ScreeningResult(target_date=None, total=0, limit=limit, offset=offset, rows=[])
+
+        tickers = self._tickers.find_by_asset_type(AssetType.KR_STOCK)
+        if not tickers:
+            return ScreeningResult(
+                target_date=resolved_date, total=0, limit=limit, offset=offset, rows=[],
+            )
+
+        fundamentals = {
+            f.ticker_id: f
+            for f in self._fundamentals.find_by_date(resolved_date)
+        }
+        ticker_ids = [t.id for t in tickers]
+        quarterly_map = self._dividends.is_quarterly_dividend_bulk(ticker_ids, today=today)
+        streak_map = self._dividends.consecutive_dividend_increase_years_bulk(ticker_ids)
+
+        rows: list[ScreeningRow] = []
+        for t in tickers:
+            f = fundamentals.get(t.id)
+            per = f.per if f is not None else None
+            pbr = f.pbr if f is not None else None
+            div = f.div if f is not None else None
+            is_q = quarterly_map.get(t.id, False)
+            streak = streak_map.get(t.id, 0)
+
+            breakdown = ScoreBreakdown(
+                per=score_per(per),
+                pbr=score_pbr(pbr),
+                dividend_yield=score_dividend_yield(div),
+                quarterly_dividend=score_quarterly_dividend(is_q),
+                consecutive_increase_years=score_consecutive_increase(streak),
+            )
+            total = (
+                breakdown.per + breakdown.pbr + breakdown.dividend_yield
+                + breakdown.quarterly_dividend + breakdown.consecutive_increase_years
+            )
+            rows.append(ScreeningRow(
+                ticker=t.ticker,
+                name=t.name,
+                per=per,
+                pbr=pbr,
+                dividend_yield=div,
+                quarterly_dividend=is_q,
+                consecutive_increase_years=streak,
+                scores=breakdown,
+                total_score=total,
+            ))
+
+        rows.sort(key=lambda r: (-r.total_score, r.ticker))
+        sliced = rows[offset:offset + limit]
+        return ScreeningResult(
+            target_date=resolved_date,
+            total=len(rows),
+            limit=limit,
+            offset=offset,
+            rows=sliced,
+        )

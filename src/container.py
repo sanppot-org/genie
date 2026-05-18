@@ -45,6 +45,7 @@ from src.service.dividend_service import DividendService
 from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
+from src.service.screening_service import ScreeningService
 from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
@@ -80,6 +81,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.routes.ticker",  # ticker 라우터 추가
             "src.api.routes.candle",  # candle 라우터 추가
             "src.api.routes.fundamental",  # fundamental 라우터 추가
+            "src.api.routes.screening",  # screening 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
     )
@@ -258,4 +260,10 @@ class ApplicationContainer(containers.DeclarativeContainer):
     buyback_service = providers.Factory(
         BuybackService,
         buyback_event_repository=stock_buyback_event_repository,
+    )
+    screening_service = providers.Factory(
+        ScreeningService,
+        ticker_repository=ticker_repository,
+        fundamental_repository=stock_fundamental_repository,
+        dividend_service=dividend_service,
     )

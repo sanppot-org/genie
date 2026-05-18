@@ -1,0 +1,118 @@
+"""GET /api/screening/kr-stock API 테스트."""
+
+from collections.abc import Generator
+from datetime import date
+from unittest.mock import MagicMock
+
+from fastapi.testclient import TestClient
+import pytest
+
+from app import app, container
+from src.service.screening_service import (
+    ScoreBreakdown,
+    ScreeningResult,
+    ScreeningRow,
+    ScreeningService,
+)
+
+
+@pytest.fixture
+def mock_screening_service() -> MagicMock:
+    return MagicMock(spec=ScreeningService)
+
+
+@pytest.fixture
+def client(mock_screening_service: MagicMock) -> Generator[TestClient, None, None]:
+    container.screening_service.override(mock_screening_service)
+    yield TestClient(app, raise_server_exceptions=False)
+    container.screening_service.reset_override()
+
+
+def _row(ticker: str, total: int = 30) -> ScreeningRow:
+    return ScreeningRow(
+        ticker=ticker, name=f"{ticker}_name",
+        per=5.0, pbr=0.5, dividend_yield=4.0,
+        quarterly_dividend=True, consecutive_increase_years=4,
+        scores=ScoreBreakdown(
+            per=15, pbr=4, dividend_yield=5,
+            quarterly_dividend=5, consecutive_increase_years=3,
+        ),
+        total_score=total,
+    )
+
+
+class TestScreeningAPI:
+    def test_returns_ranked_rows(
+            self, client: TestClient, mock_screening_service: MagicMock,
+    ) -> None:
+        """기본 호출 → 200 + 응답 형태 검증."""
+        mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
+            target_date=date(2026, 5, 15),
+            total=2, limit=50, offset=0,
+            rows=[_row("A0001", total=45), _row("B0002", total=30)],
+        )
+
+        response = client.get("/api/screening/kr-stock")
+
+        assert response.status_code == 200
+        body = response.json()["data"]
+        assert body["target_date"] == "2026-05-15"
+        assert body["total"] == 2
+        assert body["limit"] == 50
+        assert body["offset"] == 0
+        assert [r["ticker"] for r in body["rows"]] == ["A0001", "B0002"]
+        assert body["rows"][0]["total_score"] == 45
+        assert body["rows"][0]["scores"]["per"] == 15
+        assert body["rows"][0]["quarterly_dividend"] is True
+
+        mock_screening_service.score_kr_stocks.assert_called_once_with(
+            target_date=None, limit=50, offset=0,
+        )
+
+    def test_query_params_propagate(
+            self, client: TestClient, mock_screening_service: MagicMock,
+    ) -> None:
+        """date/limit/offset 파라미터가 그대로 service에 전달."""
+        mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
+            target_date=date(2026, 4, 30), total=100, limit=10, offset=20, rows=[],
+        )
+
+        response = client.get(
+            "/api/screening/kr-stock?date=2026-04-30&limit=10&offset=20",
+        )
+
+        assert response.status_code == 200
+        mock_screening_service.score_kr_stocks.assert_called_once_with(
+            target_date=date(2026, 4, 30), limit=10, offset=20,
+        )
+
+    def test_invalid_date_format_422(self, client: TestClient) -> None:
+        """date 패턴 불일치 시 422."""
+        response = client.get("/api/screening/kr-stock?date=20260430")
+        assert response.status_code == 422
+
+    def test_limit_out_of_range_422(self, client: TestClient) -> None:
+        """limit > 500 → 422."""
+        response = client.get("/api/screening/kr-stock?limit=1000")
+        assert response.status_code == 422
+
+    def test_negative_offset_422(self, client: TestClient) -> None:
+        """offset < 0 → 422."""
+        response = client.get("/api/screening/kr-stock?offset=-1")
+        assert response.status_code == 422
+
+    def test_empty_result(
+            self, client: TestClient, mock_screening_service: MagicMock,
+    ) -> None:
+        """데이터 없을 때 target_date=null + rows=[] + 200."""
+        mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
+            target_date=None, total=0, limit=50, offset=0, rows=[],
+        )
+
+        response = client.get("/api/screening/kr-stock")
+
+        assert response.status_code == 200
+        body = response.json()["data"]
+        assert body["target_date"] is None
+        assert body["total"] == 0
+        assert body["rows"] == []

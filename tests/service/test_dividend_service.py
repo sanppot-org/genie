@@ -106,3 +106,61 @@ class TestConsecutiveDividendIncreaseYears:
             self, service: DividendService, ticker_id: int,
     ) -> None:
         assert service.consecutive_dividend_increase_years(ticker_id) == 0
+
+
+class TestBulkMethods:
+    """다건 ticker 일괄 처리 — 단건 메서드와 동일한 결과를 쿼리 1회로."""
+
+    @pytest.fixture
+    def other_ticker_id(self, session: Session) -> int:
+        repo = TickerRepository(session)
+        ticker = repo.save(Ticker(
+            ticker="035420", name="NAVER",
+            asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value,
+        ))
+        return ticker.id
+
+    def test_is_quarterly_dividend_bulk_returns_per_ticker_flags(
+            self,
+            repo: StockDividendRepository,
+            service: DividendService,
+            ticker_id: int,
+            other_ticker_id: int,
+    ) -> None:
+        # ticker_id: 분기(4건), other: 연 1회만
+        repo.bulk_upsert([
+            _row(ticker_id, date(2025, 3, 31), 100, kind="INTERIM"),
+            _row(ticker_id, date(2025, 6, 30), 100, kind="INTERIM"),
+            _row(ticker_id, date(2025, 9, 30), 100, kind="INTERIM"),
+            _row(ticker_id, date(2025, 12, 27), 100, kind="SETTLE"),
+            _row(other_ticker_id, date(2025, 12, 27), 1000, kind="SETTLE"),
+        ])
+
+        result = service.is_quarterly_dividend_bulk(
+            [ticker_id, other_ticker_id], today=date(2026, 1, 31),
+        )
+        assert result == {ticker_id: True, other_ticker_id: False}
+
+    def test_consecutive_increase_years_bulk_returns_per_ticker_streak(
+            self,
+            repo: StockDividendRepository,
+            service: DividendService,
+            ticker_id: int,
+            other_ticker_id: int,
+    ) -> None:
+        repo.bulk_upsert([
+            # ticker_id: 2년 연속 인상
+            _row(ticker_id, date(2021, 12, 27), 100),
+            _row(ticker_id, date(2022, 12, 27), 110),
+            _row(ticker_id, date(2023, 12, 27), 120),
+            # other_ticker_id: 데이터 없음 → 0
+        ])
+
+        result = service.consecutive_dividend_increase_years_bulk(
+            [ticker_id, other_ticker_id],
+        )
+        assert result == {ticker_id: 2, other_ticker_id: 0}
+
+    def test_bulk_methods_handle_empty_input(self, service: DividendService) -> None:
+        assert service.is_quarterly_dividend_bulk([]) == {}
+        assert service.consecutive_dividend_increase_years_bulk([]) == {}
