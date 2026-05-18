@@ -3,7 +3,7 @@
 스케줄러에서 실행되는 모든 작업 함수들을 관리합니다.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 from time import sleep
 
@@ -21,6 +21,7 @@ from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.daily_candle_sync_service import DailyCandleSyncService
+from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.ticker_sync_service import TickerSyncService
 from src.strategy.config import BaseStrategyConfig
@@ -171,6 +172,31 @@ def sync_kr_stock_fundamentals(
     except Exception as e:
         logger.exception("펀더멘털 동기화 실패")
         slack_client.send_status(f"펀더멘털 동기화 실패 ({target_date}): {e}")
+
+
+@inject
+def sync_kr_stock_dividends(
+        service: DividendSyncService = Provide[ApplicationContainer.dividend_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """KR 주식 배당 이력 동기화 (일 1회).
+
+    최근 30일 ~ 향후 60일 범위로 호출 → 배당락일이 사전 공지된 분도 미리 수집.
+    매일 멱등 UPSERT라 중복 호출에도 데이터 무결성 유지.
+    """
+    today = datetime.now(KST).date()
+    from_date = today - timedelta(days=30)
+    to_date = today + timedelta(days=60)
+    try:
+        result = service.sync(from_date, to_date)
+        logger.info(
+            "배당 동기화 완료 from=%s to=%s received=%d upserted=%d skipped_unmapped=%d skipped_invalid=%d",
+            from_date, to_date, result.received, result.upserted,
+            result.skipped_unmapped, result.skipped_invalid,
+        )
+    except Exception as e:
+        logger.exception("배당 동기화 실패")
+        slack_client.send_status(f"배당 동기화 실패 ({from_date}~{to_date}): {e}")
 
 
 @inject

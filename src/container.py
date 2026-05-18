@@ -20,6 +20,7 @@ from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.request_scope import current_request_token
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
+from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
@@ -36,6 +37,8 @@ from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
+from src.service.dividend_service import DividendService
+from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.stock_daily_candle_service import StockDailyCandleService
@@ -104,6 +107,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     ticker_repository = providers.Factory(TickerRepository, session=_session)
     stock_fundamental_repository = providers.Factory(StockFundamentalRepository, session=_session)
     stock_daily_candle_repository = providers.Factory(StockDailyCandleRepository, session=_session)
+    stock_dividend_repository = providers.Factory(StockDividendRepository, session=_session)
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -221,4 +225,14 @@ class ApplicationContainer(containers.DeclarativeContainer):
         client=pykrx_daily_candle_client,
         ticker_repository=ticker_repository,
         daily_candle_repository=stock_daily_candle_repository,
+    )
+    dividend_sync_service = providers.Factory(
+        DividendSyncService,
+        client=hantu_domestic_api,
+        ticker_repository=ticker_repository,
+        dividend_repository=stock_dividend_repository,
+    )
+    dividend_service = providers.Factory(
+        DividendService,
+        dividend_repository=stock_dividend_repository,
     )

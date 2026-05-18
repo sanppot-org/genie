@@ -7,9 +7,10 @@ import requests
 
 from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model.domestic import balance, chart, order, psbl_order, stock_price
+from src.hantu.model.domestic import balance, chart, dividend, order, psbl_order, stock_price
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.chart import ChartInterval, PriceType
+from src.hantu.model.domestic.dividend import DividendKind
 from src.hantu.model.domestic.market_code import MarketCode
 from src.hantu.model.domestic.order import OrderDivision
 
@@ -387,6 +388,82 @@ class HantuDomesticAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return chart.MinuteChartResponseBody.model_validate(res.json())
+
+    def get_dividend_history(
+            self,
+            from_date: date,
+            to_date: date,
+            ticker: str | None = None,
+            kind: DividendKind = DividendKind.ALL,
+    ) -> list[dividend.DividendOutput]:
+        """예탁원정보(배당일정) 조회 — `ksdinfo_dividend`.
+
+        Args:
+            from_date: 조회 시작 영업일
+            to_date: 조회 종료 영업일
+            ticker: 종목코드 (None이면 전체 종목)
+            kind: 조회 구분 (ALL/SETTLE/INTERIM)
+
+        Returns:
+            list[DividendOutput]: 연속조회 합산 결과
+        """
+        sht_cd = ticker if ticker else ""
+        return self._get_dividend_recursive(
+            from_date=from_date,
+            to_date=to_date,
+            sht_cd=sht_cd,
+            kind=kind,
+        )
+
+    def _get_dividend_recursive(
+            self,
+            from_date: date,
+            to_date: date,
+            sht_cd: str,
+            kind: DividendKind,
+            cts: str = "",
+            continuation_flag: str = "",
+            accumulated: list[dividend.DividendOutput] | None = None,
+    ) -> list[dividend.DividendOutput]:
+        """배당 일정 연속 조회 (내부)."""
+        if accumulated is None:
+            accumulated = []
+
+        url = f"{self.url_base}/uapi/domestic-stock/v1/ksdinfo/dividend"
+
+        header = dividend.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+            tr_cont=continuation_flag,
+        )
+        param = dividend.RequestQueryParam(
+            CTS=cts,
+            GB1=kind.value,
+            F_DT=from_date.strftime("%Y%m%d"),
+            T_DT=to_date.strftime("%Y%m%d"),
+            SHT_CD=sht_cd,
+        )
+
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        self._validate_response(res)
+
+        body = dividend.ResponseBody.model_validate(res.json())
+        accumulated.extend(body.output1)
+
+        response_tr_cont = res.headers.get("tr_cont", "")
+        if response_tr_cont in ("M", "F") and body.cts:
+            time.sleep(0.1)
+            return self._get_dividend_recursive(
+                from_date=from_date,
+                to_date=to_date,
+                sht_cd=sht_cd,
+                kind=kind,
+                cts=body.cts,
+                continuation_flag="N",
+                accumulated=accumulated,
+            )
+        return accumulated
 
     # TR_ID 매핑 (계좌 타입, 주문 방향) -> TR_ID
     ORDER_TR_ID_MAP = {

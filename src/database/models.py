@@ -195,6 +195,35 @@ class StockFundamental(Base, TimestampMixin):
         return f"<StockFundamental(ticker_id={self.ticker_id}, date={self.date}, per={self.per})>"
 
 
+class StockDividend(Base, TimestampMixin):
+    """KIS `ksdinfo_dividend` 기반 배당 이력.
+
+    KR_STOCK 대상. 분기 배당 실시 여부 / 배당 연속 인상 연수 등 점수표 지표 산출용.
+    동일 (ticker_id, record_date, kind) 재호출 시 UPSERT.
+    """
+
+    __tablename__ = "stock_dividends"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_dividends_ticker_id"), nullable=False
+    )
+    record_date: Mapped[date] = mapped_column(Date, nullable=False, comment="배당 기준일")
+    pay_date: Mapped[date | None] = mapped_column(Date, nullable=True, comment="배당 지급일")
+    dps: Mapped[float] = mapped_column(Float, nullable=False, comment="주당 배당금 (원)")
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, comment="SETTLE: 결산, INTERIM: 중간/분기")
+    dividend_yield: Mapped[float | None] = mapped_column(Float, nullable=True, comment="시가배당률(%)")
+    fiscal_year: Mapped[int] = mapped_column(Integer, nullable=False, comment="회계연도 (record_date 기준)")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("ticker_id", "record_date", "kind"),
+        Index("ix_stock_dividends_ticker_id_record_date", "ticker_id", "record_date"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockDividend(ticker_id={self.ticker_id}, record_date={self.record_date}, kind={self.kind}, dps={self.dps})>"
+
+
 class StockDailyCandle(Base, TimestampMixin):
     """KR 주식 일자별 OHLCV (pykrx get_market_ohlcv).
 
