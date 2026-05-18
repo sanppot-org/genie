@@ -40,3 +40,31 @@ export interface CandleSeries {
 }
 
 export type GenieResponse<T> = { data: T };
+
+export interface ScreeningScoreBreakdown {
+  per: number;
+  pbr: number;
+  dividend_yield: number;
+  quarterly_dividend: number;
+  consecutive_increase_years: number;
+}
+
+export interface ScreeningRow {
+  ticker: string;
+  name: string;
+  per: number | null;
+  pbr: number | null;
+  dividend_yield: number | null;
+  quarterly_dividend: boolean;
+  consecutive_increase_years: number;
+  scores: ScreeningScoreBreakdown;
+  total_score: number;
+}
+
+export interface ScreeningResponse {
+  target_date: string | null;
+  total: number;
+  limit: number;
+  offset: number;
+  rows: ScreeningRow[];
+}
