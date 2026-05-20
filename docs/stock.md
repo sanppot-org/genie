@@ -108,13 +108,16 @@
   [x] 지표에 마우스 올리면 점수 공식 보이기
   [ ] 업종 컬럼 추가
 [] 종목 상세
+  [x] 가장 최근 종목을 기본값으로 설정
   [ ] 차트
     [x] per (on/off)
     [x] pbr (on/off)
     [x] 시가배당율 (on/off)
+    [ ] 차트 우측에서 스크롤 시 세로로 길이 조절
   [x] 배당 내역
     [x] 기간 조절
 
+[ ] 업종/섹터 데이터 추가 (KIS) 기존 데이터 교체 (스케줄러)
 [x] 배당 종류 중간 / 반기 / 분기 합치기 — sync 시 (ticker_id, record_date, dps) 그룹은 QUARTERLY>INTERIM>SETTLE 1건만 적재, 기존 데이터는 `scripts/cleanup_dividend_duplicates.py`로 정리
 
 ## 추후 작업

@@ -50,6 +50,14 @@ export default function Home() {
   const [dividendStepIdx, setDividendStepIdx] = useState<number>(STEPS.length); // ALL 기본
   const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
 
+  // 첫 hydration 직후 1회 — selected 없고 recent 있으면 최신 종목 자동 선택.
+  // 렌더 중 state 조정 패턴 (React 권장, 추가 렌더 없이 동기 반영).
+  const [autoSelected, setAutoSelected] = useState(false);
+  if (!autoSelected && !selected && recent.length > 0) {
+    setAutoSelected(true);
+    setSelected(recent[0]);
+  }
+
   // 종목 변경 시 캔들 1Y · 배당 ALL로 리셋 (렌더 중 state 조정 — React 권장 패턴).
   const [prevTicker, setPrevTicker] = useState(selected?.ticker);
   if (selected?.ticker !== prevTicker) {
