@@ -71,9 +71,9 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     60: true,
     120: true,
   });
-  const [perOn, setPerOn] = useState(true);
-  const [pbrOn, setPbrOn] = useState(true);
-  const [divOn, setDivOn] = useState(true);
+  const [perOn, setPerOn] = useState(false);
+  const [pbrOn, setPbrOn] = useState(false);
+  const [divOn, setDivOn] = useState(false);
   const didFitRef = useRef(false);
   // 초기값 true: 첫 데이터+fitContent 완료(Effect B 끝에서 해제) 전까지
   // 마운트·리사이즈·fitContent 정착 중 허위 확장 트리거를 차단.
