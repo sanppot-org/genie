@@ -59,6 +59,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const perRef = useRef<ISeriesApi<"Line"> | null>(null);
   const pbrRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const divRef = useRef<ISeriesApi<"Line"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const maRefs = useRef<(ISeriesApi<"Line"> | null)[]>([]);
   const [maOn, setMaOn] = useState<Record<MaPeriod, boolean>>({
@@ -69,6 +70,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   });
   const [perOn, setPerOn] = useState(true);
   const [pbrOn, setPbrOn] = useState(true);
+  const [divOn, setDivOn] = useState(true);
   const didFitRef = useRef(false);
   // 초기값 true: 첫 데이터+fitContent 완료(Effect B 끝에서 해제) 전까지
   // 마운트·리사이즈·fitContent 정착 중 허위 확장 트리거를 차단.
@@ -162,6 +164,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
       candleRef.current = null;
       perRef.current = null;
       pbrRef.current = null;
+      divRef.current = null;
       volRef.current = null;
       maRefs.current = [];
       didFitRef.current = false;
@@ -253,23 +256,49 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     );
   }, [perPoints]);
 
+  // Effect G: 시가배당율 라인(pane 3). perPoints.div(%) 필드 사용.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !perPoints || perPoints.length === 0) return;
+
+    if (!divRef.current) {
+      divRef.current = chart.addSeries(
+        LineSeries,
+        {
+          color: "#10b981",
+          lineWidth: 2,
+          priceLineVisible: false,
+          title: "DIV",
+        },
+        3,
+      );
+    }
+    divRef.current.setData(
+      perPoints.map<LineData | WhitespaceData>((p) =>
+        p.div == null ? { time: p.date } : { time: p.date, value: p.div },
+      ),
+    );
+  }, [perPoints]);
+
   // Effect D: 이평선 표시여부. 시리즈 1회 생성 후 visible만 토글.
   useEffect(() => {
     MA.forEach((n, k) => maRefs.current[k]?.applyOptions({ visible: maOn[n] }));
   }, [maOn]);
 
-  // Effect F: PER/PBR 표시여부 + pane stretch 일괄 관리.
+  // Effect F: PER/PBR/DIV 표시여부 + pane stretch 일괄 관리.
   // stretch=0이면 pane 자체가 접혀 빈 공간이 남지 않음.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     perRef.current?.applyOptions({ visible: perOn });
     pbrRef.current?.applyOptions({ visible: pbrOn });
+    divRef.current?.applyOptions({ visible: divOn });
     const panes = chart.panes();
     panes[0]?.setStretchFactor(3);
     if (panes.length > 1) panes[1].setStretchFactor(perOn ? 1 : 0);
     if (panes.length > 2) panes[2].setStretchFactor(pbrOn ? 1 : 0);
-  }, [perOn, pbrOn, perPoints]);
+    if (panes.length > 3) panes[3].setStretchFactor(divOn ? 1 : 0);
+  }, [perOn, pbrOn, divOn, perPoints]);
 
   if (points.length === 0) {
     return <p className="text-sm text-muted-foreground">데이터 없음</p>;
@@ -303,6 +332,14 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
           onClick={() => setPbrOn((v) => !v)}
         >
           <span style={{ color: "#8b5cf6" }}>●</span> PBR
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={divOn ? "default" : "outline"}
+          onClick={() => setDivOn((v) => !v)}
+        >
+          <span style={{ color: "#10b981" }}>●</span> DIV
         </Button>
       </div>
       <div ref={ref} className="w-full" style={{ height: 480 }} />
