@@ -22,6 +22,9 @@ import type { CandlePoint, FundamentalPoint } from "@/lib/types";
 const VOL_UP = "rgba(210,79,69,0.55)";
 const VOL_DOWN = "rgba(18,97,196,0.55)";
 
+// 전체 차트 박스 높이. 내부 pane 분배는 lightweight-charts의 pane 경계 드래그(기본 enabled)로 사용자가 조절.
+const CHART_HEIGHT = 720;
+
 // 이동평균선 (한국 HTS 표준 기간·구분색). 종가 기반 SMA, 클라 계산.
 const MA = [5, 20, 60, 120] as const;
 type MaPeriod = (typeof MA)[number];
@@ -92,7 +95,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
 
     const chart = createChart(el, {
       width: el.clientWidth,
-      height: 480,
+      height: CHART_HEIGHT,
       layout: {
         background: { type: ColorType.Solid, color: "white" },
         textColor: "#333",
@@ -342,7 +345,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
           <span style={{ color: "#10b981" }}>●</span> DIV
         </Button>
       </div>
-      <div ref={ref} className="w-full" style={{ height: 480 }} />
+      <div ref={ref} className="w-full" style={{ height: CHART_HEIGHT }} />
     </div>
   );
 }
