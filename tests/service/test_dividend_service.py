@@ -41,13 +41,12 @@ def _row(ticker_id: int, record_date: date, dps: float, kind: str = "SETTLE") ->
 
 
 class TestIsQuarterlyDividend:
-    def test_returns_true_when_three_or_more_payments_in_last_year(
+    def test_returns_true_when_quarterly_row_exists_in_last_year(
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
     ) -> None:
+        """최근 1년에 QUARTERLY 라벨 row가 1건만 있어도 True."""
         repo.bulk_upsert([
-            _row(ticker_id, date(2025, 3, 31), 100, kind="INTERIM"),
-            _row(ticker_id, date(2025, 6, 30), 100, kind="INTERIM"),
-            _row(ticker_id, date(2025, 9, 30), 100, kind="INTERIM"),
+            _row(ticker_id, date(2025, 3, 31), 100, kind="QUARTERLY"),
             _row(ticker_id, date(2025, 12, 27), 100, kind="SETTLE"),
         ])
         assert service.is_quarterly_dividend(ticker_id, today=date(2026, 1, 31)) is True
@@ -56,6 +55,25 @@ class TestIsQuarterlyDividend:
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
     ) -> None:
         repo.bulk_upsert([_row(ticker_id, date(2025, 12, 27), 1000, kind="SETTLE")])
+        assert service.is_quarterly_dividend(ticker_id, today=date(2026, 1, 31)) is False
+
+    def test_returns_false_for_interim_only(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        """중간(반기)배당만 있는 종목은 분기 아님."""
+        repo.bulk_upsert([
+            _row(ticker_id, date(2025, 6, 30), 500, kind="INTERIM"),
+            _row(ticker_id, date(2025, 12, 27), 500, kind="SETTLE"),
+        ])
+        assert service.is_quarterly_dividend(ticker_id, today=date(2026, 1, 31)) is False
+
+    def test_quarterly_row_outside_year_window_excluded(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        """1년보다 더 과거의 QUARTERLY row는 무시."""
+        repo.bulk_upsert([
+            _row(ticker_id, date(2023, 6, 30), 100, kind="QUARTERLY"),
+        ])
         assert service.is_quarterly_dividend(ticker_id, today=date(2026, 1, 31)) is False
 
 
@@ -127,11 +145,11 @@ class TestBulkMethods:
             ticker_id: int,
             other_ticker_id: int,
     ) -> None:
-        # ticker_id: 분기(4건), other: 연 1회만
+        # ticker_id: 분기배당, other: 연 1회만
         repo.bulk_upsert([
-            _row(ticker_id, date(2025, 3, 31), 100, kind="INTERIM"),
-            _row(ticker_id, date(2025, 6, 30), 100, kind="INTERIM"),
-            _row(ticker_id, date(2025, 9, 30), 100, kind="INTERIM"),
+            _row(ticker_id, date(2025, 3, 31), 100, kind="QUARTERLY"),
+            _row(ticker_id, date(2025, 6, 30), 100, kind="QUARTERLY"),
+            _row(ticker_id, date(2025, 9, 30), 100, kind="QUARTERLY"),
             _row(ticker_id, date(2025, 12, 27), 100, kind="SETTLE"),
             _row(other_ticker_id, date(2025, 12, 27), 1000, kind="SETTLE"),
         ])

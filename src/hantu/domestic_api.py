@@ -451,18 +451,24 @@ class HantuDomesticAPI(HantuBaseAPI):
         body = dividend.ResponseBody.model_validate(res.json())
         accumulated.extend(body.output1)
 
+        # KIS `ksdinfo_dividend`는 응답 body에 cts를 주지 않는다.
+        # 마지막 row의 (record_date + sht_cd) 14자 그대로가 다음 페이지 CTS.
+        # tr_cont='F'/'M'이면 더 있음, 'E'/'D'면 종료.
         response_tr_cont = res.headers.get("tr_cont", "")
-        if response_tr_cont in ("M", "F") and body.cts:
-            time.sleep(0.1)
-            return self._get_dividend_recursive(
-                from_date=from_date,
-                to_date=to_date,
-                sht_cd=sht_cd,
-                kind=kind,
-                cts=body.cts,
-                continuation_flag="N",
-                accumulated=accumulated,
-            )
+        if response_tr_cont in ("M", "F") and body.output1:
+            last = body.output1[-1]
+            if last.record_date and last.sht_cd:
+                next_cts = f"{last.record_date}{last.sht_cd}"
+                time.sleep(0.1)
+                return self._get_dividend_recursive(
+                    from_date=from_date,
+                    to_date=to_date,
+                    sht_cd=sht_cd,
+                    kind=kind,
+                    cts=next_cts,
+                    continuation_flag="N",
+                    accumulated=accumulated,
+                )
         return accumulated
 
     # TR_ID 매핑 (계좌 타입, 주문 방향) -> TR_ID

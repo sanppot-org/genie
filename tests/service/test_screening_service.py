@@ -77,9 +77,9 @@ def screening_setup(session: Session) -> ScreeningService:
         ticker_id=t1.id, date=target_date, per=4.0, pbr=0.25, div=8.0, eps=1000, bps=4000, dps=80,
     )])
     div_repo.bulk_upsert([
-        StockDividend(ticker_id=t1.id, record_date=date(2025, 3, 31), dps=20, kind="INTERIM", fiscal_year=2025),
-        StockDividend(ticker_id=t1.id, record_date=date(2025, 6, 30), dps=20, kind="INTERIM", fiscal_year=2025),
-        StockDividend(ticker_id=t1.id, record_date=date(2025, 9, 30), dps=20, kind="INTERIM", fiscal_year=2025),
+        StockDividend(ticker_id=t1.id, record_date=date(2025, 3, 31), dps=20, kind="QUARTERLY", fiscal_year=2025),
+        StockDividend(ticker_id=t1.id, record_date=date(2025, 6, 30), dps=20, kind="QUARTERLY", fiscal_year=2025),
+        StockDividend(ticker_id=t1.id, record_date=date(2025, 9, 30), dps=20, kind="QUARTERLY", fiscal_year=2025),
         StockDividend(ticker_id=t1.id, record_date=date(2025, 12, 27), dps=20, kind="SETTLE", fiscal_year=2025),
     ] + [
         StockDividend(

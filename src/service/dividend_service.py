@@ -6,6 +6,8 @@ from datetime import date, timedelta
 from src.database.models import StockDividend
 from src.database.stock_dividend_repository import StockDividendRepository
 
+_QUARTERLY_LABEL = "QUARTERLY"
+
 
 class DividendService:
     """`stock_dividends`에서 파생 지표를 계산한다.
@@ -14,21 +16,16 @@ class DividendService:
     - 배당 연속 인상 연수 (점수표 5점)
     """
 
-    QUARTERLY_THRESHOLD = 3  # 최근 1년 내 배당 횟수 기준
-
     def __init__(self, dividend_repository: StockDividendRepository) -> None:
         self._repo = dividend_repository
 
     def is_quarterly_dividend(self, ticker_id: int, today: date | None = None) -> bool:
-        """최근 1년 내 배당 지급 횟수가 3회 이상이면 분기 배당으로 본다.
-
-        (분기 회사는 결산 1 + 중간 3, 또는 중간 4 패턴 → 3건 이상이면 분기로 간주.)
-        """
+        """최근 1년 내 `kind == 'QUARTERLY'` row가 1건 이상이면 분기배당."""
         base = today or date.today()
         rows = self._repo.find_by_ticker(
             ticker_id, from_date=base - timedelta(days=365), to_date=base,
         )
-        return len(rows) >= self.QUARTERLY_THRESHOLD
+        return any(r.kind == _QUARTERLY_LABEL for r in rows)
 
     def is_quarterly_dividend_bulk(
             self, ticker_ids: list[int], today: date | None = None,
@@ -43,10 +40,8 @@ class DividendService:
         rows = self._repo.find_by_tickers(
             ticker_ids, from_date=base - timedelta(days=365), to_date=base,
         )
-        counts: dict[int, int] = defaultdict(int)
-        for r in rows:
-            counts[r.ticker_id] += 1
-        return {tid: counts[tid] >= self.QUARTERLY_THRESHOLD for tid in ticker_ids}
+        flagged = {r.ticker_id for r in rows if r.kind == _QUARTERLY_LABEL}
+        return {tid: tid in flagged for tid in ticker_ids}
 
     def consecutive_dividend_increase_years(self, ticker_id: int) -> int:
         """최근 회계연도부터 거꾸로 본 배당 연속 인상 연수.

@@ -15,9 +15,14 @@ from src.hantu.model.domestic.dividend import DividendKind, DividendOutput
 logger = logging.getLogger(__name__)
 
 
-KIND_TO_LABEL: dict[DividendKind, str] = {
-    DividendKind.SETTLE: "SETTLE",
-    DividendKind.INTERIM: "INTERIM",
+# KIS 응답 `divi_kind` 한글 라벨 → DB 라벨.
+# GB1=2(INTERIM)는 "중간"만 매칭하고 "분기"는 누락되므로 GB1=0(ALL)로 단일 호출 후
+# 응답 라벨로 세분 분류한다.
+_HANGUL_KIND_TO_LABEL: dict[str, str] = {
+    "결산": "SETTLE",
+    "중간": "INTERIM",
+    "반기": "INTERIM",   # KIS 응답에 "중간"과 "반기"가 혼재 — 의미상 동일.
+    "분기": "QUARTERLY",
 }
 
 
@@ -52,13 +57,9 @@ class DividendSyncService:
         self._dividend_repo = dividend_repository
 
     def sync(self, from_date: date, to_date: date) -> DividendSyncResult:
-        rows: list[tuple[DividendOutput, str]] = []
-        for kind in (DividendKind.SETTLE, DividendKind.INTERIM):
-            fetched = self._client.get_dividend_history(
-                from_date=from_date, to_date=to_date, kind=kind,
-            )
-            label = KIND_TO_LABEL[kind]
-            rows.extend((row, label) for row in fetched)
+        rows = self._client.get_dividend_history(
+            from_date=from_date, to_date=to_date, kind=DividendKind.ALL,
+        )
 
         tickers = self._ticker_repo.find_by_data_source(DataSource.PYKRX)
         code_to_id: dict[str, int] = {
@@ -68,12 +69,12 @@ class DividendSyncService:
         entities: list[StockDividend] = []
         skipped_unmapped = 0
         skipped_invalid = 0
-        for row, label in rows:
+        for row in rows:
             ticker_id = code_to_id.get(row.sht_cd)
             if ticker_id is None:
                 skipped_unmapped += 1
                 continue
-            entity = _build_entity(row, label, ticker_id)
+            entity = _build_entity(row, ticker_id)
             if entity is None:
                 skipped_invalid += 1
                 continue
@@ -92,11 +93,14 @@ class DividendSyncService:
         )
 
 
-def _build_entity(row: DividendOutput, label: str, ticker_id: int) -> StockDividend | None:
+def _build_entity(row: DividendOutput, ticker_id: int) -> StockDividend | None:
     record_date = _parse_kis_date(row.record_date)
     dps = _parse_float(row.per_sto_divi_amt)
     # dps=0은 "무배당 결의" 이력 — 현금배당 이벤트가 아니므로 적재하지 않는다.
     if record_date is None or dps is None or dps <= 0:
+        return None
+    label = _HANGUL_KIND_TO_LABEL.get((row.divi_kind or "").strip())
+    if label is None:
         return None
     return StockDividend(
         ticker_id=ticker_id,
