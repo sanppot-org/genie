@@ -58,6 +58,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const perRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const pbrRef = useRef<ISeriesApi<"Line"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const maRefs = useRef<(ISeriesApi<"Line"> | null)[]>([]);
   const [maOn, setMaOn] = useState<Record<MaPeriod, boolean>>({
@@ -66,6 +67,8 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     60: true,
     120: true,
   });
+  const [perOn, setPerOn] = useState(true);
+  const [pbrOn, setPbrOn] = useState(true);
   const didFitRef = useRef(false);
   // 초기값 true: 첫 데이터+fitContent 완료(Effect B 끝에서 해제) 전까지
   // 마운트·리사이즈·fitContent 정착 중 허위 확장 트리거를 차단.
@@ -158,6 +161,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
       chartRef.current = null;
       candleRef.current = null;
       perRef.current = null;
+      pbrRef.current = null;
       volRef.current = null;
       maRefs.current = [];
       didFitRef.current = false;
@@ -215,10 +219,6 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
         },
         1,
       );
-      // 주가 : PER = 3 : 1
-      const panes = chart.panes();
-      panes[0]?.setStretchFactor(3);
-      panes[1]?.setStretchFactor(1);
     }
     // null은 whitespace로 넣어 갭 유지 (connectNulls=false 동작).
     perRef.current.setData(
@@ -228,17 +228,55 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     );
   }, [perPoints]);
 
+  // Effect E: PBR 라인(pane 2). perPoints의 pbr 필드 사용 (단일 fundamentals source).
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !perPoints || perPoints.length === 0) return;
+
+    if (!pbrRef.current) {
+      pbrRef.current = chart.addSeries(
+        LineSeries,
+        {
+          color: "#8b5cf6",
+          lineWidth: 2,
+          priceLineVisible: false,
+          title: "PBR",
+        },
+        2,
+      );
+      // pane stretch는 Effect F가 토글 상태와 함께 일괄 관리.
+    }
+    pbrRef.current.setData(
+      perPoints.map<LineData | WhitespaceData>((p) =>
+        p.pbr == null ? { time: p.date } : { time: p.date, value: p.pbr },
+      ),
+    );
+  }, [perPoints]);
+
   // Effect D: 이평선 표시여부. 시리즈 1회 생성 후 visible만 토글.
   useEffect(() => {
     MA.forEach((n, k) => maRefs.current[k]?.applyOptions({ visible: maOn[n] }));
   }, [maOn]);
+
+  // Effect F: PER/PBR 표시여부 + pane stretch 일괄 관리.
+  // stretch=0이면 pane 자체가 접혀 빈 공간이 남지 않음.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    perRef.current?.applyOptions({ visible: perOn });
+    pbrRef.current?.applyOptions({ visible: pbrOn });
+    const panes = chart.panes();
+    panes[0]?.setStretchFactor(3);
+    if (panes.length > 1) panes[1].setStretchFactor(perOn ? 1 : 0);
+    if (panes.length > 2) panes[2].setStretchFactor(pbrOn ? 1 : 0);
+  }, [perOn, pbrOn, perPoints]);
 
   if (points.length === 0) {
     return <p className="text-sm text-muted-foreground">데이터 없음</p>;
   }
   return (
     <div className="space-y-2">
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         {MA.map((n) => (
           <Button
             key={n}
@@ -250,6 +288,22 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
             <span style={{ color: MA_COLOR[n] }}>●</span> MA{n}
           </Button>
         ))}
+        <Button
+          type="button"
+          size="sm"
+          variant={perOn ? "default" : "outline"}
+          onClick={() => setPerOn((v) => !v)}
+        >
+          <span style={{ color: "#0ea5e9" }}>●</span> PER
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={pbrOn ? "default" : "outline"}
+          onClick={() => setPbrOn((v) => !v)}
+        >
+          <span style={{ color: "#8b5cf6" }}>●</span> PBR
+        </Button>
       </div>
       <div ref={ref} className="w-full" style={{ height: 480 }} />
     </div>
