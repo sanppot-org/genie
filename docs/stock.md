@@ -113,8 +113,7 @@
     [x] pbr (on/off)
     [x] 시가배당율 (on/off)
   [x] 배당 내역
-    [ ] 기간 조절
-  [ ] 업종
+    [x] 기간 조절
 
 [x] 배당 종류 중간 / 반기 / 분기 합치기 — sync 시 (ticker_id, record_date, dps) 그룹은 QUARTERLY>INTERIM>SETTLE 1건만 적재, 기존 데이터는 `scripts/cleanup_dividend_duplicates.py`로 정리
 

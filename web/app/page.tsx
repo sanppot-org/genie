@@ -47,13 +47,15 @@ export default function Home() {
   const deferredQ = useDeferredValue(q);
   const [selected, setSelected] = useState<Ticker | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
+  const [dividendStepIdx, setDividendStepIdx] = useState<number>(STEPS.length); // ALL 기본
   const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
 
-  // 종목 변경 시 1Y로 리셋 (렌더 중 state 조정 — React 권장 패턴, effect 불필요).
+  // 종목 변경 시 캔들 1Y · 배당 ALL로 리셋 (렌더 중 state 조정 — React 권장 패턴).
   const [prevTicker, setPrevTicker] = useState(selected?.ticker);
   if (selected?.ticker !== prevTicker) {
     setPrevTicker(selected?.ticker);
     setStepIdx(0);
+    setDividendStepIdx(STEPS.length);
   }
 
   const tickers = useQuery({
@@ -91,13 +93,14 @@ export default function Home() {
     placeholderData: keepPreviousData,
   });
 
+  const { from: dFrom, to: dTo } = rangeFor(dividendStepIdx);
   const dividends = useQuery({
-    queryKey: ["dividends", selected?.ticker, stepIdx],
+    queryKey: ["dividends", selected?.ticker, dividendStepIdx],
     queryFn: () =>
       apiGet<GenieResponse<DividendSeries>>("/api/dividends", {
         ticker: selected!.ticker,
-        from,
-        to,
+        from: dFrom,
+        to: dTo,
       }).then((r) => r.data),
     enabled: Boolean(selected),
     placeholderData: keepPreviousData,
@@ -227,6 +230,22 @@ export default function Home() {
             <section className="space-y-2 pt-2">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <h3 className="font-medium">배당 내역</h3>
+                <div className="flex gap-1">
+                  {(["1Y", "3Y", "10Y", "ALL"] as const).map((label, i) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setDividendStepIdx(i)}
+                      className={`rounded border px-2 py-0.5 text-xs ${
+                        dividendStepIdx === i
+                          ? "bg-foreground text-background"
+                          : "bg-background hover:bg-muted"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <span className="text-xs text-muted-foreground">
                   <span style={{ color: "#f59e0b" }}>●</span> 결산
                 </span>
