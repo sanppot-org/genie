@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from src.constants import UTF_8
 
 # 프로젝트 루트 디렉토리 경로
-ENV_PROFILE = os.getenv("ENV_PROFILE", "dev")
+ENV_PROFILE = os.getenv("ENV_PROFILE", "local")
 PROJECT_ROOT = Path(__file__).parent.parent
 DEFAULT_ENV_FILE_PATH = PROJECT_ROOT / "config" / "genie" / ".env"
 CONFIG_DIR = PROJECT_ROOT / "config" / "genie"

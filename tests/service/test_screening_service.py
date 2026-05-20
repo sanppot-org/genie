@@ -122,7 +122,7 @@ def screening_setup(session: Session) -> ScreeningService:
     return ScreeningService(
         ticker_repository=ticker_repo,
         fundamental_repository=fund_repo,
-        dividend_service=DividendService(div_repo),
+        dividend_service=DividendService(div_repo, ticker_repo),
     )
 
 
@@ -478,7 +478,9 @@ class TestScoreKrStocksEmptyDb:
         service = ScreeningService(
             ticker_repository=TickerRepository(session),
             fundamental_repository=StockFundamentalRepository(session),
-            dividend_service=DividendService(StockDividendRepository(session)),
+            dividend_service=DividendService(
+                StockDividendRepository(session), TickerRepository(session),
+            ),
         )
         result = service.score_kr_stocks()
         assert result.total == 0

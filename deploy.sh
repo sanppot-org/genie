@@ -7,7 +7,7 @@ set -e
 export PATH="/root/.local/bin:/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:$PATH"
 
 # 환경 프로파일 — alembic/앱 설정이 .env.prod 오버레이를 로드하도록 강제.
-# 미설정 시 ENV_PROFILE 기본값 "dev"로 떨어져 POSTGRES_HOST 등이 localhost로 사용됨.
+# 미설정 시 ENV_PROFILE 기본값 "local"로 떨어져 POSTGRES_HOST 등이 localhost로 사용됨.
 export ENV_PROFILE=prod
 
 # uv 명령어 확인
