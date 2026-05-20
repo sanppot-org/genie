@@ -226,8 +226,14 @@ class AppConfig(BaseSettings):
 
     cors_allow_origins: list[str] = Field(
         default=["http://localhost:3000"],
-        description="CORS 허용 origin 목록 (쉼표 구분 환경변수 지원)",
+        description="CORS 허용 origin 목록 (쉼표 구분 환경변수 지원). 로컬 임의 포트는 cors_allow_origin_regex 참고.",
         alias="CORS_ALLOW_ORIGINS",
+    )
+
+    cors_allow_origin_regex: str | None = Field(
+        default=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+        description="CORS 허용 origin 정규식. 기본은 localhost/127.0.0.1 어떤 포트든 허용(dev 편의). 운영 env에서 None 또는 도메인 정규식으로 덮어쓴다.",
+        alias="CORS_ALLOW_ORIGIN_REGEX",
     )
 
     @field_validator("cors_allow_origins", mode="before")

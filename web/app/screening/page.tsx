@@ -1,10 +1,11 @@
 "use client";
 
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ScreeningRow } from "@/lib/types";
+import type { ScreeningRow, ScreeningSortBy, ScreeningSortOrder } from "@/lib/types";
 import { useScreening } from "@/lib/use-screening";
 import { formatNumber, formatPercent } from "@/lib/utils";
 
@@ -38,22 +39,31 @@ function renderConsecutive(row: ScreeningRow) {
   return scoreCell(`${row.consecutive_increase_years}년`, row.scores.consecutive_increase_years);
 }
 
-const COLUMNS = [
-  { key: "rank", label: "#", align: "text-right" },
-  { key: "ticker", label: "종목", align: "text-left" },
-  { key: "per", label: "PER", align: "text-right" },
-  { key: "pbr", label: "PBR", align: "text-right" },
-  { key: "div", label: "배당%", align: "text-right" },
-  { key: "quarterly", label: "분기", align: "text-right" },
-  { key: "consecutive", label: "연속", align: "text-right" },
-  { key: "total", label: "총점", align: "text-right" },
-] as const;
+type Column = {
+  key: string;
+  label: string;
+  align: string;
+  sortKey: ScreeningSortBy | null;
+};
+
+const COLUMNS: readonly Column[] = [
+  { key: "rank", label: "#", align: "text-right", sortKey: null },
+  { key: "ticker", label: "종목", align: "text-left", sortKey: null },
+  { key: "per", label: "PER", align: "text-right", sortKey: "per" },
+  { key: "pbr", label: "PBR", align: "text-right", sortKey: "pbr" },
+  { key: "div", label: "배당%", align: "text-right", sortKey: "dividend_yield" },
+  { key: "quarterly", label: "분기", align: "text-right", sortKey: "quarterly_dividend" },
+  { key: "consecutive", label: "연속", align: "text-right", sortKey: "consecutive_years" },
+  { key: "total", label: "총점", align: "text-right", sortKey: "total_score" },
+];
 
 export default function ScreeningPage() {
   const [date, setDate] = useState("");
   const [offset, setOffset] = useState(0);
+  const [sortBy, setSortBy] = useState<ScreeningSortBy>("total_score");
+  const [order, setOrder] = useState<ScreeningSortOrder>("desc");
 
-  const query = useScreening(date || undefined, PAGE_SIZE, offset);
+  const query = useScreening(date || undefined, PAGE_SIZE, offset, sortBy, order);
   const data = query.data;
 
   const total = data?.total ?? 0;
@@ -62,12 +72,28 @@ export default function ScreeningPage() {
   const startIdx = total === 0 ? 0 : offset + 1;
   const endIdx = Math.min(offset + PAGE_SIZE, total);
 
+  function handleHeaderClick(col: ScreeningSortBy) {
+    if (sortBy === col) {
+      if (order === "desc") {
+        setOrder("asc");
+      } else {
+        // ASC 상태에서 한 번 더 클릭 → 정렬 해제 (ticker ASC = 자연 순서)
+        setSortBy("ticker");
+        setOrder("asc");
+      }
+    } else {
+      setSortBy(col);
+      setOrder("desc");
+    }
+    setOffset(0);
+  }
+
   return (
     <main className="mx-auto w-full max-w-6xl p-6 space-y-6">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">KR 주식 스크리닝</h1>
         <p className="text-sm text-muted-foreground">
-          PER · PBR · 배당수익률 · 분기 배당 · 연속 인상 5개 지표 점수 합산 (45점 만점) 랭킹.
+          PER · PBR · 배당수익률 · 분기 배당 · 연속 인상 5개 지표 점수 합산 (45점 만점). 컬럼 헤더 클릭으로 정렬.
         </p>
       </header>
 
@@ -101,7 +127,23 @@ export default function ScreeningPage() {
                     key={c.key}
                     className={`px-3 py-2 font-medium text-muted-foreground ${c.align}`}
                   >
-                    {c.label}
+                    {c.sortKey ? (
+                      <button
+                        type="button"
+                        onClick={() => handleHeaderClick(c.sortKey!)}
+                        className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                      >
+                        {c.label}
+                        {sortBy === c.sortKey &&
+                          (order === "desc" ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronUp className="h-3 w-3" />
+                          ))}
+                      </button>
+                    ) : (
+                      c.label
+                    )}
                   </th>
                 ))}
               </tr>

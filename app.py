@@ -28,10 +28,11 @@ app = FastAPI(
     lifespan=lifespan if app_config.enable_scheduler else None,
 )
 
-# CORS — 프론트(web/) dev/배포 origin 허용
+# CORS — 프론트(web/) dev/배포 origin 허용. 로컬 임의 포트는 regex로 매칭.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=app_config.cors_allow_origins,
+    allow_origin_regex=app_config.cors_allow_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],

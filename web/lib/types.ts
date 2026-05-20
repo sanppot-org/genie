@@ -68,3 +68,14 @@ export interface ScreeningResponse {
   offset: number;
   rows: ScreeningRow[];
 }
+
+export type ScreeningSortBy =
+  | "total_score"
+  | "per"
+  | "pbr"
+  | "dividend_yield"
+  | "quarterly_dividend"
+  | "consecutive_years"
+  | "ticker";
+
+export type ScreeningSortOrder = "asc" | "desc";

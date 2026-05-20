@@ -6,13 +6,30 @@
 쿼리 4회로 전체 KR_STOCK을 메모리 join 후 정렬·페이지네이션한다.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
+from typing import Literal
 
 from src.constants import AssetType
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.dividend_service import DividendService
+
+ScreeningSortBy = Literal[
+    "total_score", "per", "pbr", "dividend_yield",
+    "quarterly_dividend", "consecutive_years", "ticker",
+]
+ScreeningSortOrder = Literal["asc", "desc"]
+
+_SORT_ATTR_MAP: dict[str, str] = {
+    "total_score": "total_score",
+    "per": "per",
+    "pbr": "pbr",
+    "dividend_yield": "dividend_yield",
+    "quarterly_dividend": "quarterly_dividend",
+    "consecutive_years": "consecutive_increase_years",
+}
 
 
 def score_per(per: float | None) -> int:
@@ -101,6 +118,28 @@ class ScreeningResult:
     rows: list[ScreeningRow]
 
 
+def _make_sort_key(attr: str, descending: bool) -> Callable[[ScreeningRow], tuple[int, float]]:
+    """비-ticker 필드용 정렬 키. NULL은 정렬 방향과 무관하게 항상 맨 뒤."""
+    def key(row: ScreeningRow) -> tuple[int, float]:
+        v = getattr(row, attr)
+        if v is None:
+            return (1, 0.0)
+        primary = float(-v if descending else v)  # bool 도 -True=-1, -False=0 으로 정상 동작
+        return (0, primary)
+    return key
+
+
+def _apply_sort(rows: list[ScreeningRow], sort_by: ScreeningSortBy, order: ScreeningSortOrder) -> None:
+    """rows를 sort_by/order 기준으로 in-place 정렬. 보조키는 항상 ticker ASC."""
+    descending = order == "desc"
+    if sort_by == "ticker":
+        rows.sort(key=lambda r: r.ticker, reverse=descending)
+        return
+    attr = _SORT_ATTR_MAP[sort_by]
+    rows.sort(key=lambda r: r.ticker)                  # secondary (stable sort 활용)
+    rows.sort(key=_make_sort_key(attr, descending))    # primary
+
+
 class ScreeningService:
     """KR_STOCK 스크리닝 점수 합산 + 정렬·페이지네이션."""
 
@@ -120,9 +159,12 @@ class ScreeningService:
             limit: int = 50,
             offset: int = 0,
             today: date | None = None,
+            sort_by: ScreeningSortBy = "total_score",
+            order: ScreeningSortOrder = "desc",
     ) -> ScreeningResult:
-        """전체 KR_STOCK을 점수 합산해 total_score DESC, ticker ASC로 정렬.
+        """전체 KR_STOCK을 점수 합산해 sort_by/order 기준으로 정렬.
 
+        기본은 total_score DESC, ticker ASC. NULL 값은 정렬 방향과 무관하게 항상 맨 뒤.
         target_date 미지정 시 `stock_fundamentals` 최신 일자 사용. 데이터 없으면 빈 결과.
         today는 분기배당 판정 기준(테스트 결정성 확보용). 기본 None → date.today().
         """
@@ -176,7 +218,7 @@ class ScreeningService:
                 total_score=total,
             ))
 
-        rows.sort(key=lambda r: (-r.total_score, r.ticker))
+        _apply_sort(rows, sort_by, order)
         sliced = rows[offset:offset + limit]
         return ScreeningResult(
             target_date=resolved_date,

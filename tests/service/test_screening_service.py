@@ -197,6 +197,59 @@ class TestScoreKrStocks:
         assert result.total == 4
 
 
+class TestScoreKrStocksSorting:
+    """sort_by/order 동작 검증 — 픽스처(A00001..D00004) 활용."""
+
+    def test_sort_by_per_asc_puts_nulls_last(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """PER ASC: A(4.0)→B(12.0)→C(null)→D(null). null은 끝, 동률은 ticker ASC."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), sort_by="per", order="asc",
+        )
+        assert [r.ticker for r in result.rows] == ["A00001", "B00002", "C00003", "D00004"]
+
+    def test_sort_by_per_desc_puts_nulls_last(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """PER DESC: B(12.0)→A(4.0)→C(null)→D(null). DESC에서도 null은 끝."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), sort_by="per", order="desc",
+        )
+        assert [r.ticker for r in result.rows] == ["B00002", "A00001", "C00003", "D00004"]
+
+    def test_sort_by_ticker_asc_is_natural_order(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """ticker ASC: 종목코드 사전순 — 정렬 해제 상태의 정의."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), sort_by="ticker", order="asc",
+        )
+        assert [r.ticker for r in result.rows] == ["A00001", "B00002", "C00003", "D00004"]
+
+    def test_sort_by_ticker_desc(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """ticker DESC: 종목코드 역순."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), sort_by="ticker", order="desc",
+        )
+        assert [r.ticker for r in result.rows] == ["D00004", "C00003", "B00002", "A00001"]
+
+    def test_default_sort_unchanged(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """파라미터 미지정 시 기존 동작(total_score DESC, ticker ASC) 그대로."""
+        default_result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+        )
+        explicit_result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            sort_by="total_score", order="desc",
+        )
+        assert [r.ticker for r in default_result.rows] == [r.ticker for r in explicit_result.rows]
+
+
 class TestScoreKrStocksEmptyDb:
     def test_returns_empty_result_when_no_fundamentals(
             self, session: Session,
