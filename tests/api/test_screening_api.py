@@ -121,6 +121,23 @@ class TestScreeningAPI:
         response = client.get("/api/screening/kr-stock?per_min=-1")
         assert response.status_code == 422
 
+    def test_q_query_propagates(
+            self, client: TestClient, mock_screening_service: MagicMock,
+    ) -> None:
+        """`q` Query가 ScreeningFilters.q로 전달."""
+        mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
+            target_date=date(2026, 5, 15), total=0, limit=50, offset=0, rows=[],
+        )
+
+        response = client.get("/api/screening/kr-stock?q=삼성")
+
+        assert response.status_code == 200
+        mock_screening_service.score_kr_stocks.assert_called_once_with(
+            target_date=None, limit=50, offset=0,
+            sort_by="total_score", order="desc",
+            filters=ScreeningFilters(q="삼성"),
+        )
+
     def test_invalid_sort_by_422(self, client: TestClient) -> None:
         """sort_by가 enum 밖이면 422."""
         response = client.get("/api/screening/kr-stock?sort_by=foo")

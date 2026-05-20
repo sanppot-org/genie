@@ -86,4 +86,5 @@ export interface ScreeningFilters {
   pbr_min?: number;
   pbr_max?: number;
   dividend_yield_min?: number;
+  q?: string;
 }

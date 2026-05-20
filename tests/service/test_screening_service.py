@@ -339,6 +339,81 @@ class TestScoreKrStocksFiltering:
         assert len(result.rows) == 1
 
 
+class TestScoreKrStocksSearch:
+    """ScreeningFilters.q (ticker/name substring, 대소문자 무시) 동작."""
+
+    def test_search_by_ticker_substring(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """ticker 부분일치: 'A00001' → A 한 종목."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(q="A00001"),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_search_by_name_substring(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """name 부분일치: '기업' → C00003(적자기업) 한 종목."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(q="기업"),
+        )
+        assert [r.ticker for r in result.rows] == ["C00003"]
+
+    def test_search_case_insensitive(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """소문자 입력도 대문자 ticker 매칭."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(q="a00001"),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_search_no_match_returns_empty(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """매칭 없으면 total=0."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(q="존재하지않음"),
+        )
+        assert result.total == 0
+        assert result.rows == []
+
+    def test_search_whitespace_only_is_noop(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """공백만 입력은 noop (전체 4개)."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(q="   "),
+        )
+        assert result.total == 4
+
+    def test_search_empty_string_is_noop(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """빈 문자열도 noop."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(q=""),
+        )
+        assert result.total == 4
+
+    def test_search_combines_with_numeric_filters(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """다른 필터와 AND. per_max=10 + q='A' → A만(B는 per=12 컷)."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(per_max=10.0, q="A"),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+
 class TestScoreKrStocksEmptyDb:
     def test_returns_empty_result_when_no_fundamentals(
             self, session: Session,

@@ -111,20 +111,27 @@ class ScreeningRow:
 
 @dataclass(frozen=True)
 class ScreeningFilters:
-    """숫자 컬럼 임계값 필터. None은 비활성. NULL 값을 가진 종목은 해당 필터가 켜지면 제외."""
+    """숫자 컬럼 임계값 필터 + 텍스트 검색.
+
+    임계값(per/pbr/dividend_yield)은 None이면 비활성. NULL 값을 가진 종목은 해당 필터가 켜지면 제외.
+    `q`는 ticker 또는 name substring (대소문자 무시). None / 빈문자열 / 공백만은 noop.
+    """
 
     per_min: float | None = None
     per_max: float | None = None
     pbr_min: float | None = None
     pbr_max: float | None = None
     dividend_yield_min: float | None = None
+    q: str | None = None
 
     @property
     def is_empty(self) -> bool:
-        return all(
+        numeric_empty = all(
             getattr(self, name) is None
             for name in ("per_min", "per_max", "pbr_min", "pbr_max", "dividend_yield_min")
         )
+        text_empty = not (self.q and self.q.strip())
+        return numeric_empty and text_empty
 
 
 @dataclass(frozen=True)
@@ -148,9 +155,11 @@ def _make_sort_key(attr: str, descending: bool) -> Callable[[ScreeningRow], tupl
 
 
 def _apply_filters(rows: list[ScreeningRow], filters: ScreeningFilters) -> list[ScreeningRow]:
-    """숫자 필터 적용. NULL 값은 임계값이 켜진 컬럼에서 자동 제외."""
+    """숫자 필터 + 텍스트 검색 적용. NULL 값은 임계값이 켜진 컬럼에서 자동 제외."""
     if filters.is_empty:
         return rows
+
+    needle = (filters.q or "").strip().lower()
 
     def keep(r: ScreeningRow) -> bool:
         if filters.per_min is not None and (r.per is None or r.per < filters.per_min):
@@ -163,6 +172,8 @@ def _apply_filters(rows: list[ScreeningRow], filters: ScreeningFilters) -> list[
             return False
         if filters.dividend_yield_min is not None and (
                 r.dividend_yield is None or r.dividend_yield < filters.dividend_yield_min):
+            return False
+        if needle and needle not in r.ticker.lower() and needle not in r.name.lower():
             return False
         return True
 

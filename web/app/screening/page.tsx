@@ -76,6 +76,7 @@ export default function ScreeningPage() {
   const [sortBy, setSortBy] = useState<ScreeningSortBy>("total_score");
   const [order, setOrder] = useState<ScreeningSortOrder>("desc");
 
+  const [q, setQ] = useState("");
   const [perMin, setPerMin] = useState("");
   const [perMax, setPerMax] = useState("");
   const [pbrMin, setPbrMin] = useState("");
@@ -84,13 +85,14 @@ export default function ScreeningPage() {
 
   const rawFilters = useMemo<ScreeningFilters>(
     () => ({
+      q: q.trim() || undefined,
       per_min: toNumOrUndef(perMin),
       per_max: toNumOrUndef(perMax),
       pbr_min: toNumOrUndef(pbrMin),
       pbr_max: toNumOrUndef(pbrMax),
       dividend_yield_min: toNumOrUndef(divMin),
     }),
-    [perMin, perMax, pbrMin, pbrMax, divMin],
+    [q, perMin, perMax, pbrMin, pbrMax, divMin],
   );
   const filters = useDebounce(rawFilters, 300);
 
@@ -105,6 +107,7 @@ export default function ScreeningPage() {
   }
 
   function resetFilters() {
+    setQ("");
     setPerMin("");
     setPerMax("");
     setPbrMin("");
@@ -114,7 +117,7 @@ export default function ScreeningPage() {
   }
 
   const hasActiveFilter =
-    perMin !== "" || perMax !== "" || pbrMin !== "" || pbrMax !== "" || divMin !== "";
+    q !== "" || perMin !== "" || perMax !== "" || pbrMin !== "" || pbrMax !== "" || divMin !== "";
 
   const total = data?.total ?? 0;
   const hasPrev = offset > 0;
@@ -169,6 +172,13 @@ export default function ScreeningPage() {
 
       <section className="rounded-lg border border-border">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-border bg-muted/20 px-3 py-2">
+          <Input
+            type="search"
+            value={q}
+            onChange={(e) => makeFilterSetter(setQ)(e.target.value)}
+            placeholder="종목명·코드 검색"
+            className="h-8 w-44"
+          />
           <FilterRange
             label="PER"
             min={perMin}
