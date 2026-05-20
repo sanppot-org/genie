@@ -110,6 +110,24 @@ class ScreeningRow:
 
 
 @dataclass(frozen=True)
+class ScreeningFilters:
+    """숫자 컬럼 임계값 필터. None은 비활성. NULL 값을 가진 종목은 해당 필터가 켜지면 제외."""
+
+    per_min: float | None = None
+    per_max: float | None = None
+    pbr_min: float | None = None
+    pbr_max: float | None = None
+    dividend_yield_min: float | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        return all(
+            getattr(self, name) is None
+            for name in ("per_min", "per_max", "pbr_min", "pbr_max", "dividend_yield_min")
+        )
+
+
+@dataclass(frozen=True)
 class ScreeningResult:
     target_date: date | None
     total: int
@@ -127,6 +145,28 @@ def _make_sort_key(attr: str, descending: bool) -> Callable[[ScreeningRow], tupl
         primary = float(-v if descending else v)  # bool 도 -True=-1, -False=0 으로 정상 동작
         return (0, primary)
     return key
+
+
+def _apply_filters(rows: list[ScreeningRow], filters: ScreeningFilters) -> list[ScreeningRow]:
+    """숫자 필터 적용. NULL 값은 임계값이 켜진 컬럼에서 자동 제외."""
+    if filters.is_empty:
+        return rows
+
+    def keep(r: ScreeningRow) -> bool:
+        if filters.per_min is not None and (r.per is None or r.per < filters.per_min):
+            return False
+        if filters.per_max is not None and (r.per is None or r.per > filters.per_max):
+            return False
+        if filters.pbr_min is not None and (r.pbr is None or r.pbr < filters.pbr_min):
+            return False
+        if filters.pbr_max is not None and (r.pbr is None or r.pbr > filters.pbr_max):
+            return False
+        if filters.dividend_yield_min is not None and (
+                r.dividend_yield is None or r.dividend_yield < filters.dividend_yield_min):
+            return False
+        return True
+
+    return [r for r in rows if keep(r)]
 
 
 def _apply_sort(rows: list[ScreeningRow], sort_by: ScreeningSortBy, order: ScreeningSortOrder) -> None:
@@ -161,6 +201,7 @@ class ScreeningService:
             today: date | None = None,
             sort_by: ScreeningSortBy = "total_score",
             order: ScreeningSortOrder = "desc",
+            filters: ScreeningFilters | None = None,
     ) -> ScreeningResult:
         """전체 KR_STOCK을 점수 합산해 sort_by/order 기준으로 정렬.
 
@@ -218,6 +259,8 @@ class ScreeningService:
                 total_score=total,
             ))
 
+        if filters is not None:
+            rows = _apply_filters(rows, filters)
         _apply_sort(rows, sort_by, order)
         sliced = rows[offset:offset + limit]
         return ScreeningResult(

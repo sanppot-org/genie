@@ -1,15 +1,28 @@
 "use client";
 
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ScreeningRow, ScreeningSortBy, ScreeningSortOrder } from "@/lib/types";
+import type {
+  ScreeningFilters,
+  ScreeningRow,
+  ScreeningSortBy,
+  ScreeningSortOrder,
+} from "@/lib/types";
+import { useDebounce } from "@/lib/use-debounce";
 import { useScreening } from "@/lib/use-screening";
 import { formatNumber, formatPercent } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
+
+function toNumOrUndef(s: string): number | undefined {
+  const t = s.trim();
+  if (!t) return undefined;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+}
 
 function scoreCell(primary: string, score: number) {
   return (
@@ -63,8 +76,45 @@ export default function ScreeningPage() {
   const [sortBy, setSortBy] = useState<ScreeningSortBy>("total_score");
   const [order, setOrder] = useState<ScreeningSortOrder>("desc");
 
-  const query = useScreening(date || undefined, PAGE_SIZE, offset, sortBy, order);
+  const [perMin, setPerMin] = useState("");
+  const [perMax, setPerMax] = useState("");
+  const [pbrMin, setPbrMin] = useState("");
+  const [pbrMax, setPbrMax] = useState("");
+  const [divMin, setDivMin] = useState("");
+
+  const rawFilters = useMemo<ScreeningFilters>(
+    () => ({
+      per_min: toNumOrUndef(perMin),
+      per_max: toNumOrUndef(perMax),
+      pbr_min: toNumOrUndef(pbrMin),
+      pbr_max: toNumOrUndef(pbrMax),
+      dividend_yield_min: toNumOrUndef(divMin),
+    }),
+    [perMin, perMax, pbrMin, pbrMax, divMin],
+  );
+  const filters = useDebounce(rawFilters, 300);
+
+  const query = useScreening(date || undefined, PAGE_SIZE, offset, sortBy, order, filters);
   const data = query.data;
+
+  function makeFilterSetter(setter: (v: string) => void): (v: string) => void {
+    return (v) => {
+      setter(v);
+      setOffset(0);
+    };
+  }
+
+  function resetFilters() {
+    setPerMin("");
+    setPerMax("");
+    setPbrMin("");
+    setPbrMax("");
+    setDivMin("");
+    setOffset(0);
+  }
+
+  const hasActiveFilter =
+    perMin !== "" || perMax !== "" || pbrMin !== "" || pbrMax !== "" || divMin !== "";
 
   const total = data?.total ?? 0;
   const hasPrev = offset > 0;
@@ -118,6 +168,33 @@ export default function ScreeningPage() {
       </div>
 
       <section className="rounded-lg border border-border">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-border bg-muted/20 px-3 py-2">
+          <FilterRange
+            label="PER"
+            min={perMin}
+            max={perMax}
+            onMinChange={makeFilterSetter(setPerMin)}
+            onMaxChange={makeFilterSetter(setPerMax)}
+          />
+          <FilterRange
+            label="PBR"
+            min={pbrMin}
+            max={pbrMax}
+            onMinChange={makeFilterSetter(setPbrMin)}
+            onMaxChange={makeFilterSetter(setPbrMax)}
+          />
+          <FilterSingle
+            label="배당% ≥"
+            value={divMin}
+            onChange={makeFilterSetter(setDivMin)}
+            placeholder="0"
+          />
+          {hasActiveFilter && (
+            <Button size="sm" variant="ghost" onClick={resetFilters} className="ml-auto">
+              필터 초기화
+            </Button>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -229,6 +306,75 @@ export default function ScreeningPage() {
         </div>
       </footer>
     </main>
+  );
+}
+
+function FilterRange({
+  label,
+  min,
+  max,
+  onMinChange,
+  onMaxChange,
+}: {
+  label: string;
+  min: string;
+  max: string;
+  onMinChange: (v: string) => void;
+  onMaxChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <Input
+        type="number"
+        min="0"
+        step="any"
+        inputMode="decimal"
+        value={min}
+        onChange={(e) => onMinChange(e.target.value)}
+        placeholder="min"
+        className="h-8 w-20"
+      />
+      <span className="text-muted-foreground">–</span>
+      <Input
+        type="number"
+        min="0"
+        step="any"
+        inputMode="decimal"
+        value={max}
+        onChange={(e) => onMaxChange(e.target.value)}
+        placeholder="max"
+        className="h-8 w-20"
+      />
+    </div>
+  );
+}
+
+function FilterSingle({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className="text-muted-foreground">{label}</span>
+      <Input
+        type="number"
+        min="0"
+        step="any"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-8 w-20"
+      />
+    </div>
   );
 }
 

@@ -79,3 +79,11 @@ export type ScreeningSortBy =
   | "ticker";
 
 export type ScreeningSortOrder = "asc" | "desc";
+
+export interface ScreeningFilters {
+  per_min?: number;
+  per_max?: number;
+  pbr_min?: number;
+  pbr_max?: number;
+  dividend_yield_min?: number;
+}

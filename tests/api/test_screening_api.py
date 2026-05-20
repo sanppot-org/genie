@@ -10,6 +10,7 @@ import pytest
 from app import app, container
 from src.service.screening_service import (
     ScoreBreakdown,
+    ScreeningFilters,
     ScreeningResult,
     ScreeningRow,
     ScreeningService,
@@ -68,6 +69,7 @@ class TestScreeningAPI:
         mock_screening_service.score_kr_stocks.assert_called_once_with(
             target_date=None, limit=50, offset=0,
             sort_by="total_score", order="desc",
+            filters=ScreeningFilters(),
         )
 
     def test_query_params_propagate(
@@ -87,7 +89,37 @@ class TestScreeningAPI:
         mock_screening_service.score_kr_stocks.assert_called_once_with(
             target_date=date(2026, 4, 30), limit=10, offset=20,
             sort_by="per", order="asc",
+            filters=ScreeningFilters(),
         )
+
+    def test_filter_query_params_propagate(
+            self, client: TestClient, mock_screening_service: MagicMock,
+    ) -> None:
+        """필터 Query가 ScreeningFilters로 묶여 service에 전달."""
+        mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
+            target_date=date(2026, 5, 15), total=0, limit=50, offset=0, rows=[],
+        )
+
+        response = client.get(
+            "/api/screening/kr-stock"
+            "?per_min=2&per_max=5&pbr_min=0.3&pbr_max=1.0&dividend_yield_min=4",
+        )
+
+        assert response.status_code == 200
+        mock_screening_service.score_kr_stocks.assert_called_once_with(
+            target_date=None, limit=50, offset=0,
+            sort_by="total_score", order="desc",
+            filters=ScreeningFilters(
+                per_min=2.0, per_max=5.0,
+                pbr_min=0.3, pbr_max=1.0,
+                dividend_yield_min=4.0,
+            ),
+        )
+
+    def test_negative_filter_422(self, client: TestClient) -> None:
+        """음수 필터는 ge=0 위반 → 422."""
+        response = client.get("/api/screening/kr-stock?per_min=-1")
+        assert response.status_code == 422
 
     def test_invalid_sort_by_422(self, client: TestClient) -> None:
         """sort_by가 enum 밖이면 422."""

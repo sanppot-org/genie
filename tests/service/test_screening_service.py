@@ -13,6 +13,7 @@ from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.dividend_service import DividendService
 from src.service.screening_service import (
+    ScreeningFilters,
     ScreeningService,
     score_consecutive_increase,
     score_dividend_yield,
@@ -248,6 +249,94 @@ class TestScoreKrStocksSorting:
             sort_by="total_score", order="desc",
         )
         assert [r.ticker for r in default_result.rows] == [r.ticker for r in explicit_result.rows]
+
+
+class TestScoreKrStocksFiltering:
+    """ScreeningFilters 동작 — 픽스처(A:per=4/pbr=0.25/div=8, B:12/1.5/2, C:null/0.5/null, D:전무) 활용."""
+
+    def test_filter_per_max_excludes_higher_and_null(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """per_max=5 → A(4.0)만 통과. B(12.0)·C(null)·D(null) 모두 제외."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(per_max=5.0),
+        )
+        assert result.total == 1
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_filter_per_min_excludes_lower_and_null(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """per_min=10 → B(12.0)만 통과. A(4.0)·C(null)·D(null) 제외."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(per_min=10.0),
+        )
+        assert [r.ticker for r in result.rows] == ["B00002"]
+
+    def test_filter_pbr_range(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """pbr 0.4~0.6 → C(0.5)만. A(0.25)·B(1.5)·D(null) 제외."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(pbr_min=0.4, pbr_max=0.6),
+        )
+        assert [r.ticker for r in result.rows] == ["C00003"]
+
+    def test_filter_dividend_yield_min_excludes_low_and_null(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """dividend_yield_min=3.0 → A(8.0)만. B(2.0)·C(null)·D(null) 제외."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(dividend_yield_min=3.0),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_filter_combination_intersects(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """여러 필터는 AND. per_max=10 + pbr_max=0.3 → A만."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(per_max=10.0, pbr_max=0.3),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_filter_yields_empty_when_no_match(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """모든 종목이 컷되면 total=0, rows=[]."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(per_max=0.5),
+        )
+        assert result.total == 0
+        assert result.rows == []
+
+    def test_filter_none_is_unchanged(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """filters=None 시 기본 동작과 동일 (4개 전체)."""
+        no_filter = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        empty_filter = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), filters=ScreeningFilters(),
+        )
+        assert no_filter.total == empty_filter.total == 4
+
+    def test_filter_total_reflects_post_filter_count(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """페이지네이션 total은 필터 후 결과 길이를 반영."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(per_max=10.0),
+            limit=10, offset=0,
+        )
+        assert result.total == 1
+        assert len(result.rows) == 1
 
 
 class TestScoreKrStocksEmptyDb:
