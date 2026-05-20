@@ -283,6 +283,40 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     );
   }, [perPoints]);
 
+  // Effect H: 우측 가격축 영역 휠 → 가격 범위 직접 zoom (v5 API).
+  // IPriceScaleApi.setVisibleRange + setAutoScale로 진짜 가격 범위를 좁히거나 넓힌다.
+  // 가격축 외 영역은 라이브러리 기본(시간축 zoom) 그대로.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = candleRef.current;
+    if (!chart || !series) return;
+
+    const container = chart.chartElement();
+    const onWheel = (e: WheelEvent) => {
+      const priceScale = series.priceScale();
+      const rect = container.getBoundingClientRect();
+      const axisLeft = rect.right - priceScale.width();
+      if (e.clientX < axisLeft) return; // 차트 본문 → 시간축 zoom 그대로
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const r = priceScale.getVisibleRange();
+      if (!r) return;
+      priceScale.setAutoScale(false);
+      const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const k = Math.exp(px * 0.002); // <1: zoom in / >1: zoom out
+      const mid = (r.from + r.to) / 2;
+      priceScale.setVisibleRange({
+        from: mid - (mid - r.from) * k,
+        to: mid + (r.to - mid) * k,
+      });
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    return () => container.removeEventListener("wheel", onWheel, { capture: true });
+  }, []);
+
   // Effect D: 이평선 표시여부. 시리즈 1회 생성 후 visible만 토글.
   useEffect(() => {
     MA.forEach((n, k) => maRefs.current[k]?.applyOptions({ visible: maOn[n] }));
