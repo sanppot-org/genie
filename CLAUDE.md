@@ -78,3 +78,4 @@ pnpm --dir web lint                          # ESLint
 - 커밋은 임의로 하지 말고 사용자의 허락을 구한다.
 - **DB 쓰기 명령(특히 `alembic upgrade/downgrade`, `psql` 변경 쿼리) 실행 전에는 반드시 호스트를 먼저 확인하고 사용자 승인을 받는다.** `.env.dev`/`.env.prod`가 prod IP(`140.245.67.107` 등)를 가리킬 수 있어, 무심코 prod DB에 마이그레이션이 적용될 수 있다. 점검 순서: ① `uv run python -c "from src.config import DatabaseConfig; print(DatabaseConfig().database_url)"` 로 대상 확인 → ② 사용자에게 대상 명시하며 승인 요청 → ③ 실행. 로컬 docker 대상이면 `ENV_PROFILE=local` 또는 `POSTGRES_HOST=localhost`로 명시.
 - 외부 API(KIS, PYKRX 등) 연동 시 API 요청과 응답에 대한 명세를 충분히 숙지하고 작업한다. 명세가 불충분한 경우 임의로 작업하지 말고 사용자에게 요청한다.
+- **외부 라이브러리·API 문제로 2번 이상 실패하면 즉시 리서치한다.** 더 시도하지 말고 (a) 라이브러리 dist/typings.d.ts에서 정확한 API 확인, (b) `context7` MCP로 공식 문서 조회, (c) GitHub issues 검색. 추측 기반 시도를 누적하지 않는다.
