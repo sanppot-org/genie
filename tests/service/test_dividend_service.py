@@ -29,8 +29,8 @@ def repo(session: Session) -> StockDividendRepository:
 
 
 @pytest.fixture
-def service(repo: StockDividendRepository) -> DividendService:
-    return DividendService(repo)
+def service(repo: StockDividendRepository, session: Session) -> DividendService:
+    return DividendService(repo, TickerRepository(session))
 
 
 def _row(ticker_id: int, record_date: date, dps: float, kind: str = "SETTLE") -> StockDividend:
@@ -228,3 +228,46 @@ class TestBulkMethods:
     def test_bulk_methods_handle_empty_input(self, service: DividendService) -> None:
         assert service.is_quarterly_dividend_bulk([]) == {}
         assert service.consecutive_dividend_increase_years_bulk([]) == {}
+
+
+class TestGetHistory:
+    """배당 지급 이력 조회 — 차트 표시용."""
+
+    def test_returns_ticker_and_rows_sorted_by_record_date(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        repo.bulk_upsert([
+            _row(ticker_id, date(2024, 6, 30), 361, kind="INTERIM"),
+            _row(ticker_id, date(2024, 12, 27), 361, kind="SETTLE"),
+            _row(ticker_id, date(2024, 3, 31), 361, kind="INTERIM"),
+        ])
+
+        ticker, rows = service.get_history("005930")
+
+        assert ticker.ticker == "005930"
+        assert ticker.name == "삼성전자"
+        assert [r.record_date for r in rows] == [date(2024, 3, 31), date(2024, 6, 30), date(2024, 12, 27)]
+        assert [r.kind for r in rows] == ["INTERIM", "INTERIM", "SETTLE"]
+
+    def test_applies_date_filter(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        repo.bulk_upsert([
+            _row(ticker_id, date(2022, 12, 27), 1000),
+            _row(ticker_id, date(2023, 12, 27), 1100),
+            _row(ticker_id, date(2024, 12, 27), 1200),
+        ])
+        _, rows = service.get_history("005930", from_date=date(2023, 1, 1), to_date=date(2023, 12, 31))
+        assert [r.dps for r in rows] == [1100]
+
+    def test_no_rows_returns_empty_list(
+            self, service: DividendService, ticker_id: int,  # ticker만 만들고 배당은 없음
+    ) -> None:
+        _, rows = service.get_history("005930")
+        assert rows == []
+
+    def test_unknown_ticker_raises_not_found(self, service: DividendService) -> None:
+        from src.service.exceptions import ExceptionCode, GenieError
+        with pytest.raises(GenieError) as exc_info:
+            service.get_history("999999")
+        assert exc_info.value.code == ExceptionCode.NOT_FOUND

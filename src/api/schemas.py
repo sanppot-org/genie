@@ -84,6 +84,25 @@ class FundamentalSeriesResponse(BaseModel):
     points: list[FundamentalPoint]
 
 
+class DividendPoint(BaseModel):
+    """배당 지급 1건."""
+
+    record_date: date
+    kind: str  # "SETTLE" | "INTERIM"
+    dps: float
+    fiscal_year: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DividendSeriesResponse(BaseModel):
+    """ticker별 배당 지급 이력."""
+
+    ticker: str
+    name: str
+    points: list[DividendPoint]
+
+
 class GenieResponse[T](BaseModel):
     """공통 API 응답 모델"""
 

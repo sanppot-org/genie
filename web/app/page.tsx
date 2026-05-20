@@ -6,7 +6,13 @@ import { useDeferredValue, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { apiGet } from "@/lib/api";
-import type { CandleSeries, FundamentalSeries, GenieResponse, Ticker } from "@/lib/types";
+import type {
+  CandleSeries,
+  DividendSeries,
+  FundamentalSeries,
+  GenieResponse,
+  Ticker,
+} from "@/lib/types";
 import { useRecentTickers } from "@/lib/use-recent-tickers";
 
 const CandleChart = dynamic(
@@ -15,6 +21,11 @@ const CandleChart = dynamic(
     ssr: false,
     loading: () => <p className="text-sm text-muted-foreground">차트 로딩 중...</p>,
   },
+);
+
+const DividendChart = dynamic(
+  () => import("@/components/dividend-chart").then((m) => m.DividendChart),
+  { ssr: false, loading: () => null },
 );
 
 // 차트 좌측 팬 시 단계적으로 넓히는 lookback(년). 마지막 단계 이후는 ALL(from/to 생략).
@@ -72,6 +83,18 @@ export default function Home() {
     queryKey: ["candles", selected?.ticker, stepIdx],
     queryFn: () =>
       apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
+        ticker: selected!.ticker,
+        from,
+        to,
+      }).then((r) => r.data),
+    enabled: Boolean(selected),
+    placeholderData: keepPreviousData,
+  });
+
+  const dividends = useQuery({
+    queryKey: ["dividends", selected?.ticker, stepIdx],
+    queryFn: () =>
+      apiGet<GenieResponse<DividendSeries>>("/api/dividends", {
         ticker: selected!.ticker,
         from,
         to,
@@ -199,6 +222,23 @@ export default function Home() {
               hasMore={stepIdx < STEPS.length}
               onNeedMore={() => setStepIdx((i) => Math.min(i + 1, STEPS.length))}
             />
+          )}
+          {dividends.data && dividends.data.ticker === selected.ticker && (
+            <section className="space-y-2 pt-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <h3 className="font-medium">배당 내역</h3>
+                <span className="text-xs text-muted-foreground">
+                  <span style={{ color: "#f59e0b" }}>●</span> 결산
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  <span style={{ color: "#14b8a6" }}>●</span> 분기
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  <span style={{ color: "#6366f1" }}>●</span> 중간/반기
+                </span>
+              </div>
+              <DividendChart points={dividends.data.points} />
+            </section>
           )}
         </section>
       )}

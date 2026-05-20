@@ -39,6 +39,21 @@ export interface CandleSeries {
   points: CandlePoint[];
 }
 
+export type DividendKind = "SETTLE" | "INTERIM" | "QUARTERLY";
+
+export interface DividendPoint {
+  record_date: string;
+  kind: DividendKind;
+  dps: number;
+  fiscal_year: number;
+}
+
+export interface DividendSeries {
+  ticker: string;
+  name: string;
+  points: DividendPoint[];
+}
+
 export type GenieResponse<T> = { data: T };
 
 export interface ScreeningScoreBreakdown {

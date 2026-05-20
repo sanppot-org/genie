@@ -81,6 +81,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.routes.ticker",  # ticker 라우터 추가
             "src.api.routes.candle",  # candle 라우터 추가
             "src.api.routes.fundamental",  # fundamental 라우터 추가
+            "src.api.routes.dividend",  # dividend 라우터 추가
             "src.api.routes.screening",  # screening 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
@@ -244,6 +245,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     dividend_service = providers.Factory(
         DividendService,
         dividend_repository=stock_dividend_repository,
+        ticker_repository=ticker_repository,
     )
     treasury_stock_sync_service = providers.Factory(
         TreasuryStockSyncService,

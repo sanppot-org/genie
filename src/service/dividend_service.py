@@ -3,8 +3,10 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
-from src.database.models import StockDividend
+from src.database.models import StockDividend, Ticker
 from src.database.stock_dividend_repository import StockDividendRepository
+from src.database.ticker_repository import TickerRepository
+from src.service.exceptions import GenieError
 
 _QUARTERLY_LABEL = "QUARTERLY"
 
@@ -14,10 +16,29 @@ class DividendService:
 
     - 분기 배당 실시 여부 (점수표 5점)
     - 배당 연속 인상 연수 (점수표 5점)
+    - 배당 지급 이력 조회 (차트 표시용)
     """
 
-    def __init__(self, dividend_repository: StockDividendRepository) -> None:
+    def __init__(
+            self,
+            dividend_repository: StockDividendRepository,
+            ticker_repository: TickerRepository,
+    ) -> None:
         self._repo = dividend_repository
+        self._tickers = ticker_repository
+
+    def get_history(
+            self,
+            ticker_code: str,
+            from_date: date | None = None,
+            to_date: date | None = None,
+    ) -> tuple[Ticker, list[StockDividend]]:
+        """ticker 코드로 종목 + 일자 범위 배당 이력 반환. 종목 미발견 시 404."""
+        ticker = self._tickers.find_by_ticker(ticker_code)
+        if ticker is None:
+            raise GenieError.not_found(0)
+        rows = self._repo.find_by_ticker(ticker.id, from_date, to_date)
+        return ticker, rows
 
     def is_quarterly_dividend(self, ticker_id: int, today: date | None = None) -> bool:
         """최근 1년 내 `kind == 'QUARTERLY'` row가 1건 이상이면 분기배당."""
