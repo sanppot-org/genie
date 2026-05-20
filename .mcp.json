@@ -9,6 +9,9 @@
         "server.py",
         "--stdio"
       ]
+    },
+    "genie-prod-pg": {
+      "command": "/Users/sandeulpark/personal/genie/scripts/mcp-prod-pg.sh"
     }
   }
 }

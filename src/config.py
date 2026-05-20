@@ -152,8 +152,8 @@ class LogtailConfig(BaseSettings):
     """Better Stack (Logtail) 로깅 설정
 
     `.env.{ENV_PROFILE}`도 함께 로드해 환경별로 활성/비활성을 분리한다.
-    예: `.env.dev`에만 LOGTAIL_SOURCE_TOKEN을 두면 운영(기본 프로파일 dev)에서만 동작,
-    로컬(.env.local/.env.dev-local)엔 토큰이 없어 자동 비활성화된다.
+    예: `.env.prod`에만 LOGTAIL_SOURCE_TOKEN을 두면 운영(기본 프로파일 dev)에서만 동작,
+    로컬(.env.local/.env.prod-local)엔 토큰이 없어 자동 비활성화된다.
     """
 
     model_config = SettingsConfigDict(
