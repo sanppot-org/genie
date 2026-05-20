@@ -43,17 +43,19 @@ class DividendService:
         flagged = {r.ticker_id for r in rows if r.kind == _QUARTERLY_LABEL}
         return {tid: tid in flagged for tid in ticker_ids}
 
-    def consecutive_dividend_increase_years(self, ticker_id: int) -> int:
+    def consecutive_dividend_increase_years(
+            self, ticker_id: int, today: date | None = None,
+    ) -> int:
         """최근 회계연도부터 거꾸로 본 배당 연속 인상 연수.
 
         점수표 정의: 동결 시 연속은 인정되나 인상으로는 인정되지 않는다.
         구현: 감소가 나오는 순간 break. 인상이면 +1, 동결이면 그대로(연속 유지).
         """
         rows = self._repo.find_by_ticker(ticker_id)
-        return self._calc_streak(rows)
+        return self._calc_streak(rows, today)
 
     def consecutive_dividend_increase_years_bulk(
-            self, ticker_ids: list[int],
+            self, ticker_ids: list[int], today: date | None = None,
     ) -> dict[int, int]:
         """다건 ticker에 대해 연속 인상 연수 일괄 산출. 쿼리 1회.
 
@@ -65,14 +67,25 @@ class DividendService:
         grouped: dict[int, list[StockDividend]] = defaultdict(list)
         for r in rows:
             grouped[r.ticker_id].append(r)
-        return {tid: self._calc_streak(grouped.get(tid, [])) for tid in ticker_ids}
+        return {tid: self._calc_streak(grouped.get(tid, []), today) for tid in ticker_ids}
 
     @staticmethod
-    def _calc_streak(rows: list[StockDividend]) -> int:
+    def _calc_streak(rows: list[StockDividend], today: date | None = None) -> int:
+        """진행 중인 회계연도 row는 부분합이라 비교에서 제외한다.
+
+        한국 12월 결산 + 3월 정기 주총 + 4월 배당 공시 관행 기준 cutoff:
+        - 5월 이후: 작년까지는 완료 → cutoff = year - 1
+        - 4월 이전: 작년치도 아직 미마감 → cutoff = year - 2
+        """
         if not rows:
             return 0
+        today = today or date.today()
+        cutoff_year = today.year - 1 if today.month >= 5 else today.year - 2
+
         year_to_dps: dict[int, float] = defaultdict(float)
         for r in rows:
+            if r.fiscal_year > cutoff_year:
+                continue
             year_to_dps[r.fiscal_year] += r.dps
         years_desc = sorted(year_to_dps.keys(), reverse=True)
         streak = 0

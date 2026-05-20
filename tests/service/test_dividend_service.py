@@ -125,6 +125,52 @@ class TestConsecutiveDividendIncreaseYears:
     ) -> None:
         assert service.consecutive_dividend_increase_years(ticker_id) == 0
 
+    def test_in_progress_fiscal_year_excluded_after_april(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        """5월 이후: 진행 중인 올해(2026) fiscal_year row가 있어도 streak 계산에서 제외.
+
+        2026년 1분기 배당(부분합)이 2025년 연간보다 작아서 'break' 시키지 않도록 함.
+        """
+        repo.bulk_upsert([
+            _row(ticker_id, date(2023, 12, 27), 1000),
+            _row(ticker_id, date(2024, 12, 27), 1200),
+            _row(ticker_id, date(2025, 12, 27), 1444),
+            _row(ticker_id, date(2026, 3, 31), 361, kind="QUARTERLY"),  # 진행 중 부분합
+        ])
+        # cutoff=2025 → 2025↑2024↑2023 → streak = 2 (2026은 무시)
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2026, 5, 20),
+        ) == 2
+
+    def test_in_progress_fiscal_year_excluded_before_may(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        """4월 이전: 작년치도 아직 미마감이므로 재작년까지만 비교."""
+        repo.bulk_upsert([
+            _row(ticker_id, date(2023, 12, 27), 1000),
+            _row(ticker_id, date(2024, 12, 27), 1200),
+            _row(ticker_id, date(2025, 12, 27), 800),   # 미완 (감소처럼 보이지만 제외돼야)
+            _row(ticker_id, date(2026, 3, 31), 100, kind="QUARTERLY"),  # 미완
+        ])
+        # 2026-03-20 → cutoff=2024 → 2024↑2023만 비교 → streak = 1
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2026, 3, 20),
+        ) == 1
+
+    def test_bulk_respects_today_param(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        repo.bulk_upsert([
+            _row(ticker_id, date(2024, 12, 27), 1000),
+            _row(ticker_id, date(2025, 12, 27), 1100),
+            _row(ticker_id, date(2026, 3, 31), 200, kind="QUARTERLY"),  # 진행 중
+        ])
+        result = service.consecutive_dividend_increase_years_bulk(
+            [ticker_id], today=date(2026, 5, 20),
+        )
+        assert result == {ticker_id: 1}  # 2026 제외, 2025↑2024 = 1
+
 
 class TestBulkMethods:
     """다건 ticker 일괄 처리 — 단건 메서드와 동일한 결과를 쿼리 1회로."""

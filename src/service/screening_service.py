@@ -246,7 +246,9 @@ class ScreeningService:
         }
         ticker_ids = [t.id for t in tickers]
         quarterly_map = self._dividends.is_quarterly_dividend_bulk(ticker_ids, today=today)
-        streak_map = self._dividends.consecutive_dividend_increase_years_bulk(ticker_ids)
+        streak_map = self._dividends.consecutive_dividend_increase_years_bulk(
+            ticker_ids, today=today,
+        )
 
         rows: list[ScreeningRow] = []
         for t in tickers:
