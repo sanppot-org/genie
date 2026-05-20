@@ -414,6 +414,62 @@ class TestScoreKrStocksSearch:
         assert [r.ticker for r in result.rows] == ["A00001"]
 
 
+class TestScoreKrStocksQuarterlyAndStreak:
+    """quarterly_only / consecutive_years_min — A는 분기배당+장기 streak, 나머지는 모두 비분기 + streak=0."""
+
+    def test_quarterly_only_keeps_only_quarterly(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """quarterly_only=True → A만 통과(나머지는 분기배당 아님)."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            filters=ScreeningFilters(quarterly_only=True),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_quarterly_only_false_is_noop(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """quarterly_only=False(기본) → 전체 4개 그대로."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(quarterly_only=False),
+        )
+        assert result.total == 4
+
+    def test_consecutive_years_min_keeps_long_streak(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """consecutive_years_min=5 → A만(B/C/D는 streak=0)."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(consecutive_years_min=5),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+    def test_consecutive_years_min_zero_is_noop(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """consecutive_years_min=0 → 모두 0 이상이라 전체 4개."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15),
+            filters=ScreeningFilters(consecutive_years_min=0),
+        )
+        assert result.total == 4
+
+    def test_combination_with_numeric_filters(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """quarterly_only + consecutive_years_min=3 + per_max=10 → A만."""
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            filters=ScreeningFilters(
+                quarterly_only=True, consecutive_years_min=3, per_max=10.0,
+            ),
+        )
+        assert [r.ticker for r in result.rows] == ["A00001"]
+
+
 class TestScoreKrStocksEmptyDb:
     def test_returns_empty_result_when_no_fundamentals(
             self, session: Session,

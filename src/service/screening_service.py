@@ -122,16 +122,21 @@ class ScreeningFilters:
     pbr_min: float | None = None
     pbr_max: float | None = None
     dividend_yield_min: float | None = None
+    quarterly_only: bool = False
+    consecutive_years_min: int | None = None
     q: str | None = None
 
     @property
     def is_empty(self) -> bool:
         numeric_empty = all(
             getattr(self, name) is None
-            for name in ("per_min", "per_max", "pbr_min", "pbr_max", "dividend_yield_min")
+            for name in (
+                "per_min", "per_max", "pbr_min", "pbr_max",
+                "dividend_yield_min", "consecutive_years_min",
+            )
         )
         text_empty = not (self.q and self.q.strip())
-        return numeric_empty and text_empty
+        return numeric_empty and not self.quarterly_only and text_empty
 
 
 @dataclass(frozen=True)
@@ -172,6 +177,11 @@ def _apply_filters(rows: list[ScreeningRow], filters: ScreeningFilters) -> list[
             return False
         if filters.dividend_yield_min is not None and (
                 r.dividend_yield is None or r.dividend_yield < filters.dividend_yield_min):
+            return False
+        if filters.quarterly_only and not r.quarterly_dividend:
+            return False
+        if filters.consecutive_years_min is not None and (
+                r.consecutive_increase_years < filters.consecutive_years_min):
             return False
         if needle and needle not in r.ticker.lower() and needle not in r.name.lower():
             return False

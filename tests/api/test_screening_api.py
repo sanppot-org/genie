@@ -138,6 +138,30 @@ class TestScreeningAPI:
             filters=ScreeningFilters(q="삼성"),
         )
 
+    def test_quarterly_and_consecutive_query_propagate(
+            self, client: TestClient, mock_screening_service: MagicMock,
+    ) -> None:
+        """quarterly_only / consecutive_years_min Query가 그대로 전달."""
+        mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
+            target_date=date(2026, 5, 15), total=0, limit=50, offset=0, rows=[],
+        )
+
+        response = client.get(
+            "/api/screening/kr-stock?quarterly_only=true&consecutive_years_min=5",
+        )
+
+        assert response.status_code == 200
+        mock_screening_service.score_kr_stocks.assert_called_once_with(
+            target_date=None, limit=50, offset=0,
+            sort_by="total_score", order="desc",
+            filters=ScreeningFilters(quarterly_only=True, consecutive_years_min=5),
+        )
+
+    def test_negative_consecutive_years_422(self, client: TestClient) -> None:
+        """음수 consecutive_years_min은 ge=0 위반 → 422."""
+        response = client.get("/api/screening/kr-stock?consecutive_years_min=-1")
+        assert response.status_code == 422
+
     def test_invalid_sort_by_422(self, client: TestClient) -> None:
         """sort_by가 enum 밖이면 422."""
         response = client.get("/api/screening/kr-stock?sort_by=foo")

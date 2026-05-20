@@ -82,6 +82,8 @@ export default function ScreeningPage() {
   const [pbrMin, setPbrMin] = useState("");
   const [pbrMax, setPbrMax] = useState("");
   const [divMin, setDivMin] = useState("");
+  const [consecutiveMin, setConsecutiveMin] = useState("");
+  const [quarterlyOnly, setQuarterlyOnly] = useState(false);
 
   const rawFilters = useMemo<ScreeningFilters>(
     () => ({
@@ -91,8 +93,10 @@ export default function ScreeningPage() {
       pbr_min: toNumOrUndef(pbrMin),
       pbr_max: toNumOrUndef(pbrMax),
       dividend_yield_min: toNumOrUndef(divMin),
+      consecutive_years_min: toNumOrUndef(consecutiveMin),
+      quarterly_only: quarterlyOnly || undefined,
     }),
-    [q, perMin, perMax, pbrMin, pbrMax, divMin],
+    [q, perMin, perMax, pbrMin, pbrMax, divMin, consecutiveMin, quarterlyOnly],
   );
   const filters = useDebounce(rawFilters, 300);
 
@@ -113,11 +117,14 @@ export default function ScreeningPage() {
     setPbrMin("");
     setPbrMax("");
     setDivMin("");
+    setConsecutiveMin("");
+    setQuarterlyOnly(false);
     setOffset(0);
   }
 
   const hasActiveFilter =
-    q !== "" || perMin !== "" || perMax !== "" || pbrMin !== "" || pbrMax !== "" || divMin !== "";
+    q !== "" || perMin !== "" || perMax !== "" || pbrMin !== "" || pbrMax !== ""
+    || divMin !== "" || consecutiveMin !== "" || quarterlyOnly;
 
   const total = data?.total ?? 0;
   const hasPrev = offset > 0;
@@ -199,6 +206,24 @@ export default function ScreeningPage() {
             onChange={makeFilterSetter(setDivMin)}
             placeholder="0"
           />
+          <FilterSingle
+            label="연속 ≥년"
+            value={consecutiveMin}
+            onChange={makeFilterSetter(setConsecutiveMin)}
+            placeholder="0"
+          />
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+            <input
+              type="checkbox"
+              checked={quarterlyOnly}
+              onChange={(e) => {
+                setQuarterlyOnly(e.target.checked);
+                setOffset(0);
+              }}
+              className="h-4 w-4 rounded border-input"
+            />
+            <span className="text-muted-foreground">분기배당만</span>
+          </label>
           {hasActiveFilter && (
             <Button size="sm" variant="ghost" onClick={resetFilters} className="ml-auto">
               필터 초기화

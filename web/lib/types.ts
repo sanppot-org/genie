@@ -86,5 +86,7 @@ export interface ScreeningFilters {
   pbr_min?: number;
   pbr_max?: number;
   dividend_yield_min?: number;
+  quarterly_only?: boolean;
+  consecutive_years_min?: number;
   q?: string;
 }

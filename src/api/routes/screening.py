@@ -39,6 +39,8 @@ def get_kr_stock_screening(
         pbr_min: float | None = Query(default=None, ge=0),
         pbr_max: float | None = Query(default=None, ge=0),
         dividend_yield_min: float | None = Query(default=None, ge=0),
+        quarterly_only: bool = Query(default=False),
+        consecutive_years_min: int | None = Query(default=None, ge=0),
         q: str | None = Query(default=None, max_length=50),
         service: ScreeningService = Depends(Provide[ApplicationContainer.screening_service]),
 ) -> GenieResponse[ScreeningResponse]:
@@ -54,6 +56,8 @@ def get_kr_stock_screening(
         per_min=per_min, per_max=per_max,
         pbr_min=pbr_min, pbr_max=pbr_max,
         dividend_yield_min=dividend_yield_min,
+        quarterly_only=quarterly_only,
+        consecutive_years_min=consecutive_years_min,
         q=q,
     )
     result = service.score_kr_stocks(
