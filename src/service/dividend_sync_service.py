@@ -25,15 +25,21 @@ _HANGUL_KIND_TO_LABEL: dict[str, str] = {
     "분기": "QUARTERLY",
 }
 
+# 동일 이벤트가 여러 라벨로 응답될 때 채택 우선순위.
+# KIS는 분기 배당을 "중간"·"분기" 두 라벨로 동시에 응답해 (record_date, dps)가 같은
+# 중복 row가 생긴다. 더 specific한 분류를 채택.
+KIND_PRIORITY: dict[str, int] = {"QUARTERLY": 3, "INTERIM": 2, "SETTLE": 1}
+
 
 @dataclass(frozen=True)
 class DividendSyncResult:
     """sync 결과 통계."""
 
-    received: int           # KIS 응답 row 수
-    upserted: int           # 실제 DB에 쓴 row 수
-    skipped_unmapped: int   # ticker가 KR_STOCK 마스터에 없음
-    skipped_invalid: int    # record_date/dps 파싱 실패
+    received: int             # KIS 응답 row 수
+    upserted: int             # 실제 DB에 쓴 row 수
+    skipped_unmapped: int     # ticker가 KR_STOCK 마스터에 없음
+    skipped_invalid: int      # record_date/dps 파싱 실패
+    collapsed_duplicates: int # 동일 (ticker_id, record_date, dps)에 라벨만 다른 중복 정규화 수
 
 
 class DividendSyncService:
@@ -80,17 +86,36 @@ class DividendSyncService:
                 continue
             entities.append(entity)
 
-        self._dividend_repo.bulk_upsert(entities)
+        deduped, collapsed = _dedup_by_event(entities)
+        self._dividend_repo.bulk_upsert(deduped)
         logger.info(
-            "배당 동기화 완료 from=%s to=%s received=%d upserted=%d skipped_unmapped=%d skipped_invalid=%d",
-            from_date, to_date, len(rows), len(entities), skipped_unmapped, skipped_invalid,
+            "배당 동기화 완료 from=%s to=%s received=%d upserted=%d skipped_unmapped=%d "
+            "skipped_invalid=%d collapsed_duplicates=%d",
+            from_date, to_date, len(rows), len(deduped),
+            skipped_unmapped, skipped_invalid, collapsed,
         )
         return DividendSyncResult(
             received=len(rows),
-            upserted=len(entities),
+            upserted=len(deduped),
             skipped_unmapped=skipped_unmapped,
             skipped_invalid=skipped_invalid,
+            collapsed_duplicates=collapsed,
         )
+
+
+def _dedup_by_event(entities: list[StockDividend]) -> tuple[list[StockDividend], int]:
+    """같은 (ticker_id, record_date, dps) 그룹은 KIND_PRIORITY 최상위 1건만 남긴다.
+
+    KIS가 분기 배당을 "중간"·"분기" 두 라벨로 동시에 응답해 라벨만 다른 중복 row가
+    생기는 케이스를 정규화. dps가 다르면 별도 이벤트로 간주해 모두 보존.
+    """
+    best: dict[tuple[int, date, float], StockDividend] = {}
+    for e in entities:
+        key = (e.ticker_id, e.record_date, e.dps)
+        cur = best.get(key)
+        if cur is None or KIND_PRIORITY.get(e.kind, 0) > KIND_PRIORITY.get(cur.kind, 0):
+            best[key] = e
+    return list(best.values()), len(entities) - len(best)
 
 
 def _build_entity(row: DividendOutput, ticker_id: int) -> StockDividend | None:

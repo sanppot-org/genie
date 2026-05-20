@@ -116,7 +116,7 @@
     [ ] 기간 조절
   [ ] 업종
 
-[ ] 배당 종류 중간 / 반기 / 분기 합치기
+[x] 배당 종류 중간 / 반기 / 분기 합치기 — sync 시 (ticker_id, record_date, dps) 그룹은 QUARTERLY>INTERIM>SETTLE 1건만 적재, 기존 데이터는 `scripts/cleanup_dividend_duplicates.py`로 정리
 
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.

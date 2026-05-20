@@ -68,6 +68,7 @@ class TestDividendSyncService:
         assert result.upserted == 3
         assert result.skipped_unmapped == 0
         assert result.skipped_invalid == 0
+        assert result.collapsed_duplicates == 0
 
         stored = StockDividendRepository(session).find_by_ticker(kr_stock_ticker.id)
         kind_by_date = {r.record_date: r.kind for r in stored}
@@ -76,6 +77,53 @@ class TestDividendSyncService:
             date(2024, 6, 30): "INTERIM",
             date(2024, 3, 31): "QUARTERLY",
         }
+
+    def test_sync_collapses_duplicate_kind_for_same_event(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """KIS가 동일 (record_date, dps)를 '중간'·'분기' 두 라벨로 응답하면 QUARTERLY만 남는다."""
+        rows = [
+            DividendOutput(
+                sht_cd="005930", record_date="20240331",
+                per_sto_divi_amt="361", divi_kind="중간",
+            ),
+            DividendOutput(
+                sht_cd="005930", record_date="20240331",
+                per_sto_divi_amt="361", divi_kind="분기",
+            ),
+        ]
+        service, _ = _make_service(session, rows)
+
+        result = service.sync(date(2024, 1, 1), date(2024, 12, 31))
+
+        assert result.received == 2
+        assert result.upserted == 1
+        assert result.collapsed_duplicates == 1
+
+        stored = StockDividendRepository(session).find_by_ticker(kr_stock_ticker.id)
+        assert len(stored) == 1
+        assert stored[0].kind == "QUARTERLY"
+
+    def test_sync_preserves_same_date_different_dps(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """같은 record_date라도 dps가 다르면 별도 이벤트로 모두 보존."""
+        rows = [
+            DividendOutput(
+                sht_cd="005930", record_date="20240331",
+                per_sto_divi_amt="361", divi_kind="분기",
+            ),
+            DividendOutput(
+                sht_cd="005930", record_date="20240331",
+                per_sto_divi_amt="100", divi_kind="중간",
+            ),
+        ]
+        service, _ = _make_service(session, rows)
+
+        result = service.sync(date(2024, 1, 1), date(2024, 12, 31))
+
+        assert result.upserted == 2
+        assert result.collapsed_duplicates == 0
 
     def test_sync_skips_unknown_divi_kind(
             self, session: Session, kr_stock_ticker: Ticker,
