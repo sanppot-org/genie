@@ -5,6 +5,12 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   ScreeningFilters,
   ScreeningRow,
@@ -52,6 +58,36 @@ function renderConsecutive(row: ScreeningRow) {
   return scoreCell(`${row.consecutive_increase_years}년`, row.scores.consecutive_increase_years);
 }
 
+type ScoreFormula = { title: string; rows: string[] };
+
+// 점수 공식 — 백엔드 SOT: src/service/screening_service.py 35–87
+const SCORE_FORMULAS: Record<string, ScoreFormula> = {
+  per: {
+    title: "PER (20점)",
+    rows: ["< 5 → 20점", "< 8 → 15점", "< 10 → 10점", "≥ 10 → 5점", "적자/결측 → 0점"],
+  },
+  pbr: {
+    title: "PBR (5점)",
+    rows: ["< 0.3 → 5점", "< 0.6 → 4점", "< 1.0 → 3점", "≥ 1.0 → 0점", "결측 → 0점"],
+  },
+  div: {
+    title: "배당수익률 (10점)",
+    rows: ["> 7% → 10점", "> 5% → 7점", "> 3% → 5점", "≤ 3% → 2점", "0/결측 → 0점"],
+  },
+  quarterly: {
+    title: "분기 배당 (5점)",
+    rows: ["분기배당 실시 → 5점", "미실시 → 0점"],
+  },
+  consecutive: {
+    title: "연속 인상 (5점)",
+    rows: ["≥ 10년 → 5점", "≥ 5년 → 4점", "≥ 3년 → 3점", "그 외 → 0점"],
+  },
+  total: {
+    title: "총점 (45점 만점)",
+    rows: ["PER + PBR + 배당% + 분기 + 연속 합산"],
+  },
+};
+
 type Column = {
   key: string;
   label: string;
@@ -69,6 +105,21 @@ const COLUMNS: readonly Column[] = [
   { key: "consecutive", label: "연속", align: "text-right", sortKey: "consecutive_years" },
   { key: "total", label: "총점", align: "text-right", sortKey: "total_score" },
 ];
+
+function FormulaTooltipBody({ formula }: { formula: ScoreFormula }) {
+  return (
+    <TooltipContent>
+      <div className="mb-1 font-semibold">{formula.title}</div>
+      <ul className="space-y-0.5">
+        {formula.rows.map((row) => (
+          <li key={row} className="tabular-nums">
+            {row}
+          </li>
+        ))}
+      </ul>
+    </TooltipContent>
+  );
+}
 
 export default function ScreeningPage() {
   const [date, setDate] = useState("");
@@ -232,34 +283,56 @@ export default function ScreeningPage() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/30">
-                {COLUMNS.map((c) => (
-                  <th
-                    key={c.key}
-                    className={`px-3 py-2 font-medium text-muted-foreground ${c.align}`}
-                  >
-                    {c.sortKey ? (
-                      <button
-                        type="button"
-                        onClick={() => handleHeaderClick(c.sortKey!)}
-                        className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            <TooltipProvider delay={200}>
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  {COLUMNS.map((c) => {
+                    const formula = SCORE_FORMULAS[c.key];
+                    const sortIcon =
+                      c.sortKey && sortBy === c.sortKey ? (
+                        order === "desc" ? (
+                          <ChevronDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronUp className="h-3 w-3" />
+                        )
+                      ) : null;
+                    return (
+                      <th
+                        key={c.key}
+                        className={`px-3 py-2 font-medium text-muted-foreground ${c.align}`}
                       >
-                        {c.label}
-                        {sortBy === c.sortKey &&
-                          (order === "desc" ? (
-                            <ChevronDown className="h-3 w-3" />
+                        {c.sortKey ? (
+                          formula ? (
+                            <Tooltip>
+                              <TooltipTrigger
+                                type="button"
+                                onClick={() => handleHeaderClick(c.sortKey!)}
+                                className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded cursor-help"
+                              >
+                                {c.label}
+                                {sortIcon}
+                              </TooltipTrigger>
+                              <FormulaTooltipBody formula={formula} />
+                            </Tooltip>
                           ) : (
-                            <ChevronUp className="h-3 w-3" />
-                          ))}
-                      </button>
-                    ) : (
-                      c.label
-                    )}
-                  </th>
-                ))}
-              </tr>
-            </thead>
+                            <button
+                              type="button"
+                              onClick={() => handleHeaderClick(c.sortKey!)}
+                              className="inline-flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                            >
+                              {c.label}
+                              {sortIcon}
+                            </button>
+                          )
+                        ) : (
+                          c.label
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+            </TooltipProvider>
             <tbody>
               {query.isLoading && !data && (
                 <SkeletonRows />
