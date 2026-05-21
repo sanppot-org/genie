@@ -148,6 +148,10 @@ class Ticker(Base, TimestampMixin):
         ticker: 티커 코드 (예: KRW-BTC, AAPL, 005930)
         asset_type: 자산 유형 (CRYPTO, STOCK, ETF)
         data_source: 데이터 소스 (UPBIT, BINANCE, HANTU)
+
+    업종/섹터 컬럼 (KR_STOCK만 채워짐, ETF/암호화폐는 NULL):
+        industry_code/_name: KSIC (한국표준산업분류)
+        sector_(large|mid|small)_code/_name: KIS 지수업종 3단 분류 (증권업계 표준)
     """
 
     __tablename__ = "tickers"
@@ -159,6 +163,13 @@ class Ticker(Base, TimestampMixin):
     data_source: Mapped[DataSource] = mapped_column(Enum(DataSource, native_enum=False), nullable=False, index=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true(), default=True)
     industry_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    industry_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    sector_large_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    sector_large_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sector_mid_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    sector_mid_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    sector_small_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    sector_small_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     def __repr__(self) -> str:
         """문자열 표현"""

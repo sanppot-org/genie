@@ -7,7 +7,7 @@ import requests
 
 from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model.domestic import balance, chart, dividend, order, psbl_order, stock_price
+from src.hantu.model.domestic import balance, chart, dividend, order, psbl_order, search_stock_info, stock_price
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.chart import ChartInterval, PriceType
 from src.hantu.model.domestic.dividend import DividendKind
@@ -118,6 +118,34 @@ class HantuDomesticAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return stock_price.ResponseBody.model_validate(res.json())
+
+    def search_stock_info(self, ticker: str) -> search_stock_info.ResponseBody:
+        """주식기본조회 — 종목코드로 업종/섹터 분류 등 메타데이터 조회.
+
+        Args:
+            ticker: 종목코드 (6자리, 예: '005930')
+
+        Returns:
+            search_stock_info.ResponseBody: KSIC + 지수업종 3단 분류 포함.
+        """
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/search-stock-info"
+
+        header = search_stock_info.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = search_stock_info.RequestQueryParam(
+            PRDT_TYPE_CD="300",
+            PDNO=ticker,
+        )
+
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+
+        self._validate_response(res)
+
+        return search_stock_info.ResponseBody.model_validate(res.json())
 
     def sell_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
         """시장가 매도 주문

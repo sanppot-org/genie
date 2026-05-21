@@ -30,6 +30,7 @@ from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
+from src.providers.kis_company_client import KisCompanyClient
 from src.providers.pykrx_daily_candle_client import PykrxDailyCandleClient
 from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
@@ -207,11 +208,12 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
     pykrx_ticker_client = providers.Singleton(PykrxTickerClient)
     dart_company_client = providers.Singleton(DartCompanyClient, opendart_config)
+    kis_company_client = providers.Singleton(KisCompanyClient, hantu_domestic_api)
     ticker_sync_service = providers.Factory(
         TickerSyncService,
         client=pykrx_ticker_client,
         repository=ticker_repository,
-        dart_client=dart_company_client,
+        kis_client=kis_company_client,
     )
     pykrx_fundamental_client = providers.Singleton(PykrxFundamentalClient)
     fundamental_sync_service = providers.Factory(

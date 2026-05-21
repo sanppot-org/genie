@@ -7,7 +7,7 @@ from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.models import Ticker
 from src.database.ticker_repository import TickerRepository
-from src.providers.dart_company_client import DartCompanyClient
+from src.providers.kis_company_client import KisCompanyClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
 
 logger = logging.getLogger(__name__)
@@ -37,20 +37,21 @@ class TickerSyncService:
     - 이름 변경 (둘 다 O, name 다름) → UPDATE name
     - 재상장 (둘 다 O, DB.active=False) → UPDATE active=True
 
-    DART에서 `industry_code`를 보강한다 (best-effort):
+    KIS `search_stock_info`에서 KSIC + 지수업종 3단(대/중/소) 8개 필드를 보강한다
+    (best-effort):
     - 신규 INSERT 시
-    - 기존 row 중 `industry_code`가 NULL인 경우 ("둘 다 존재" 분기에서 백필)
+    - 기존 row 중 `sector_large_code`가 NULL인 경우 ("둘 다 존재" 분기에서 백필)
     """
 
     def __init__(
         self,
         client: PykrxTickerClient,
         repository: TickerRepository,
-        dart_client: DartCompanyClient,
+        kis_client: KisCompanyClient,
     ) -> None:
         self._client = client
         self._repo = repository
-        self._dart_client = dart_client
+        self._kis_client = kis_client
 
     def sync_pykrx(self) -> SyncResult:
         """pykrx 종목 정보로 DB를 동기화. 모든 변경을 한 트랜잭션에서 commit.
@@ -69,7 +70,7 @@ class TickerSyncService:
 
             if info is not None and existing is None:
                 entity = info.to_entity()
-                self._enrich_with_dart(entity)
+                self._enrich_with_kis(entity)
                 self._repo.session.add(entity)
                 inserted += 1
                 continue
@@ -93,9 +94,9 @@ class TickerSyncService:
                 existing.active = True
                 reactivated += 1
                 changed = True
-            if existing.industry_code is None:
-                # 기존 row 백필 — DART 호출은 NULL인 경우에만, 채워지면 이후 sync에선 호출 안 함
-                self._enrich_with_dart(existing)
+            if existing.sector_large_code is None:
+                # 기존 row 백필 — sector NULL인 경우에만 KIS 호출 (구 DART industry_code만 있는 row 포함)
+                self._enrich_with_kis(existing)
             if not changed:
                 unchanged += 1
 
@@ -108,19 +109,26 @@ class TickerSyncService:
             unchanged=unchanged,
         )
 
-    def _enrich_with_dart(self, entity: Ticker) -> None:
-        """ticker에 DART 메타데이터(`industry_code`)를 채운다.
+    def _enrich_with_kis(self, entity: Ticker) -> None:
+        """ticker에 KIS 업종/섹터 8개 필드를 채운다.
 
-        ETF는 펀드라서 DART에 corp 등록이 없으므로 호출 자체를 skip한다.
+        ETF는 KIS 응답에서 업종/섹터가 비어 와 의미가 없으므로 호출 자체를 skip한다.
         best-effort — 예외/None 응답은 warning만 남기고 sync 진행을 막지 않는다.
         """
         if entity.asset_type != AssetType.KR_STOCK:
             return
         try:
-            dart_info = self._dart_client.fetch_company_info(entity.ticker)
+            info = self._kis_client.fetch_industry_info(entity.ticker)
         except Exception as e:
-            logger.warning("DART 메타데이터 조회 실패 (ticker=%s): %s", entity.ticker, e)
+            logger.warning("KIS 메타데이터 조회 실패 (ticker=%s): %s", entity.ticker, e)
             return
-        if dart_info is None:
+        if info is None:
             return
-        entity.industry_code = dart_info.industry_code
+        entity.industry_code = info.industry_code
+        entity.industry_name = info.industry_name
+        entity.sector_large_code = info.sector_large_code
+        entity.sector_large_name = info.sector_large_name
+        entity.sector_mid_code = info.sector_mid_code
+        entity.sector_mid_name = info.sector_mid_name
+        entity.sector_small_code = info.sector_small_code
+        entity.sector_small_name = info.sector_small_name
