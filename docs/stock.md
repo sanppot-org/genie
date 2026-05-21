@@ -117,7 +117,7 @@
   [x] 배당 내역
     [x] 기간 조절
 
-[ ] 업종/섹터 데이터 추가 (KIS) 기존 데이터 교체 (스케줄러)
+[x] 업종/섹터 데이터 추가 (KIS) 기존 데이터 교체 (스케줄러)
 [x] 배당 종류 중간 / 반기 / 분기 합치기 — sync 시 (ticker_id, record_date, dps) 그룹은 QUARTERLY>INTERIM>SETTLE 1건만 적재, 기존 데이터는 `scripts/cleanup_dividend_duplicates.py`로 정리
 
 ## 추후 작업
