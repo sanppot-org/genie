@@ -10,17 +10,23 @@ from datetime import date
 from typing import Any
 from unittest.mock import MagicMock
 
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+from starlette.requests import Request
 
 from app import app, container
+from src.api.middleware import DBSessionMiddleware
 from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.database import Database, make_request_session
 from src.database.models import Base, StockDailyCandle, Ticker
+from src.database.ticker_repository import TickerRepository
+from src.service.exceptions import GenieError
 
 
 def _make_database() -> Database:
@@ -100,6 +106,104 @@ def seeded_db() -> Generator[Database, Any, None]:
     yield db
     container.database.reset_override()
     db.engine.dispose()
+
+
+def _make_test_app() -> FastAPI:
+    """미들웨어만 장착한 최소 FastAPI 앱 — boundary commit 단위 테스트용."""
+    test_app = FastAPI()
+
+    async def _handle_genie(_: Request, exc: Exception) -> JSONResponse:
+        assert isinstance(exc, GenieError)
+        return exc.to_json_response()
+
+    test_app.add_exception_handler(GenieError, _handle_genie)
+    test_app.add_middleware(DBSessionMiddleware, database_provider=container.database)
+    return test_app
+
+
+def test_4xx_응답시_partial_flush_rollback(seeded_db: Database) -> None:
+    """endpoint가 save 후 GenieError raise → 핸들러가 409 변환 → middleware rollback.
+
+    repo는 flush만 하므로 middleware가 status<400만 commit해야 한다.
+    안 그러면 클라이언트는 409를 받았는데 DB엔 save된 row가 남는 정합성 깨짐.
+    """
+    test_app = _make_test_app()
+
+    @test_app.get("/save-then-conflict")
+    def save_then_conflict() -> None:
+        TickerRepository(seeded_db.RequestSession()).save(
+            Ticker(ticker="ZZZ", asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX),
+        )
+        raise GenieError.already_exists(name="ZZZ")
+
+    r = TestClient(test_app).get("/save-then-conflict")
+    assert r.status_code == 409, r.text
+
+    verify = seeded_db.SessionLocal()
+    try:
+        assert verify.query(Ticker).filter_by(ticker="ZZZ").count() == 0, (
+            "4xx 응답인데 partial flush가 commit됨 (F2 회귀)"
+        )
+    finally:
+        verify.close()
+
+
+def test_2xx_응답시_write_commit(seeded_db: Database) -> None:
+    """endpoint가 save 후 정상 응답 → middleware가 unit-of-work commit."""
+    test_app = _make_test_app()
+
+    @test_app.get("/save-ok")
+    def save_ok() -> dict[str, bool]:
+        TickerRepository(seeded_db.RequestSession()).save(
+            Ticker(ticker="WWW", asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX),
+        )
+        return {"ok": True}
+
+    r = TestClient(test_app).get("/save-ok")
+    assert r.status_code == 200, r.text
+
+    verify = seeded_db.SessionLocal()
+    try:
+        assert verify.query(Ticker).filter_by(ticker="WWW").count() == 1, "2xx commit 누락"
+    finally:
+        verify.close()
+
+
+def test_commit_실패시_500으로_대체되고_rollback(seeded_db: Database) -> None:
+    """commit이 실패하면 클라이언트가 2xx 받지 않고 500을 받아야 한다.
+
+    응답 send는 commit 성공 후로 버퍼링되므로, commit 예외 시 미들웨어가 500을
+    직접 송신한다. 동시에 close()가 rollback해서 partial write가 남지 않는다.
+    """
+    test_app = _make_test_app()
+
+    @test_app.get("/save-then-commit-fails")
+    def save_then_commit_fails() -> dict[str, bool]:
+        TickerRepository(seeded_db.RequestSession()).save(
+            Ticker(ticker="VVV", asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX),
+        )
+        return {"ok": True}
+
+    real_factory = seeded_db.SessionLocal
+
+    def failing_factory() -> Session:
+        sess = real_factory()
+        sess.commit = MagicMock(side_effect=RuntimeError("simulated commit failure"))  # type: ignore[method-assign]
+        return sess
+
+    original_request_session = seeded_db.RequestSession
+    seeded_db.RequestSession = make_request_session(failing_factory)  # type: ignore[arg-type]
+    try:
+        r = TestClient(test_app).get("/save-then-commit-fails")
+        assert r.status_code == 500, f"commit 실패 → 500 변환 누락 (got {r.status_code})"
+    finally:
+        seeded_db.RequestSession = original_request_session
+
+    verify = real_factory()
+    try:
+        assert verify.query(Ticker).filter_by(ticker="VVV").count() == 0, "commit 실패 후 rollback 누락"
+    finally:
+        verify.close()
 
 
 def test_read_요청_반복시_세션_누수_없음(seeded_db: Database) -> None:

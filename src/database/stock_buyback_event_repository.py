@@ -77,4 +77,3 @@ class StockBuybackEventRepository(BaseRepository[StockBuybackEvent, int]):
         )
 
         self.session.execute(stmt)
-        self.session.commit()

@@ -180,7 +180,6 @@ class CandleMinute1Repository(WritableCandleRepository[CandleMinute1]):
         )
 
         self.session.execute(stmt)
-        self.session.commit()
 
 
 class CandleHour1Repository(ReadOnlyCandleRepository[CandleHour1]):

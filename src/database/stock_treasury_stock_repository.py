@@ -70,4 +70,3 @@ class StockTreasuryStockRepository(BaseRepository[StockTreasuryStock, int]):
         )
 
         self.session.execute(stmt)
-        self.session.commit()

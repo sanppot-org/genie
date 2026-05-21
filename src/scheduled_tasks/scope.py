@@ -11,6 +11,7 @@ idle-in-transaction 잔존 방지.
 """
 
 from collections.abc import Callable
+from contextvars import ContextVar
 from functools import wraps
 
 from src.database.database import Database
@@ -18,11 +19,23 @@ from src.database.request_scope import begin_scope, current_request_token, end_s
 
 _database_provider: Callable[[], Database] | None = None
 
+_rollback_flag: ContextVar[bool] = ContextVar("genie_db_scope_rollback", default=False)
+
 
 def configure_db_scoped(database_provider: Callable[[], Database]) -> None:
     """앱 부팅 시 1회 호출: 데코레이터가 사용할 Database provider 등록."""
     global _database_provider
     _database_provider = database_provider
+
+
+def mark_rollback_only() -> None:
+    """현재 task scope의 트랜잭션을 commit하지 말고 rollback하라고 표시.
+
+    task가 예외를 catch해서 정상 return하지만 부분 flush를 폐기해야 할 때 호출.
+    `except Exception: ... slack.send(...)` 같은 swallowing 패턴에서 silent
+    partial commit을 방지한다.
+    """
+    _rollback_flag.set(True)
 
 
 def db_scoped[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
@@ -33,7 +46,10 @@ def db_scoped[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
 
     Reentrant: 이미 outer scope(HTTP 미들웨어 또는 다른 `@db_scoped`) 안이면
     그대로 위임 → 세션/토큰을 outer와 공유, inner는 라이프사이클 미관여.
-    중첩 시 inner가 토큰을 덮어써 outer 세션이 누수되는 사고를 차단한다.
+
+    Boundary unit-of-work: 정상 종료 시 commit, 예외 시 close()가 자동 rollback.
+    task가 예외를 catch해서 정상 return하지만 부분 변경을 폐기하고 싶으면
+    `mark_rollback_only()` 호출.
     """
 
     @wraps(fn)
@@ -44,11 +60,28 @@ def db_scoped[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
             )
         if current_request_token() is not None:
             return fn(*args, **kwargs)
+        db = _database_provider()
         begin_scope()
+        _rollback_flag.set(False)
         try:
-            return fn(*args, **kwargs)
+            result = fn(*args, **kwargs)
+            # 정상 종료 — task 단위 unit-of-work commit (HTTP 미들웨어와 대칭).
+            # DB 미사용 task는 registry.has() False라 건너뛴다.
+            # `mark_rollback_only()`로 명시된 경우 commit 대신 rollback (예외
+            # swallowing 패턴에서 partial flush 폐기).
+            if db.RequestSession.registry.has():
+                sess = db.RequestSession()
+                if sess.in_transaction():
+                    if _rollback_flag.get():
+                        sess.rollback()
+                    else:
+                        sess.commit()
+            return result
         finally:
-            _database_provider().RequestSession.remove()
+            # 예외 경로는 commit/rollback 분기를 거치지 않고 여기로 옴 → remove()의
+            # close()가 미커밋 트랜잭션 자동 rollback. 플래그도 다음 task를 위해 초기화.
+            _rollback_flag.set(False)
+            db.RequestSession.remove()
             end_scope()
 
     return wrapper

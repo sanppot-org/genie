@@ -87,4 +87,3 @@ class StockFundamentalRepository(BaseRepository[StockFundamental, int]):
         )
 
         self.session.execute(stmt)
-        self.session.commit()

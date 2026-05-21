@@ -20,7 +20,7 @@ from src.providers.pykrx_fundamental_client import KrxClosedDayError
 from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
-from src.scheduled_tasks.scope import db_scoped
+from src.scheduled_tasks.scope import db_scoped, mark_rollback_only
 from src.service.buyback_sync_service import BuybackSyncService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_sync_service import DividendSyncService
@@ -156,6 +156,7 @@ def sync_kr_stock_tickers(
             result.inserted, result.deactivated, result.renamed, result.reactivated, result.unchanged,
         )
     except Exception as e:
+        mark_rollback_only()
         logger.exception("한국 주식 종목 동기화 실패")
         slack_client.send_status(f"한국 주식 종목 동기화 실패: {e}")
 
@@ -181,6 +182,7 @@ def sync_kr_stock_fundamentals(
     except (KrxClosedDayError, EmptyPykrxResponseError) as e:
         logger.info("펀더멘털 동기화 skip date=%s reason=%s", target_date, e)
     except Exception as e:
+        mark_rollback_only()
         logger.exception("펀더멘털 동기화 실패")
         slack_client.send_status(f"펀더멘털 동기화 실패 ({target_date}): {e}")
 
@@ -207,6 +209,7 @@ def sync_kr_stock_dividends(
             result.skipped_unmapped, result.skipped_invalid,
         )
     except Exception as e:
+        mark_rollback_only()
         logger.exception("배당 동기화 실패")
         slack_client.send_status(f"배당 동기화 실패 ({from_date}~{to_date}): {e}")
 
@@ -232,6 +235,7 @@ def sync_kr_stock_buybacks(
             result.upserted, result.skipped_failure,
         )
     except Exception as e:
+        mark_rollback_only()
         logger.exception("자사주 공시 동기화 실패")
         slack_client.send_status(f"자사주 공시 동기화 실패 ({from_date}~{today}): {e}")
 
@@ -256,6 +260,7 @@ def sync_kr_stock_treasury_stocks(
             result.upserted, result.skipped_no_data, result.skipped_failure,
         )
     except Exception as e:
+        mark_rollback_only()
         logger.exception("자사주 동기화 실패")
         slack_client.send_status(f"자사주 동기화 실패: {e}")
 
@@ -282,5 +287,6 @@ def sync_kr_stock_daily_candles(
     except (KrxClosedDayError, EmptyPykrxResponseError) as e:
         logger.info("일봉 동기화 skip date=%s reason=%s", target_date, e)
     except Exception as e:
+        mark_rollback_only()
         logger.exception("일봉 동기화 실패")
         slack_client.send_status(f"일봉 동기화 실패 ({target_date}): {e}")

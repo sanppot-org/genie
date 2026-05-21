@@ -86,4 +86,3 @@ class StockDividendRepository(BaseRepository[StockDividend, int]):
         )
 
         self.session.execute(stmt)
-        self.session.commit()

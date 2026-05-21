@@ -14,11 +14,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import container
+from src.common.data_adapter import DataSource
+from src.constants import AssetType
 from src.database.database import Database, make_request_session
-from src.database.models import Base
+from src.database.models import Base, Ticker
 from src.database.request_scope import current_request_token
 from src.database.ticker_repository import TickerRepository
-from src.scheduled_tasks.scope import configure_db_scoped, db_scoped
+from src.scheduled_tasks.scope import configure_db_scoped, db_scoped, mark_rollback_only
 
 
 def _make_database() -> Database:
@@ -136,6 +138,103 @@ def test_중첩_호출시_outer가_라이프사이클_소유(tracked_db: tuple[D
     assert len(created) == 1, f"중첩 호출도 세션 1개 기대, 실제 {len(created)}개"
     assert created[0].leak_flag["closed"], "outer 종료 시 close 누락 = 누수"
     assert current_request_token() is None
+
+
+def _make_ticker(code: str) -> Ticker:
+    return Ticker(ticker=code, asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value)
+
+
+def test_정상_종료시_boundary가_미커밋_쓰기를_commit(tracked_db: tuple[Database, list[Session]]) -> None:
+    """task 본문은 flush만 하고, 데코레이터가 task 단위 commit을 책임진다."""
+    db, _ = tracked_db
+
+    @db_scoped
+    def task() -> None:
+        TickerRepository(db.RequestSession()).save(_make_ticker("AAA"))
+
+    task()
+
+    verify = db.SessionLocal()
+    try:
+        assert verify.query(Ticker).filter_by(ticker="AAA").count() == 1, "boundary commit 누락"
+    finally:
+        verify.close()
+
+
+def test_예외_발생시_multi_write가_모두_rollback(tracked_db: tuple[Database, list[Session]]) -> None:
+    """service가 여러 write를 조합하다가 뒤에서 실패하면 앞선 변경도 rollback.
+
+    기존엔 repo가 즉시 commit해서 silent partial commit이 가능했다.
+    boundary commit + flush-only repo로 멀티-write atomicity 보장.
+    """
+    db, _ = tracked_db
+
+    @db_scoped
+    def task() -> None:
+        repo = TickerRepository(db.RequestSession())
+        repo.save(_make_ticker("AAA"))
+        repo.save(_make_ticker("BBB"))
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError):
+        task()
+
+    verify = db.SessionLocal()
+    try:
+        assert verify.query(Ticker).count() == 0, "예외 경로 rollback 실패 = silent partial commit"
+    finally:
+        verify.close()
+
+
+def test_mark_rollback_only_시_swallow된_예외에도_partial_flush_rollback(
+    tracked_db: tuple[Database, list[Session]],
+) -> None:
+    """task가 예외를 catch + mark_rollback_only → flush된 write 폐기."""
+    db, _ = tracked_db
+
+    @db_scoped
+    def task() -> None:
+        TickerRepository(db.RequestSession()).save(_make_ticker("AAA"))
+        try:
+            raise RuntimeError("inner")
+        except RuntimeError:
+            mark_rollback_only()
+
+    task()  # 정상 return
+
+    verify = db.SessionLocal()
+    try:
+        assert verify.query(Ticker).count() == 0, (
+            "mark_rollback_only 무시 = silent partial commit (F3 회귀)"
+        )
+    finally:
+        verify.close()
+
+
+def test_연속_task_사이에_rollback_flag_누출되지_않는다(
+    tracked_db: tuple[Database, list[Session]],
+) -> None:
+    """앞 task에서 mark_rollback_only 호출 후, 다음 task는 정상 commit 동작."""
+    db, _ = tracked_db
+
+    @db_scoped
+    def task_rollback() -> None:
+        TickerRepository(db.RequestSession()).save(_make_ticker("AAA"))
+        mark_rollback_only()
+
+    @db_scoped
+    def task_normal() -> None:
+        TickerRepository(db.RequestSession()).save(_make_ticker("BBB"))
+
+    task_rollback()
+    task_normal()
+
+    verify = db.SessionLocal()
+    try:
+        rows = {t.ticker for t in verify.query(Ticker).all()}
+        assert rows == {"BBB"}, f"플래그 누출 또는 commit 누락: {rows}"
+    finally:
+        verify.close()
 
 
 def test_연속_task_세션_누수_0(tracked_db: tuple[Database, list[Session]]) -> None:

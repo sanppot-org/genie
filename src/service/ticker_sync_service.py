@@ -99,7 +99,7 @@ class TickerSyncService:
             if not changed:
                 unchanged += 1
 
-        self._repo.session.commit()
+        self._repo.session.flush()
         return SyncResult(
             inserted=inserted,
             deactivated=deactivated,

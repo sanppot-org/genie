@@ -87,16 +87,10 @@ class BaseRepository[T: HasId, ID](ReadOnlyRepository[T, ID], ABC):
         return self.session.query(model_class).order_by(model_class.id).all()
 
     def save(self, entity: T) -> T:
-        """Save or update entity (upsert).
+        """Save or update entity (upsert) — flush only; commit은 호출자 책임.
 
-        If entity with same unique constraint fields exists, updates it.
-        Otherwise, creates new entity.
-
-        Args:
-            entity: Entity to save
-
-        Returns:
-            Saved entity
+        같은 session 안에서는 flush로 가시화되고, 트랜잭션 커밋은 request/task
+        boundary(미들웨어·@db_scoped)가 일괄 처리한다.
         """
         # Find existing entity by unique constraint fields
         unique_fields = self._get_unique_constraint_fields()
@@ -113,22 +107,14 @@ class BaseRepository[T: HasId, ID](ReadOnlyRepository[T, ID], ABC):
             result = entity
 
         self.session.flush()
-        self.session.commit()
         self.session.refresh(result)
         return result
 
     def delete_by_id(self, entity_id: ID) -> bool:
-        """Delete entity by ID.
-
-        Args:
-            entity_id: Primary key value
-
-        Returns:
-            True if deleted, False if not found
-        """
+        """Delete entity by ID — flush only; commit은 호출자 책임."""
         entity = self.find_by_id(entity_id)
         if entity:
             self.session.delete(entity)
-            self.session.commit()
+            self.session.flush()
             return True
         return False
