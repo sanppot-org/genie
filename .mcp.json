@@ -12,6 +12,10 @@
     },
     "genie-prod-pg": {
       "command": "/Users/sandeulpark/personal/genie/scripts/mcp-prod-pg.sh"
+    },
+    "kis-trade": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:3000/sse"]
     }
   }
 }
