@@ -112,6 +112,32 @@ def test_같은_task_내_여러_리포가_세션_공유(tracked_db: tuple[Databa
     assert len(created) == 1, f"task당 세션 1개 기대, 실제 {len(created)}개"
 
 
+def test_중첩_호출시_outer가_라이프사이클_소유(tracked_db: tuple[Database, list[Session]]) -> None:
+    """중첩 @db_scoped는 reentrancy 가드로 outer scope 공유 — 세션 1개, 1회 close.
+
+    가드 없이는 inner가 토큰을 덮어쓰고 None으로 클리어 → outer 세션 누수 +
+    outer post-inner DB 호출이 레거시 폴백으로 빠짐. 회귀 감지.
+    """
+    db, created = tracked_db
+
+    @db_scoped
+    def inner() -> None:
+        TickerRepository(db.RequestSession()).find_all()
+
+    @db_scoped
+    def outer() -> None:
+        s_before = db.RequestSession()
+        TickerRepository(s_before).find_all()
+        inner()
+        s_after = db.RequestSession()
+        assert s_after is s_before, "중첩 후에도 outer 세션 유지 — 토큰 보존 실패"
+
+    outer()
+    assert len(created) == 1, f"중첩 호출도 세션 1개 기대, 실제 {len(created)}개"
+    assert created[0].leak_flag["closed"], "outer 종료 시 close 누락 = 누수"
+    assert current_request_token() is None
+
+
 def test_연속_task_세션_누수_0(tracked_db: tuple[Database, list[Session]]) -> None:
     """task를 반복 실행해도 이전 세션이 닫히고 새 세션이 생성된다(누수 0)."""
     db, created = tracked_db

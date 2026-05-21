@@ -14,7 +14,7 @@ from collections.abc import Callable
 from functools import wraps
 
 from src.database.database import Database
-from src.database.request_scope import begin_scope, end_scope
+from src.database.request_scope import begin_scope, current_request_token, end_scope
 
 _database_provider: Callable[[], Database] | None = None
 
@@ -30,6 +30,10 @@ def db_scoped[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
 
     DB 미사용 task에도 안전(`RequestSession.remove()`는 세션 미체크아웃 시 no-op).
     `@inject`보다 바깥에 둔다 → wrapper가 scope를 열고 `@inject`가 의존성 주입.
+
+    Reentrant: 이미 outer scope(HTTP 미들웨어 또는 다른 `@db_scoped`) 안이면
+    그대로 위임 → 세션/토큰을 outer와 공유, inner는 라이프사이클 미관여.
+    중첩 시 inner가 토큰을 덮어써 outer 세션이 누수되는 사고를 차단한다.
     """
 
     @wraps(fn)
@@ -38,6 +42,8 @@ def db_scoped[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
             raise RuntimeError(
                 "db_scoped not configured — app.py에서 configure_db_scoped(container.database) 호출 필요",
             )
+        if current_request_token() is not None:
+            return fn(*args, **kwargs)
         begin_scope()
         try:
             return fn(*args, **kwargs)
