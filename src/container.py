@@ -61,9 +61,10 @@ from util.binance.binance_api import BinanceAPI
 def _resolve_session(db: Database) -> Session:
     """리포지토리용 세션 해석.
 
-    요청 스코프 활성 시 scoped_session 레지스트리의 세션을 공유(같은 요청의
-    모든 리포가 동일 Session, 미들웨어가 요청 끝에 `.remove()`로 정리 → 누수
-    없음). 비요청(스케줄러·CLI)은 레거시 `get_session()` 폴백(Phase 3 대상).
+    스코프 토큰이 활성(HTTP 미들웨어 또는 `@db_scoped` 스케줄러 task)이면
+    scoped_session 레지스트리의 세션을 공유(같은 단위의 모든 리포가 동일
+    Session, 진입점이 종료 시 `.remove()`로 정리 → 누수 없음). 토큰 미설정
+    경로(테스트 직접 호출 등)는 레거시 `get_session()` 폴백.
     """
     if current_request_token() is not None:
         return db.RequestSession()

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.database.database import Database
-from src.database.request_scope import begin_request_scope, end_request_scope
+from src.database.request_scope import begin_scope, end_scope
 
 
 class DBSessionMiddleware:
@@ -19,7 +19,8 @@ class DBSessionMiddleware:
     pure ASGI 미들웨어라 다운스트림과 동일 태스크/컨텍스트에서 실행 → 여기서
     설정한 토큰 ContextVar가 동기 엔드포인트의 threadpool 컨텍스트 복사에
     포함된다. `BaseHTTPMiddleware`는 자식 태스크라 contextvar가 전파되지 않아
-    사용하지 않는다. 스케줄러는 ASGI를 안 거쳐 영향 없음(레거시 폴백, Phase 3).
+    사용하지 않는다. 스케줄러 task 경로는 `src.scheduled_tasks.scope.db_scoped`
+    데코레이터가 동일 메커니즘으로 처리한다.
     """
 
     def __init__(self, app: ASGIApp, database_provider: Callable[[], Database]) -> None:
@@ -30,11 +31,11 @@ class DBSessionMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-        begin_request_scope()
+        begin_scope()
         try:
             await self.app(scope, receive, send)
         finally:
             # token이 아직 설정된 상태에서 remove() → scopefunc로 현재 요청의
             # 세션을 찾아 close+rollback+폐기. DB 미사용 요청은 no-op.
             self._database().RequestSession.remove()
-            end_request_scope()
+            end_scope()

@@ -10,6 +10,7 @@ from src.api.routes import candle, dividend, fundamental, health, screening, str
 from src.config import AppConfig
 from src.container import ApplicationContainer
 from src.logging_config import setup_logging
+from src.scheduled_tasks.scope import configure_db_scoped
 from src.service.exceptions import GenieError
 
 # Better Stack 로깅 설정
@@ -38,9 +39,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 요청 스코프 DB 세션 (커넥션 누수 차단, Phase 1) — container.database는
-# override 가능한 provider라 테스트와 일관.
+# 요청/task 스코프 DB 세션 (커넥션 누수 차단) — container.database는
+# override 가능한 provider라 테스트와 일관. 스케줄러 task용 @db_scoped 데코레이터도
+# 동일 provider를 사용하므로 부팅 시 1회 등록.
 app.add_middleware(DBSessionMiddleware, database_provider=container.database)
+configure_db_scoped(container.database)
 
 # 예외 핸들러 등록
 app.add_exception_handler(GenieError, handle_genie_error)

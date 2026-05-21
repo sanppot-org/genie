@@ -20,6 +20,7 @@ from src.providers.pykrx_fundamental_client import KrxClosedDayError
 from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
+from src.scheduled_tasks.scope import db_scoped
 from src.service.buyback_sync_service import BuybackSyncService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_sync_service import DividendSyncService
@@ -32,6 +33,7 @@ from src.upbit.upbit_api import UpbitAPI
 logger = logging.getLogger(__name__)
 
 
+@db_scoped
 @inject
 def run_strategies(
         context: ScheduledTasksContext = Provide[ApplicationContainer.tasks_context],
@@ -76,6 +78,7 @@ def run_strategies(
         context.slack_client.send_status(f"전략 실행 중 예외 발생: {e}")
 
 
+@db_scoped
 @inject
 def check_upbit_status(
         upbit_api: UpbitAPI = Provide[ApplicationContainer.upbit_api],
@@ -87,6 +90,7 @@ def check_upbit_status(
         raise SystemError
 
 
+@db_scoped
 @inject
 def update_upbit_krw(
         upbit_api: UpbitAPI = Provide[ApplicationContainer.upbit_api],
@@ -104,6 +108,7 @@ def update_upbit_krw(
     ])
 
 
+@db_scoped
 @inject
 def update_bithumb_krw(
         bithumb_api: BithumbApi = Provide[ApplicationContainer.bithumb_api],
@@ -118,12 +123,14 @@ def update_bithumb_krw(
     ])
 
 
+@db_scoped
 @inject
 def report(reporter: Reporter = Provide[ApplicationContainer.reporter]) -> None:
     """리포트 생성 - 의존성 자동 주입"""
     reporter.report()
 
 
+@db_scoped
 @inject
 def update_data(
         price_data_collector: GoogleSheetDataCollector = Provide[ApplicationContainer.price_data_collector]) -> None:
@@ -131,6 +138,7 @@ def update_data(
     price_data_collector.collect_price()
 
 
+@db_scoped
 @inject
 def sync_kr_stock_tickers(
         service: TickerSyncService = Provide[ApplicationContainer.ticker_sync_service],
@@ -152,6 +160,7 @@ def sync_kr_stock_tickers(
         slack_client.send_status(f"한국 주식 종목 동기화 실패: {e}")
 
 
+@db_scoped
 @inject
 def sync_kr_stock_fundamentals(
         service: FundamentalSyncService = Provide[ApplicationContainer.fundamental_sync_service],
@@ -176,6 +185,7 @@ def sync_kr_stock_fundamentals(
         slack_client.send_status(f"펀더멘털 동기화 실패 ({target_date}): {e}")
 
 
+@db_scoped
 @inject
 def sync_kr_stock_dividends(
         service: DividendSyncService = Provide[ApplicationContainer.dividend_sync_service],
@@ -201,6 +211,7 @@ def sync_kr_stock_dividends(
         slack_client.send_status(f"배당 동기화 실패 ({from_date}~{to_date}): {e}")
 
 
+@db_scoped
 @inject
 def sync_kr_stock_buybacks(
         service: BuybackSyncService = Provide[ApplicationContainer.buyback_sync_service],
@@ -225,6 +236,7 @@ def sync_kr_stock_buybacks(
         slack_client.send_status(f"자사주 공시 동기화 실패 ({from_date}~{today}): {e}")
 
 
+@db_scoped
 @inject
 def sync_kr_stock_treasury_stocks(
         service: TreasuryStockSyncService = Provide[ApplicationContainer.treasury_stock_sync_service],
@@ -248,6 +260,7 @@ def sync_kr_stock_treasury_stocks(
         slack_client.send_status(f"자사주 동기화 실패: {e}")
 
 
+@db_scoped
 @inject
 def sync_kr_stock_daily_candles(
         service: DailyCandleSyncService = Provide[ApplicationContainer.daily_candle_sync_service],

@@ -43,6 +43,7 @@ class Database:
             pool_size=10,  # 연결 풀 크기
             max_overflow=20,  # 최대 추가 연결 수
             pool_pre_ping=True,  # 연결 상태 확인
+            pool_timeout=10,  # 풀 고갈 시 빠른 실패(진단 용이). 기본 30초.
             echo=False,  # SQL 로그 (개발시 True)
             connect_args={"options": "-c timezone=Asia/Seoul"},  # 세션 타임존 설정
         )
