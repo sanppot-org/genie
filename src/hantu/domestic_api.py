@@ -7,7 +7,16 @@ import requests
 
 from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
-from src.hantu.model.domestic import balance, chart, dividend, order, psbl_order, search_stock_info, stock_price
+from src.hantu.model.domestic import (
+    balance,
+    chart,
+    dividend,
+    income_statement,
+    order,
+    psbl_order,
+    search_stock_info,
+    stock_price,
+)
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.chart import ChartInterval, PriceType
 from src.hantu.model.domestic.dividend import DividendKind
@@ -146,6 +155,37 @@ class HantuDomesticAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return search_stock_info.ResponseBody.model_validate(res.json())
+
+    def income_statement(self, ticker: str, div_cls_code: str) -> income_statement.ResponseBody:
+        """국내주식 손익계산서 조회 — 결산기별 매출/영업이익/순이익 등.
+
+        단일 호출에 전체 이력(연간 20여 년·분기 30여 기) 반환 → tr_cont 연속조회 불필요.
+
+        Args:
+            ticker: 종목코드 (6자리, 예: '005930')
+            div_cls_code: 분류 구분 ('0': 년, '1': 분기 — 분기는 연단위 누적합산)
+
+        Returns:
+            income_statement.ResponseBody: output(결산기별 손익계산서 리스트).
+        """
+        url = f"{self.url_base}/uapi/domestic-stock/v1/finance/income-statement"
+
+        header = income_statement.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = income_statement.RequestQueryParam(
+            FID_DIV_CLS_CODE=div_cls_code,
+            fid_input_iscd=ticker,
+        )
+
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+
+        self._validate_response(res)
+
+        return income_statement.ResponseBody.model_validate(res.json())
 
     def sell_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
         """시장가 매도 주문

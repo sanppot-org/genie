@@ -116,11 +116,15 @@
     [x] 차트 우측에서 스크롤 시 세로로 길이 조절
   [x] 배당 내역
     [x] 기간 조절
+  [x] 손익계산서 (매출·영업이익·순이익) — KIS income-statement
+    [x] 막대그래프 3계열 + 요약 표(YoY·영업이익률·순이익률)
+    [x] 연간/분기 토글 + 분기 단일환산 토글
 
+[x] 손익계산서 수집 (KIS income-statement) — `stock_income_statements`, 백필 스크립트 + 주1회 스케줄러(월 19:00), 증분 가드, 청크 커밋
 [x] 업종/섹터 데이터 추가 (KIS) 기존 데이터 교체 (스케줄러)
 [x] 배당 종류 중간 / 반기 / 분기 합치기 — sync 시 (ticker_id, record_date, dps) 그룹은 QUARTERLY>INTERIM>SETTLE 1건만 적재, 기존 데이터는 `scripts/cleanup_dividend_duplicates.py`로 정리
 
 ## 추후 작업
 - 동기화 작업 결과를 DB에 기록 (성공/실패/skip + SyncResult 카운트). 운영 가시성 및 통계용. 스케줄러가 안정화된 후 진행.
 - 펀더멘털 데이터 활용: 섹터(industry_code) × PER/PBR 평균, 저평가 스크리닝 API
-- 분기/연간 재무제표 — DART OpenAPI `finstate` endpoint (TTM PER 계산 등)
+- 분기/연간 재무제표 — 매출·영업이익·순이익은 KIS income-statement로 완료(위 참조). TTM PER 등 추가 항목은 DART OpenAPI `finstate` 또는 KIS 재무비율 보강 검토.

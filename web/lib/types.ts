@@ -56,6 +56,26 @@ export interface DividendSeries {
 
 export type GenieResponse<T> = { data: T };
 
+export type PeriodType = "ANNUAL" | "QUARTER";
+
+export interface IncomeStatementPoint {
+  stac_yymm: string;
+  revenue: number | null;
+  cost_of_sales: number | null;
+  gross_profit: number | null;
+  operating_profit: number | null;
+  ordinary_profit: number | null;
+  net_income: number | null;
+}
+
+export interface IncomeStatementSeries {
+  ticker: string;
+  name: string;
+  period_type: PeriodType;
+  single_quarter: boolean;
+  points: IncomeStatementPoint[];
+}
+
 export interface ScreeningScoreBreakdown {
   per: number;
   pbr: number;

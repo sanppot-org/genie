@@ -9,6 +9,7 @@ from src.scheduled_tasks.tasks import (
     sync_kr_stock_daily_candles,
     sync_kr_stock_dividends,
     sync_kr_stock_fundamentals,
+    sync_kr_stock_income_statements,
     sync_kr_stock_tickers,
     sync_kr_stock_treasury_stocks,
     update_bithumb_krw,
@@ -77,5 +78,11 @@ def get_schedules() -> list[ScheduleConfig]:
             trigger=CronTrigger(day_of_week="mon", hour=18, minute=30),
             id="sync_kr_stock_buybacks",
             name="한국 주식 자사주 매입·처분 공시 동기화",
+        ),
+        ScheduleConfig(
+            func=sync_kr_stock_income_statements,
+            trigger=CronTrigger(day_of_week="mon", hour=19, minute=0),
+            id="sync_kr_stock_income_statements",
+            name="한국 주식 손익계산서 동기화",
         ),
     ]

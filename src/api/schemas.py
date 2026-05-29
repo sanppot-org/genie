@@ -103,6 +103,41 @@ class DividendSeriesResponse(BaseModel):
     points: list[DividendPoint]
 
 
+class IncomeStatementPoint(BaseModel):
+    """결산기별 손익계산서 1건 (금액 단위: 억원)."""
+
+    stac_yymm: str  # 결산년월 YYYYMM
+    revenue: float | None = None           # 매출액
+    cost_of_sales: float | None = None     # 매출원가
+    gross_profit: float | None = None      # 매출총이익
+    operating_profit: float | None = None  # 영업이익
+    ordinary_profit: float | None = None   # 경상이익
+    net_income: float | None = None        # 당기순이익
+
+
+class IncomeStatementSeriesResponse(BaseModel):
+    """ticker별 손익계산서 시계열."""
+
+    ticker: str
+    name: str
+    period_type: str       # ANNUAL | QUARTER
+    single_quarter: bool   # 분기 단일환산 적용 여부
+    points: list[IncomeStatementPoint]
+
+
+class SyncFinancialsResponse(BaseModel):
+    """KIS 손익계산서 동기화 응답."""
+
+    ticker_count: int
+    skipped_current: int
+    api_calls_attempted: int
+    api_calls_failed: int
+    rows_received: int
+    rows_upserted: int
+    chunks_committed: int
+    chunks_failed: int
+
+
 class GenieResponse[T](BaseModel):
     """공통 API 응답 모델"""
 

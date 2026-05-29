@@ -1,6 +1,7 @@
 """SQLAlchemy models for TimescaleDB."""
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -13,6 +14,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    Numeric,
     PrimaryKeyConstraint,
     String,
     func,
@@ -293,6 +295,39 @@ class StockBuybackEvent(Base, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<StockBuybackEvent(ticker_id={self.ticker_id}, type={self.event_type}, resolution_date={self.resolution_date})>"
+
+
+class StockIncomeStatement(Base, TimestampMixin):
+    """KIS 국내주식 손익계산서 — 결산기별 매출/영업이익/순이익 시계열.
+
+    KR_STOCK 대상. period_type(ANNUAL/QUARTER) × stac_yymm(결산년월)별 1 row.
+    금액 단위 = 억원(KIS 원본). 적자는 음수, 미제공/결측은 NULL.
+    분기(QUARTER)는 KIS 원본 그대로 연단위 누적합산 저장 — 단일분기 환산은 조회 레이어 파생.
+    동일 (ticker_id, period_type, stac_yymm) 재호출 시 UPSERT(실적 정정 반영).
+    """
+
+    __tablename__ = "stock_income_statements"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_income_statements_ticker_id"), nullable=False
+    )
+    period_type: Mapped[str] = mapped_column(String(8), nullable=False, comment="ANNUAL: 연간, QUARTER: 분기(누적)")
+    stac_yymm: Mapped[str] = mapped_column(String(6), nullable=False, comment="결산년월 YYYYMM")
+    sale_account: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True, comment="매출액(억원)")
+    sale_cost: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True, comment="매출원가(억원)")
+    sale_totl_prfi: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True, comment="매출총이익(억원)")
+    bsop_prti: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True, comment="영업이익(억원)")
+    op_prfi: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True, comment="경상이익(억원)")
+    thtr_ntin: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True, comment="당기순이익(억원)")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("ticker_id", "period_type", "stac_yymm"),
+        Index("ix_stock_income_statements_ticker_id_stac_yymm", "ticker_id", "stac_yymm"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockIncomeStatement(ticker_id={self.ticker_id}, period={self.period_type}, stac_yymm={self.stac_yymm})>"
 
 
 class StockDailyCandle(Base, TimestampMixin):

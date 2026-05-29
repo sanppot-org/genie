@@ -6,7 +6,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.exception_handlers import handle_genie_error, handle_unhandled_exception
 from src.api.lifespan import lifespan
 from src.api.middleware import DBSessionMiddleware
-from src.api.routes import candle, dividend, fundamental, health, screening, strategy, ticker
+from src.api.routes import (
+    candle,
+    dividend,
+    fundamental,
+    health,
+    income_statement,
+    screening,
+    strategy,
+    ticker,
+)
 from src.config import AppConfig
 from src.container import ApplicationContainer
 from src.logging_config import setup_logging
@@ -56,4 +65,5 @@ app.include_router(ticker.router, prefix="/api")
 app.include_router(candle.router, prefix="/api")
 app.include_router(fundamental.router, prefix="/api")
 app.include_router(dividend.router, prefix="/api")
+app.include_router(income_statement.router, prefix="/api")
 app.include_router(screening.router, prefix="/api")

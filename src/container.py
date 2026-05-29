@@ -23,6 +23,7 @@ from src.database.stock_buyback_event_repository import StockBuybackEventReposit
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
+from src.database.stock_income_statement_repository import StockIncomeStatementRepository
 from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
@@ -31,6 +32,7 @@ from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
 from src.providers.kis_company_client import KisCompanyClient
+from src.providers.kis_income_statement_client import KisIncomeStatementClient
 from src.providers.pykrx_daily_candle_client import PykrxDailyCandleClient
 from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
@@ -46,6 +48,8 @@ from src.service.dividend_service import DividendService
 from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
+from src.service.income_statement_service import IncomeStatementService
+from src.service.income_statement_sync_service import IncomeStatementSyncService
 from src.service.screening_service import ScreeningService
 from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
@@ -84,6 +88,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.routes.candle",  # candle 라우터 추가
             "src.api.routes.fundamental",  # fundamental 라우터 추가
             "src.api.routes.dividend",  # dividend 라우터 추가
+            "src.api.routes.income_statement",  # 손익계산서 라우터 추가
             "src.api.routes.screening",  # screening 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
@@ -120,6 +125,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     stock_dividend_repository = providers.Factory(StockDividendRepository, session=_session)
     stock_treasury_stock_repository = providers.Factory(StockTreasuryStockRepository, session=_session)
     stock_buyback_event_repository = providers.Factory(StockBuybackEventRepository, session=_session)
+    stock_income_statement_repository = providers.Factory(StockIncomeStatementRepository, session=_session)
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -265,6 +271,17 @@ class ApplicationContainer(containers.DeclarativeContainer):
     buyback_service = providers.Factory(
         BuybackService,
         buyback_event_repository=stock_buyback_event_repository,
+    )
+    kis_income_statement_client = providers.Singleton(KisIncomeStatementClient, hantu_domestic_api)
+    income_statement_sync_service = providers.Factory(
+        IncomeStatementSyncService,
+        database=database,
+        kis_client=kis_income_statement_client,
+    )
+    income_statement_service = providers.Factory(
+        IncomeStatementService,
+        ticker_repository=ticker_repository,
+        income_statement_repository=stock_income_statement_repository,
     )
     screening_service = providers.Factory(
         ScreeningService,

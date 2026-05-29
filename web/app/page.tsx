@@ -11,6 +11,7 @@ import type {
   DividendSeries,
   FundamentalSeries,
   GenieResponse,
+  IncomeStatementSeries,
   Ticker,
 } from "@/lib/types";
 import { useRecentTickers } from "@/lib/use-recent-tickers";
@@ -26,6 +27,11 @@ const CandleChart = dynamic(
 const DividendChart = dynamic(
   () => import("@/components/dividend-chart").then((m) => m.DividendChart),
   { ssr: false, loading: () => null },
+);
+
+const FinancialsChart = dynamic(
+  () => import("@/components/financials-chart").then((m) => m.FinancialsChart),
+  { ssr: false, loading: () => <p className="text-sm text-muted-foreground">불러오는 중...</p> },
 );
 
 // 차트 좌측 팬 시 단계적으로 넓히는 lookback(년). 마지막 단계 이후는 ALL(from/to 생략).
@@ -48,6 +54,8 @@ export default function Home() {
   const [selected, setSelected] = useState<Ticker | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
   const [dividendStepIdx, setDividendStepIdx] = useState<number>(STEPS.length); // ALL 기본
+  const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarter">("annual");
+  const [financialSingle, setFinancialSingle] = useState(false);
   const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
 
   // 첫 hydration 직후 1회 — selected 없고 recent 있으면 최신 종목 자동 선택.
@@ -64,6 +72,8 @@ export default function Home() {
     setPrevTicker(selected?.ticker);
     setStepIdx(0);
     setDividendStepIdx(STEPS.length);
+    setFinancialPeriod("annual");
+    setFinancialSingle(false);
   }
 
   const tickers = useQuery({
@@ -109,6 +119,18 @@ export default function Home() {
         ticker: selected!.ticker,
         from: dFrom,
         to: dTo,
+      }).then((r) => r.data),
+    enabled: Boolean(selected),
+    placeholderData: keepPreviousData,
+  });
+
+  const financials = useQuery({
+    queryKey: ["financials", selected?.ticker, financialPeriod, financialSingle],
+    queryFn: () =>
+      apiGet<GenieResponse<IncomeStatementSeries>>("/api/financials", {
+        ticker: selected!.ticker,
+        period: financialPeriod,
+        single: financialPeriod === "quarter" ? financialSingle : undefined,
       }).then((r) => r.data),
     enabled: Boolean(selected),
     placeholderData: keepPreviousData,
@@ -267,6 +289,61 @@ export default function Home() {
               <DividendChart points={dividends.data.points} />
             </section>
           )}
+
+          <section className="space-y-2 pt-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <h3 className="font-medium">손익계산서</h3>
+              <div className="flex gap-1">
+                {(["annual", "quarter"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setFinancialPeriod(p)}
+                    className={`rounded border px-2 py-0.5 text-xs ${
+                      financialPeriod === p
+                        ? "bg-foreground text-background"
+                        : "bg-background hover:bg-muted"
+                    }`}
+                  >
+                    {p === "annual" ? "연간" : "분기"}
+                  </button>
+                ))}
+              </div>
+              {financialPeriod === "quarter" && (
+                <button
+                  type="button"
+                  onClick={() => setFinancialSingle((v) => !v)}
+                  className={`rounded border px-2 py-0.5 text-xs ${
+                    financialSingle
+                      ? "bg-foreground text-background"
+                      : "bg-background hover:bg-muted"
+                  }`}
+                >
+                  단일분기
+                </button>
+              )}
+              <span className="text-xs text-muted-foreground">
+                <span style={{ color: "#3b82f6" }}>●</span> 매출
+              </span>
+              <span className="text-xs text-muted-foreground">
+                <span style={{ color: "#10b981" }}>●</span> 영업이익
+              </span>
+              <span className="text-xs text-muted-foreground">
+                <span style={{ color: "#f59e0b" }}>●</span> 순이익
+              </span>
+            </div>
+            {financials.isLoading && (
+              <p className="text-sm text-muted-foreground">불러오는 중...</p>
+            )}
+            {financials.isError && (
+              <p className="text-sm text-red-600">
+                조회 실패: {(financials.error as Error).message}
+              </p>
+            )}
+            {financials.data && financials.data.ticker === selected.ticker && (
+              <FinancialsChart series={financials.data} />
+            )}
+          </section>
         </section>
       )}
     </main>
