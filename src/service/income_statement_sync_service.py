@@ -10,6 +10,7 @@
 from dataclasses import dataclass
 from datetime import date
 import logging
+from time import sleep
 
 from src.common.data_adapter import DataSource
 from src.constants import AssetType
@@ -51,10 +52,12 @@ class IncomeStatementSyncService:
             database: Database,
             kis_client: KisIncomeStatementClient,
             chunk_size: int = 200,
+            throttle_sec: float = 0.3,
     ) -> None:
         self._database = database
         self._kis = kis_client
         self._chunk_size = chunk_size
+        self._throttle_sec = throttle_sec  # KIS 초당 거래건수 제한(EGW00201) 회피용 호출 간격
 
     def sync(self, skip_current: bool = True, now: date | None = None) -> IncomeStatementSyncResult:
         """active KR_STOCK 전종목 손익계산서 동기화.
@@ -100,6 +103,9 @@ class IncomeStatementSyncService:
                     logger.warning("손익계산서 조회 실패 ticker=%s period=%s: %s", code, period, e)
                     api_calls_failed += 1
                     continue
+                finally:
+                    if self._throttle_sec > 0:
+                        sleep(self._throttle_sec)  # 초당 거래건수 제한 회피
                 rows_received += len(rows)
                 buffer.extend(_to_entities(ticker_id, rows))
 

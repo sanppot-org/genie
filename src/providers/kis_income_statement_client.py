@@ -33,6 +33,13 @@ PERIOD_QUARTER = "QUARTER"
 # period_type → KIS FID_DIV_CLS_CODE
 _DIV_CLS = {PERIOD_ANNUAL: "0", PERIOD_QUARTER: "1"}
 
+# KIS 초당 거래건수 초과(rate limit) 코드 — 일시적이므로 재시도 대상.
+_RATE_LIMIT_CODE = "EGW00201"
+
+
+class KisRateLimitError(Exception):
+    """KIS 초당 거래건수 초과(EGW00201). 일시적 → 재시도."""
+
 
 @dataclass(frozen=True)
 class IncomeStatementRow:
@@ -71,23 +78,29 @@ class KisIncomeStatementClient:
         self._api = api
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=2, max=10),
-        retry=retry_if_exception_type(requests.RequestException),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=1, max=10),
+        retry=retry_if_exception_type((requests.RequestException, KisRateLimitError)),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )
     def fetch(self, ticker: str, period_type: str) -> list[IncomeStatementRow]:
         """종목 손익계산서 조회 (raw 결산기 행 그대로, 연간 선두 비결산행 필터는 조회 레이어 담당).
 
-        - 일시 네트워크 오류(RequestException)는 재시도 후 최종 실패 시 예외 전파
-        - KIS API 자체 오류(HTTP 429/5xx, rt_cd != 0 등)는 `_validate_response`가 예외를
-          던지며 **전파**한다 → 호출자(sync)가 `api_calls_failed`로 집계(빈 응답과 구분).
-          빈 리스트는 '정상 응답이지만 데이터 없음'만을 의미한다.
+        - 일시 네트워크 오류(RequestException) / 초당 거래건수 초과(EGW00201)는 재시도.
+        - 그 외 KIS API 오류(rt_cd != 0, 잘못된 종목코드 등)는 **전파** → 호출자(sync)가
+          `api_calls_failed`로 집계(빈 응답과 구분). 빈 리스트는 '정상이나 데이터 없음'만 의미.
         - stac_yymm 없는 행은 skip
         """
         div = _DIV_CLS[period_type]
-        response = self._api.income_statement(ticker, div)
+        try:
+            response = self._api.income_statement(ticker, div)
+        except requests.RequestException:
+            raise
+        except Exception as e:
+            if _RATE_LIMIT_CODE in str(e):
+                raise KisRateLimitError(str(e)) from e
+            raise
 
         rows: list[IncomeStatementRow] = []
         for out in response.output:

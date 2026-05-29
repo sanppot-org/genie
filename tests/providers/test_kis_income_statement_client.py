@@ -4,12 +4,14 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
+from tenacity import wait_none
 
 from src.hantu.domestic_api import HantuDomesticAPI
 from src.hantu.model.domestic.income_statement import IncomeStatementOutput, ResponseBody
 from src.providers.kis_income_statement_client import (
     PERIOD_ANNUAL,
     KisIncomeStatementClient,
+    KisRateLimitError,
 )
 
 
@@ -101,3 +103,21 @@ def test_fetch_returns_empty_on_valid_empty_response() -> None:
     client = KisIncomeStatementClient(api)
 
     assert client.fetch("005930", PERIOD_ANNUAL) == []
+
+
+def test_fetch_retries_on_rate_limit() -> None:
+    """초당 거래건수 초과(EGW00201)는 KisRateLimitError로 재시도(stop_after_attempt=5)."""
+    api = MagicMock(spec=HantuDomesticAPI)
+    api.income_statement.side_effect = Exception(
+        'Error: {"rt_cd":"1","msg_cd":"EGW00201","msg1":"초당 거래건수를 초과하였습니다."}'
+    )
+    client = KisIncomeStatementClient(api)
+
+    original_wait = KisIncomeStatementClient.fetch.retry.wait  # type: ignore[attr-defined]
+    KisIncomeStatementClient.fetch.retry.wait = wait_none()  # type: ignore[attr-defined]
+    try:
+        with pytest.raises(KisRateLimitError):
+            client.fetch("005930", PERIOD_ANNUAL)
+        assert api.income_statement.call_count == 5
+    finally:
+        KisIncomeStatementClient.fetch.retry.wait = original_wait  # type: ignore[attr-defined]
