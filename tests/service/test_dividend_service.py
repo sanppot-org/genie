@@ -81,13 +81,18 @@ class TestConsecutiveDividendIncreaseYears:
     def test_continuous_increase_returns_count(
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
     ) -> None:
-        """2021→2022→2023 모두 인상이면 2 (전년 대비 비교 횟수)."""
+        """2021→2022→2023 모두 인상이면 2 (전년 대비 비교 횟수).
+
+        recency 앵커 때문에 최신 데이터(2023)가 cutoff_year여야 하므로 today=2024-05 고정.
+        """
         repo.bulk_upsert([
             _row(ticker_id, date(2021, 12, 27), 100),
             _row(ticker_id, date(2022, 12, 27), 110),
             _row(ticker_id, date(2023, 12, 27), 120),
         ])
-        assert service.consecutive_dividend_increase_years(ticker_id) == 2
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2024, 5, 20),
+        ) == 2
 
     def test_freeze_keeps_streak_but_not_count_as_increase(
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
@@ -105,7 +110,9 @@ class TestConsecutiveDividendIncreaseYears:
             _row(ticker_id, date(2023, 12, 27), 120),
             _row(ticker_id, date(2024, 12, 27), 120),
         ])
-        assert service.consecutive_dividend_increase_years(ticker_id) == 2
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2025, 5, 20),
+        ) == 2
 
     def test_decrease_breaks_streak(
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
@@ -118,12 +125,48 @@ class TestConsecutiveDividendIncreaseYears:
             _row(ticker_id, date(2024, 12, 27), 120),  # 인상
         ])
         # 2024→2023(+1), 2023→2022(+1), 2022→2021(감소 → break)
-        assert service.consecutive_dividend_increase_years(ticker_id) == 2
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2025, 5, 20),
+        ) == 2
 
     def test_no_dividends_returns_zero(
             self, service: DividendService, ticker_id: int,
     ) -> None:
         assert service.consecutive_dividend_increase_years(ticker_id) == 0
+
+    def test_gap_year_breaks_streak(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        """배당 중단(연도 누락)은 연속을 끊는다 — 최근 연속분만 인정.
+
+        2023 배당 중단(row 없음)으로 2024↔2022가 단절 → 최신 2025↑2024(+1)만 인정.
+        """
+        repo.bulk_upsert([
+            _row(ticker_id, date(2021, 12, 27), 100),
+            _row(ticker_id, date(2022, 12, 27), 110),
+            # 2023 배당 중단 (dps<=0은 sync에서 적재되지 않아 결측)
+            _row(ticker_id, date(2024, 12, 27), 120),
+            _row(ticker_id, date(2025, 12, 27), 130),
+        ])
+        # cutoff=2025, years_desc=[2025,2024,2022,2021]: 2025↑2024(+1), 2024↔2022 단절→break
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2026, 5, 20),
+        ) == 1
+
+    def test_stale_streak_returns_zero(
+            self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
+    ) -> None:
+        """과거에 인상했어도 최근 완료 회계연도에 배당이 없으면 0 (recency 앵커)."""
+        repo.bulk_upsert([
+            _row(ticker_id, date(2018, 12, 27), 100),
+            _row(ticker_id, date(2019, 12, 27), 110),
+            _row(ticker_id, date(2020, 12, 27), 120),
+            # 2021~ 배당 완전 중단
+        ])
+        # today=2026-05 → cutoff=2025, 최신 데이터 연도 2020 != 2025 → 0
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2026, 5, 20),
+        ) == 0
 
     def test_in_progress_fiscal_year_excluded_after_april(
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
@@ -221,7 +264,7 @@ class TestBulkMethods:
         ])
 
         result = service.consecutive_dividend_increase_years_bulk(
-            [ticker_id, other_ticker_id],
+            [ticker_id, other_ticker_id], today=date(2024, 5, 20),
         )
         assert result == {ticker_id: 2, other_ticker_id: 0}
 

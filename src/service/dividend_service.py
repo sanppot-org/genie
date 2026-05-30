@@ -97,6 +97,13 @@ class DividendService:
         한국 12월 결산 + 3월 정기 주총 + 4월 배당 공시 관행 기준 cutoff:
         - 5월 이후: 작년까지는 완료 → cutoff = year - 1
         - 4월 이전: 작년치도 아직 미마감 → cutoff = year - 2
+
+        '연속 인상'은 현재성·연속성을 요구한다:
+        - recency: 가장 최신 비교 연도가 cutoff_year(가장 최근 완료 회계연도)가 아니면
+          최근 배당이 끊긴 것 → 0. (오래전 끝난 인상 행진은 인정하지 않는다)
+        - 연속성: 연도가 1년씩 이어져야 한다. 배당 중단으로 연도가 단절되면 그 지점에서
+          끊긴다. (dps<=0은 sync에서 적재되지 않으므로 결측 연도 = 중단으로 본다)
+        동결은 연속을 끊지 않지만 인상 카운트엔 포함되지 않는다.
         """
         if not rows:
             return 0
@@ -109,8 +116,16 @@ class DividendService:
                 continue
             year_to_dps[r.fiscal_year] += r.dps
         years_desc = sorted(year_to_dps.keys(), reverse=True)
+
+        # recency 앵커: 최근 완료 회계연도에 배당이 없으면 '진행 중 연속'이 아니다.
+        if not years_desc or years_desc[0] != cutoff_year:
+            return 0
+
         streak = 0
         for i in range(len(years_desc) - 1):
+            # 연도 단절(배당 중단)은 연속을 끊는다.
+            if years_desc[i] - years_desc[i + 1] != 1:
+                break
             cur = year_to_dps[years_desc[i]]
             prev = year_to_dps[years_desc[i + 1]]
             if cur < prev:
