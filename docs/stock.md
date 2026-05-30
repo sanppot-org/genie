@@ -97,7 +97,7 @@
 
 [ ] 액면분할 후 주가
 [x] 로컬에서 better stack 비활성화
-[ ] 프로파일에 따라서 스케줄러 비활성화
+[x] 프로파일에 따라서 스케줄러 비활성화
 
 [ ] 스크리닝
   [ ] 다중 정렬
@@ -106,6 +106,7 @@
     [x] 종목 검색
     [x] 분기, 연속, 총점
   [x] 지표에 마우스 올리면 점수 공식 보이기
+  [x] 자사주 점수 3지표 추가 (매입·소각 7 / 연간 소각비율 8 / 보유비율 5) — 45→65점, 표시+정렬(필터는 2차), 결측은 N/A·0점
   [ ] 업종 컬럼 추가
 [] 종목 상세
   [x] 가장 최근 종목을 기본값으로 설정
@@ -121,6 +122,8 @@
     [x] 연간/분기 토글 + 분기 단일환산 토글
 
 [x] 손익계산서 수집 (KIS income-statement) — `stock_income_statements`, 백필 스크립트 + 주1회 스케줄러(월 19:00), 증분 가드, 청크 커밋
+[x] 자사주 소각 수집 (DART 자기주식소각결정 공시) — `stock_cancellation_events`(보통/종류주 분리), `list`+`document` 정규식 파싱, 백필 스크립트 + 주1회 스케줄러(월 19:30), 청크 커밋
+[x] buyback/treasury sync 백필 커밋 버그 수정 — `Database` 주입 + 내부 `session_scope`로 통일(standalone 백필도 커밋되도록), 죽은 `BuybackService` 제거
 [x] 업종/섹터 데이터 추가 (KIS) 기존 데이터 교체 (스케줄러)
 [x] 배당 종류 중간 / 반기 / 분기 합치기 — sync 시 (ticker_id, record_date, dps) 그룹은 QUARTERLY>INTERIM>SETTLE 1건만 적재, 기존 데이터는 `scripts/cleanup_dividend_duplicates.py`로 정리
 

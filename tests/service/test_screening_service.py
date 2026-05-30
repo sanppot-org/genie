@@ -7,19 +7,32 @@ from sqlalchemy.orm import Session
 
 from src.common.data_adapter import DataSource
 from src.constants import AssetType
-from src.database.models import StockDividend, StockFundamental, Ticker
+from src.database.models import (
+    StockBuybackEvent,
+    StockCancellationEvent,
+    StockDividend,
+    StockFundamental,
+    StockTreasuryStock,
+    Ticker,
+)
+from src.database.stock_buyback_event_repository import StockBuybackEventRepository
+from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
+from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.dividend_service import DividendService
 from src.service.screening_service import (
     ScreeningFilters,
     ScreeningService,
+    score_annual_cancel_ratio,
     score_consecutive_increase,
     score_dividend_yield,
     score_pbr,
     score_per,
     score_quarterly_dividend,
+    score_regular_buyback,
+    score_treasury_holding,
 )
 
 
@@ -58,6 +71,23 @@ class TestScoreRules:
     def test_score_consecutive_increase(self, years: int, expected: int) -> None:
         assert score_consecutive_increase(years) == expected
 
+    def test_score_regular_buyback(self) -> None:
+        assert score_regular_buyback(True) == 7
+        assert score_regular_buyback(False) == 0
+
+    @pytest.mark.parametrize("ratio,expected", [
+        (0.0, 0), (0.5, 0), (0.51, 3), (1.5, 3), (1.51, 5),
+        (2.0, 5), (2.01, 8), (10.0, 8),
+    ])
+    def test_score_annual_cancel_ratio(self, ratio: float, expected: int) -> None:
+        assert score_annual_cancel_ratio(ratio) == expected
+
+    @pytest.mark.parametrize("ratio,expected", [
+        (0.0, 5), (1.99, 4), (2.0, 2), (4.99, 2), (5.0, 0), (10.0, 0),
+    ])
+    def test_score_treasury_holding(self, ratio: float, expected: int) -> None:
+        assert score_treasury_holding(ratio) == expected
+
 
 @pytest.fixture
 def screening_setup(session: Session) -> ScreeningService:
@@ -65,6 +95,9 @@ def screening_setup(session: Session) -> ScreeningService:
     ticker_repo = TickerRepository(session)
     fund_repo = StockFundamentalRepository(session)
     div_repo = StockDividendRepository(session)
+    buyback_repo = StockBuybackEventRepository(session)
+    cancel_repo = StockCancellationEventRepository(session)
+    treasury_repo = StockTreasuryStockRepository(session)
 
     target_date = date(2026, 5, 15)
 
@@ -88,6 +121,20 @@ def screening_setup(session: Session) -> ScreeningService:
         )
         for y in range(2014, 2025)
     ])
+    # A: 최근 1년 취득결정(①), 소각 30,000주(②), 발행 1,000,000 → 소각비율 3%(>2 → 8점),
+    #    자사주 보유 1.0%(③ <2 → 4점).
+    buyback_repo.bulk_upsert([StockBuybackEvent(
+        ticker_id=t1.id, rcept_no="A-ACQ-1", event_type="ACQUISITION",
+        resolution_date=date(2026, 1, 10),
+    )])
+    cancel_repo.bulk_upsert([StockCancellationEvent(
+        ticker_id=t1.id, rcept_no="A-CXL-1", report_nm="주식소각결정",
+        resolution_date=date(2026, 2, 1), common_shares=30_000, preferred_shares=0,
+    )])
+    treasury_repo.bulk_upsert([StockTreasuryStock(
+        ticker_id=t1.id, stlm_dt=date(2025, 12, 31), reprt_code="11011",
+        issued_shares=1_000_000, treasury_shares=10_000, treasury_ratio=1.0,
+    )])
 
     # 중간 점수: 평균 PER, PBR 1.0 (PBR 0점), 보통 배당
     t2 = ticker_repo.save(Ticker(
@@ -106,6 +153,11 @@ def screening_setup(session: Session) -> ScreeningService:
     fund_repo.bulk_upsert([StockFundamental(
         ticker_id=t3.id, date=target_date, per=None, pbr=0.5, div=None, eps=None, bps=8000, dps=None,
     )])
+    # C: treasury row 있음 & 보유 0주(ratio==0) → ③ 5점, raw 0.0. (소각 없으니 ② 0.0% → 0점)
+    treasury_repo.bulk_upsert([StockTreasuryStock(
+        ticker_id=t3.id, stlm_dt=date(2025, 12, 31), reprt_code="11011",
+        issued_shares=500_000, treasury_shares=0, treasury_ratio=0.0,
+    )])
 
     # 펀더멘털 없음: 모든 점수 0 (특정일 데이터 누락 케이스)
     ticker_repo.save(Ticker(
@@ -123,6 +175,9 @@ def screening_setup(session: Session) -> ScreeningService:
         ticker_repository=ticker_repo,
         fundamental_repository=fund_repo,
         dividend_service=DividendService(div_repo, ticker_repo),
+        buyback_event_repository=buyback_repo,
+        cancellation_event_repository=cancel_repo,
+        treasury_stock_repository=treasury_repo,
     )
 
 
@@ -139,15 +194,28 @@ class TestScoreKrStocks:
         assert result.total == 4
         assert {r.ticker for r in result.rows} == {"A00001", "B00002", "C00003", "D00004"}
 
-        # 1위: A00001 (저PER 20 + 저PBR 5 + 고배당 10 + 분기 5 + 10년+ 5 = 45)
+        # 1위: A00001 (PER 20 + PBR 5 + 배당 10 + 분기 5 + 연속 5 + 매입소각 7 + 소각비율 8 + 보유 4 = 64)
         top = result.rows[0]
         assert top.ticker == "A00001"
-        assert top.total_score == 45
         assert top.scores.per == 20
         assert top.scores.pbr == 5
         assert top.scores.dividend_yield == 10
         assert top.scores.quarterly_dividend == 5
         assert top.scores.consecutive_increase_years == 5
+        assert top.scores.regular_buyback == 7        # 취득결정 + 소각 존재
+        assert top.scores.annual_cancel_ratio == 8    # 30,000/1,000,000 = 3% > 2
+        assert top.scores.treasury_holding == 4       # 보유 1.0% (<2)
+        assert top.regular_buyback is True
+        assert top.annual_cancel_ratio == 3.0
+        assert top.treasury_ratio == 1.0
+        # total은 breakdown 합과 일치
+        s = top.scores
+        assert top.total_score == (
+            s.per + s.pbr + s.dividend_yield + s.quarterly_dividend
+            + s.consecutive_increase_years + s.regular_buyback
+            + s.annual_cancel_ratio + s.treasury_holding
+        )
+        assert top.total_score == 64
 
         # 정렬 검증: total_score 내림차순
         scores = [r.total_score for r in result.rows]
@@ -162,7 +230,12 @@ class TestScoreKrStocks:
         assert c.per is None
         assert c.scores.per == 0
         assert c.scores.pbr == 4   # 0.5 → 4
-        assert c.total_score == 4
+        # treasury row 있음 & 보유 0주 → ③ 5점, raw 0.0 (소각 없으니 ② 0.0% → 0점, raw 0.0)
+        assert c.treasury_ratio == 0.0
+        assert c.scores.treasury_holding == 5
+        assert c.annual_cancel_ratio == 0.0
+        assert c.scores.annual_cancel_ratio == 0
+        assert c.total_score == 4 + 5   # pbr 4 + 보유 5
 
     def test_no_fundamental_row_yields_all_zero(
             self, screening_setup: ScreeningService,
@@ -172,6 +245,44 @@ class TestScoreKrStocks:
         d = next(r for r in result.rows if r.ticker == "D00004")
         assert d.per is None and d.pbr is None and d.dividend_yield is None
         assert d.total_score == 0
+
+    def test_no_treasury_row_yields_zero_not_five(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """③ 회귀: treasury row 없는 종목은 보유비율 0점(5점 아님) + raw None.
+
+        ② 발행주식수 미상이므로 소각비율도 0점 + raw None.
+        """
+        result = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        # B00002·D00004 모두 treasury row 없음.
+        for code in ("B00002", "D00004"):
+            row = next(r for r in result.rows if r.ticker == code)
+            assert row.treasury_ratio is None
+            assert row.scores.treasury_holding == 0
+            assert row.annual_cancel_ratio is None
+            assert row.scores.annual_cancel_ratio == 0
+
+    def test_regular_buyback_via_cancellation_only(
+            self, session: Session, screening_setup: ScreeningService,
+    ) -> None:
+        """① 소각만 있어도(취득결정 없이) 매입·소각 결정 7점."""
+        ticker_repo = TickerRepository(session)
+        cancel_repo = StockCancellationEventRepository(session)
+        e = ticker_repo.save(Ticker(
+            ticker="E00005", name="소각만한주",
+            asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value,
+        ))
+        cancel_repo.bulk_upsert([StockCancellationEvent(
+            ticker_id=e.id, rcept_no="E-CXL-1", report_nm="주식소각결정",
+            resolution_date=date(2026, 3, 1), common_shares=5_000, preferred_shares=0,
+        )])
+
+        result = screening_setup.score_kr_stocks(
+            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+        )
+        row = next(r for r in result.rows if r.ticker == "E00005")
+        assert row.regular_buyback is True
+        assert row.scores.regular_buyback == 7
 
     def test_pagination(self, screening_setup: ScreeningService) -> None:
         """limit/offset이 정렬된 전체 결과를 슬라이스."""
@@ -481,6 +592,9 @@ class TestScoreKrStocksEmptyDb:
             dividend_service=DividendService(
                 StockDividendRepository(session), TickerRepository(session),
             ),
+            buyback_event_repository=StockBuybackEventRepository(session),
+            cancellation_event_repository=StockCancellationEventRepository(session),
+            treasury_stock_repository=StockTreasuryStockRepository(session),
         )
         result = service.score_kr_stocks()
         assert result.total == 0

@@ -1,4 +1,4 @@
-"""KR 주식 스크리닝 API — 5개 지표 점수 합산 랭킹."""
+"""KR 주식 스크리닝 API — 8개 지표 점수 합산 랭킹 (65점 만점)."""
 # ruff: noqa: B008
 
 from dataclasses import asdict
@@ -22,8 +22,11 @@ router = APIRouter(tags=["screening"])
 ScreeningSortBy = Literal[
     "total_score", "per", "pbr", "dividend_yield",
     "quarterly_dividend", "consecutive_years", "ticker",
+    "regular_buyback", "annual_cancel_ratio", "treasury_holding",
 ]
 ScreeningSortOrder = Literal["asc", "desc"]
+
+_MAX_SCORE = 65
 
 
 @router.get("/screening/kr-stock", response_model=GenieResponse[ScreeningResponse])
@@ -44,7 +47,7 @@ def get_kr_stock_screening(
         q: str | None = Query(default=None, max_length=50),
         service: ScreeningService = Depends(Provide[ApplicationContainer.screening_service]),
 ) -> GenieResponse[ScreeningResponse]:
-    """전체 KR_STOCK을 5개 지표 점수 합산해 sort_by/order 기준으로 정렬.
+    """전체 KR_STOCK을 8개 지표 점수 합산해(65점 만점) sort_by/order 기준으로 정렬.
 
     기본은 total_score DESC, ticker ASC. NULL 값은 정렬 방향과 무관하게 항상 맨 뒤.
     `date` 미지정 시 `stock_fundamentals` 최신 일자 사용. 데이터 없으면 빈 결과.
@@ -73,6 +76,7 @@ def _to_response(result: ScreeningResult) -> ScreeningResponse:
         total=result.total,
         limit=result.limit,
         offset=result.offset,
+        max_score=_MAX_SCORE,
         rows=[
             ScreeningRowResponse(
                 ticker=r.ticker,
@@ -82,6 +86,9 @@ def _to_response(result: ScreeningResult) -> ScreeningResponse:
                 dividend_yield=r.dividend_yield,
                 quarterly_dividend=r.quarterly_dividend,
                 consecutive_increase_years=r.consecutive_increase_years,
+                regular_buyback=r.regular_buyback,
+                annual_cancel_ratio=r.annual_cancel_ratio,
+                treasury_ratio=r.treasury_ratio,
                 scores=ScreeningScoreBreakdown(**asdict(r.scores)),
                 total_score=r.total_score,
             )

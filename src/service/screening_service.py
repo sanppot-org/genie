@@ -1,24 +1,29 @@
-"""KR 주식 스크리닝 — 5개 지표 점수 합산 랭킹.
+"""KR 주식 스크리닝 — 8개 지표 점수 합산 랭킹.
 
-점수표(`docs/종목_선정_점수표.md`) 중 자동 수집된 5개:
-- PER (20점), PBR (5점), 배당수익률 (10점), 분기 배당 (5점), 연속 인상 (5점) — 합계 45점.
+점수표(`docs/종목_선정_점수표.md`) 중 자동 수집된 8개:
+- PER (20점), PBR (5점), 배당수익률 (10점), 분기 배당 (5점), 연속 인상 (5점),
+  정기 매입·소각 결정 (7점), 연간 소각비율 (8점), 자사주 보유비율 (5점) — 합계 65점.
 
-쿼리 4회로 전체 KR_STOCK을 메모리 join 후 정렬·페이지네이션한다.
+자사주 3개 지표는 buyback/cancellation/treasury repo bulk 집계로 메모리 join한다.
 """
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Literal
 
 from src.constants import AssetType
+from src.database.stock_buyback_event_repository import StockBuybackEventRepository
+from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
+from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.dividend_service import DividendService
 
 ScreeningSortBy = Literal[
     "total_score", "per", "pbr", "dividend_yield",
     "quarterly_dividend", "consecutive_years", "ticker",
+    "regular_buyback", "annual_cancel_ratio", "treasury_holding",
 ]
 ScreeningSortOrder = Literal["asc", "desc"]
 
@@ -29,6 +34,9 @@ _SORT_ATTR_MAP: dict[str, str] = {
     "dividend_yield": "dividend_yield",
     "quarterly_dividend": "quarterly_dividend",
     "consecutive_years": "consecutive_increase_years",
+    "regular_buyback": "scores.regular_buyback",
+    "annual_cancel_ratio": "scores.annual_cancel_ratio",
+    "treasury_holding": "scores.treasury_holding",
 }
 
 
@@ -87,6 +95,42 @@ def score_consecutive_increase(years: int) -> int:
     return 0
 
 
+def score_regular_buyback(has: bool) -> int:
+    """정기적 매입·소각 결정 여부: 있음→7, 없음→0.
+
+    최근 1년 ACQUISITION 취득결정 OR 직전 12개월 소각 존재를 호출부가 판정해 넘긴다.
+    """
+    return 7 if has else 0
+
+
+def score_annual_cancel_ratio(ratio: float) -> int:
+    """연간 소각비율(%) 점수: >2→8, >1.5→5, >0.5→3, 그 외→0.
+
+    결측(발행주식수 미상)은 호출부 책임 — 여기엔 값이 있을 때만 들어온다.
+    """
+    if ratio > 2:
+        return 8
+    if ratio > 1.5:
+        return 5
+    if ratio > 0.5:
+        return 3
+    return 0
+
+
+def score_treasury_holding(ratio: float) -> int:
+    """자사주 보유비율(%) 점수: ==0→5, <2→4, <5→2, 그 외→0.
+
+    treasury row 없음(결측)은 호출부 책임 — 여기엔 값이 있을 때만 들어온다.
+    """
+    if ratio == 0:
+        return 5
+    if ratio < 2:
+        return 4
+    if ratio < 5:
+        return 2
+    return 0
+
+
 @dataclass(frozen=True)
 class ScoreBreakdown:
     per: int
@@ -94,6 +138,9 @@ class ScoreBreakdown:
     dividend_yield: int
     quarterly_dividend: int
     consecutive_increase_years: int
+    regular_buyback: int
+    annual_cancel_ratio: int
+    treasury_holding: int
 
 
 @dataclass(frozen=True)
@@ -105,6 +152,9 @@ class ScreeningRow:
     dividend_yield: float | None
     quarterly_dividend: bool
     consecutive_increase_years: int
+    regular_buyback: bool
+    annual_cancel_ratio: float | None
+    treasury_ratio: float | None
     scores: ScoreBreakdown
     total_score: int
 
@@ -148,10 +198,23 @@ class ScreeningResult:
     rows: list[ScreeningRow]
 
 
+def _resolve_attr(row: "ScreeningRow", attr: str) -> float | None:
+    """단일 또는 dotted attr 경로 해석 (예: 'scores.regular_buyback').
+
+    정렬 가능한 숫자형(int/float/bool) 또는 None을 반환한다.
+    """
+    obj: object = row
+    for part in attr.split("."):
+        obj = getattr(obj, part)
+    if obj is None:
+        return None
+    return float(obj)  # type: ignore[arg-type]
+
+
 def _make_sort_key(attr: str, descending: bool) -> Callable[[ScreeningRow], tuple[int, float]]:
     """비-ticker 필드용 정렬 키. NULL은 정렬 방향과 무관하게 항상 맨 뒤."""
     def key(row: ScreeningRow) -> tuple[int, float]:
-        v = getattr(row, attr)
+        v = _resolve_attr(row, attr)
         if v is None:
             return (1, 0.0)
         primary = float(-v if descending else v)  # bool 도 -True=-1, -False=0 으로 정상 동작
@@ -209,10 +272,16 @@ class ScreeningService:
             ticker_repository: TickerRepository,
             fundamental_repository: StockFundamentalRepository,
             dividend_service: DividendService,
+            buyback_event_repository: StockBuybackEventRepository,
+            cancellation_event_repository: StockCancellationEventRepository,
+            treasury_stock_repository: StockTreasuryStockRepository,
     ) -> None:
         self._tickers = ticker_repository
         self._fundamentals = fundamental_repository
         self._dividends = dividend_service
+        self._buybacks = buyback_event_repository
+        self._cancellations = cancellation_event_repository
+        self._treasuries = treasury_stock_repository
 
     def score_kr_stocks(
             self,
@@ -250,6 +319,13 @@ class ScreeningService:
             ticker_ids, today=today,
         )
 
+        # 자사주 3개 지표 bulk 집계 (최근 1년 윈도우).
+        base = today or date.today()
+        window_from = base - timedelta(days=365)
+        cancelled_map = self._cancellations.cancelled_shares_by_ticker(ticker_ids, window_from, base)
+        acq_ids = self._buybacks.acquisition_ticker_ids_since(ticker_ids, window_from)
+        treasury_map = self._treasuries.latest_by_tickers(ticker_ids)
+
         rows: list[ScreeningRow] = []
         for t in tickers:
             f = fundamentals.get(t.id)
@@ -259,16 +335,47 @@ class ScreeningService:
             is_q = quarterly_map.get(t.id, False)
             streak = streak_map.get(t.id, 0)
 
+            # ① 정기 매입·소각 결정: 취득결정 OR 소각 존재.
+            has_buyback = (t.id in acq_ids) or (cancelled_map.get(t.id, 0) > 0)
+
+            # ②③ treasury row가 있어야 발행주식수·보유비율을 안다.
+            tr = treasury_map.get(t.id)
+            issued = tr[0] if tr else None
+            hold_ratio = tr[1] if tr else None
+
+            # ② 연간 소각비율: 발행주식수를 알 때만 계산, 결측이면 0점+raw None.
+            ann_ratio: float | None
+            if issued is not None and issued > 0:
+                ratio = cancelled_map.get(t.id, 0) / issued * 100
+                ann_ratio = ratio
+                s_ann = score_annual_cancel_ratio(ratio)
+            else:
+                ann_ratio = None
+                s_ann = 0
+
+            # ③ 보유비율: row 없으면 0점(N/A), 0주면 5점, 그 외 구간 점수.
+            if hold_ratio is None:
+                s_hold = 0
+            elif hold_ratio == 0:
+                s_hold = 5
+            else:
+                s_hold = score_treasury_holding(hold_ratio)
+
             breakdown = ScoreBreakdown(
                 per=score_per(per),
                 pbr=score_pbr(pbr),
                 dividend_yield=score_dividend_yield(div),
                 quarterly_dividend=score_quarterly_dividend(is_q),
                 consecutive_increase_years=score_consecutive_increase(streak),
+                regular_buyback=score_regular_buyback(has_buyback),
+                annual_cancel_ratio=s_ann,
+                treasury_holding=s_hold,
             )
             total = (
                 breakdown.per + breakdown.pbr + breakdown.dividend_yield
                 + breakdown.quarterly_dividend + breakdown.consecutive_increase_years
+                + breakdown.regular_buyback + breakdown.annual_cancel_ratio
+                + breakdown.treasury_holding
             )
             rows.append(ScreeningRow(
                 ticker=t.ticker,
@@ -278,6 +385,9 @@ class ScreeningService:
                 dividend_yield=div,
                 quarterly_dividend=is_q,
                 consecutive_increase_years=streak,
+                regular_buyback=has_buyback,
+                annual_cancel_ratio=ann_ratio,
+                treasury_ratio=hold_ratio,
                 scores=breakdown,
                 total_score=total,
             ))

@@ -297,6 +297,37 @@ class StockBuybackEvent(Base, TimestampMixin):
         return f"<StockBuybackEvent(ticker_id={self.ticker_id}, type={self.event_type}, resolution_date={self.resolution_date})>"
 
 
+class StockCancellationEvent(Base, TimestampMixin):
+    """DART 주식소각결정 공시 이벤트 (자사주 소각).
+
+    KR_STOCK 대상. 점수표 "자사주 소각" 판정용.
+    PK는 (ticker_id, rcept_no) — DART 접수번호가 종목별 유일하므로 동일 공시 재호출은 UPSERT.
+    """
+
+    __tablename__ = "stock_cancellation_events"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_cancellation_events_ticker_id"), nullable=False
+    )
+    rcept_no: Mapped[str] = mapped_column(String(14), nullable=False, comment="DART 접수번호")
+    report_nm: Mapped[str] = mapped_column(String(128), nullable=False, comment="공시명([기재정정]/(자회사) 판별·정정추적)")
+    resolution_date: Mapped[date] = mapped_column(Date, nullable=False, comment="이사회결의일(결정일)")
+    cancel_date: Mapped[date | None] = mapped_column(Date, nullable=True, comment="소각 예정일")
+    common_shares: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="소각 보통주 수")
+    preferred_shares: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="소각 종류주 수")
+    cancel_amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="소각예정금액(원)")
+    acquisition_method: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="소각할 주식의 취득방법")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("ticker_id", "rcept_no"),
+        Index("ix_stock_cancellation_events_ticker_id_resolution_date", "ticker_id", "resolution_date"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockCancellationEvent(ticker_id={self.ticker_id}, rcept_no={self.rcept_no}, resolution_date={self.resolution_date})>"
+
+
 class StockIncomeStatement(Base, TimestampMixin):
     """KIS 국내주식 손익계산서 — 결산기별 매출/영업이익/순이익 시계열.
 

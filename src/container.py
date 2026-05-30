@@ -20,6 +20,7 @@ from src.database.database import Database
 from src.database.repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
 from src.database.request_scope import current_request_token
 from src.database.stock_buyback_event_repository import StockBuybackEventRepository
+from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
@@ -39,8 +40,8 @@ from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
-from src.service.buyback_service import BuybackService
 from src.service.buyback_sync_service import BuybackSyncService
+from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
@@ -125,6 +126,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     stock_dividend_repository = providers.Factory(StockDividendRepository, session=_session)
     stock_treasury_stock_repository = providers.Factory(StockTreasuryStockRepository, session=_session)
     stock_buyback_event_repository = providers.Factory(StockBuybackEventRepository, session=_session)
+    stock_cancellation_event_repository = providers.Factory(StockCancellationEventRepository, session=_session)
     stock_income_statement_repository = providers.Factory(StockIncomeStatementRepository, session=_session)
 
     # Google Sheet Clients
@@ -258,19 +260,13 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
     treasury_stock_sync_service = providers.Factory(
         TreasuryStockSyncService,
+        database=database,
         client=dart_company_client,
-        ticker_repository=ticker_repository,
-        treasury_stock_repository=stock_treasury_stock_repository,
     )
     buyback_sync_service = providers.Factory(
         BuybackSyncService,
+        database=database,
         client=dart_company_client,
-        ticker_repository=ticker_repository,
-        buyback_event_repository=stock_buyback_event_repository,
-    )
-    buyback_service = providers.Factory(
-        BuybackService,
-        buyback_event_repository=stock_buyback_event_repository,
     )
     kis_income_statement_client = providers.Singleton(KisIncomeStatementClient, hantu_domestic_api)
     income_statement_sync_service = providers.Factory(
@@ -283,9 +279,17 @@ class ApplicationContainer(containers.DeclarativeContainer):
         ticker_repository=ticker_repository,
         income_statement_repository=stock_income_statement_repository,
     )
+    cancellation_sync_service = providers.Factory(
+        CancellationSyncService,
+        database=database,
+        dart_client=dart_company_client,
+    )
     screening_service = providers.Factory(
         ScreeningService,
         ticker_repository=ticker_repository,
         fundamental_repository=stock_fundamental_repository,
         dividend_service=dividend_service,
+        buyback_event_repository=stock_buyback_event_repository,
+        cancellation_event_repository=stock_cancellation_event_repository,
+        treasury_stock_repository=stock_treasury_stock_repository,
     )

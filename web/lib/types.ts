@@ -82,6 +82,9 @@ export interface ScreeningScoreBreakdown {
   dividend_yield: number;
   quarterly_dividend: number;
   consecutive_increase_years: number;
+  regular_buyback: number;
+  annual_cancel_ratio: number;
+  treasury_holding: number;
 }
 
 export interface ScreeningRow {
@@ -92,6 +95,9 @@ export interface ScreeningRow {
   dividend_yield: number | null;
   quarterly_dividend: boolean;
   consecutive_increase_years: number;
+  regular_buyback: boolean;
+  annual_cancel_ratio: number | null;
+  treasury_ratio: number | null;
   scores: ScreeningScoreBreakdown;
   total_score: number;
 }
@@ -101,6 +107,7 @@ export interface ScreeningResponse {
   total: number;
   limit: number;
   offset: number;
+  max_score: number;
   rows: ScreeningRow[];
 }
 
@@ -111,7 +118,10 @@ export type ScreeningSortBy =
   | "dividend_yield"
   | "quarterly_dividend"
   | "consecutive_years"
-  | "ticker";
+  | "ticker"
+  | "regular_buyback"
+  | "annual_cancel_ratio"
+  | "treasury_holding";
 
 export type ScreeningSortOrder = "asc" | "desc";
 

@@ -40,6 +40,30 @@ class StockBuybackEventRepository(BaseRepository[StockBuybackEvent, int]):
             query = query.filter(StockBuybackEvent.event_type == event_type)
         return query.order_by(StockBuybackEvent.resolution_date.desc()).all()
 
+    def acquisition_ticker_ids_since(
+            self,
+            ticker_ids: list[int],
+            from_date: date,
+    ) -> set[int]:
+        """`from_date` 이후 ACQUISITION(취득결정) 공시가 있는 ticker_id 집합. 쿼리 1회.
+
+        resolution_date >= from_date + event_type='ACQUISITION' + ticker_id IN.
+        결과는 조건을 만족하는 ticker_id만 포함.
+        """
+        if not ticker_ids:
+            return set()
+        rows = (
+            self.session.query(StockBuybackEvent.ticker_id)
+            .filter(
+                StockBuybackEvent.ticker_id.in_(ticker_ids),
+                StockBuybackEvent.event_type == "ACQUISITION",
+                StockBuybackEvent.resolution_date >= from_date,
+            )
+            .distinct()
+            .all()
+        )
+        return {row[0] for row in rows}
+
     def bulk_upsert(self, entities: list[StockBuybackEvent]) -> None:
         """Postgres ON CONFLICT로 (ticker_id, rcept_no) 키 일괄 UPSERT.
 

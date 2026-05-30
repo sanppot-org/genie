@@ -22,6 +22,7 @@ from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.scheduled_tasks.scope import db_scoped, mark_rollback_only
 from src.service.buyback_sync_service import BuybackSyncService
+from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_sync_service import DividendSyncService
 from src.service.fundamental_sync_service import FundamentalSyncService
@@ -239,6 +240,33 @@ def sync_kr_stock_buybacks(
         mark_rollback_only()
         logger.exception("자사주 공시 동기화 실패")
         slack_client.send_status(f"자사주 공시 동기화 실패 ({from_date}~{today}): {e}")
+
+
+@db_scoped
+@inject
+def sync_kr_stock_cancellations(
+        service: CancellationSyncService = Provide[ApplicationContainer.cancellation_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """KR 주식 주식소각결정 공시(자사주 소각) 동기화 (주 1회, 매주 월요일 19:30 KST).
+
+    DART 공시는 수시 발생 → 분기 폴링은 너무 느림. 주 1회 충분.
+    최근 90일을 안전 buffer로 매번 호출 (수정·정정 공시 반영). 멱등 UPSERT라 중복 호출 안전.
+    초기 전종목 백필은 scripts/backfill_cancellations.py 사용.
+    """
+    today = datetime.now(KST).date()
+    from_date = today - timedelta(days=90)
+    try:
+        result = service.sync(from_date, today)
+        logger.info(
+            "주식소각결정 동기화 완료 from=%s to=%s tickers=%d api_fail=%d rows_upserted=%d chunks_fail=%d",
+            from_date, today, result.ticker_count, result.api_calls_failed,
+            result.rows_upserted, result.chunks_failed,
+        )
+    except Exception as e:
+        mark_rollback_only()
+        logger.exception("주식소각결정 동기화 실패")
+        slack_client.send_status(f"주식소각결정 동기화 실패 ({from_date}~{today}): {e}")
 
 
 @db_scoped

@@ -1,5 +1,21 @@
 의사결정 기록
 
+## 2026-05-30: 자사주 소각 수집 + 스크리너 자사주 점수(3지표)
+
+### 핵심 결정
+- **출처**: 자사주 소각은 **KIS에 전무**(전체문서 엑셀까지 확인) → **DART 전용**. DART에 소각 구조화 JSON API 없음(OpenDartReader `event()` 미지원) → `list()`로 "주식소각결정" 공시 식별 → `document()` 원문 **정규식 파싱**(레이블 일정: 소각주식수·소각예정금액·소각예정일·이사회결의일). 삼성 005930 실측 검증.
+- **스키마**: 신규 `stock_cancellation_events`(PK `(ticker_id, rcept_no)`, 보통주/종류주 분리 보존, `cancel_date`/`cancel_amount`/`acquisition_method`). 기존 `stock_buyback_events`에 `event_type="CANCELLATION"`으로 **합치지 않음**(period_start 의미오염·종류주 손실 회피). architect/codex 합의.
+- **sync 안전**: `CancellationSyncService`는 손익계산서 패턴(Database 주입 + 청크 독립 `session_scope` + DART 호출은 트랜잭션 밖). backfill 1회 + 주1회 cron(월 19:30).
+- **백필 커밋 버그 수정**: 기존 `BuybackSyncService`/`TreasuryStockSyncService`가 주입 repo만 쓰고 커밋 주체가 `@db_scoped`(스케줄러)에만 의존 → **standalone 백필 스크립트에서 커밋 안 됨**(로그는 upserted=N, 실제 0행). 두 서비스를 손익/소각과 동일한 `Database` 주입 + 내부 `session_scope` 패턴으로 통일(부수효과: 전종목 DART 호출 중 트랜잭션 점유 안티패턴도 제거).
+- **스크리너 점수(45→65점)**: 점수표 자사주 3지표(매입·소각 7 / 연간 소각비율 8 / 보유비율 5)를 `ScreeningService`에 추가. 별도 시스템 X — 기존 score 파이프라인 확장(repo bulk 메서드 3개 직접 주입, `fundamental_repository` 주입과 일관).
+  - **결측 vs 진짜 0(가장 중요)**: ③ "없음→5점"은 **자기주식 0주(데이터 존재)**. treasury row 자체가 없는 종목(미백필)은 **0점+raw None(N/A)** — 5점 오인 절대 금지. ② issued 미상도 0점+N/A.
+  - ② "연간"=**직전 12개월 rolling, resolution_date 기준**(cancel_date는 nullable·무인덱스). ① 매입은 취득**결정** 공시(intent)로 근사, DISPOSAL 제외.
+  - 신규 컬럼은 **표시+정렬만**(필터는 결측정책 충돌·UX 혼란으로 2차). 응답에 `max_score` 추가.
+- **죽은 코드 제거(D)**: `BuybackService.is_regular_buyback`(소비처 없음 + 매입만 카운트해 "매입·소각" 스펙 불일치) → bulk 판정으로 대체, `buyback_service.py`/테스트 삭제.
+
+### 검토
+architect/critic + codex 교차검증 2회(소각 수집 설계, 스크리너 점수 설계). 로컬 Postgres 실데이터 엔드투엔드 검증(삼성 7/3/4, SK 7/8/2, `DISTINCT ON` 최신연도 선택 정상).
+
 ## 2026-05-29: KIS 손익계산서(매출·영업이익·순이익) 수집 + 상세화면 표시
 
 ### 핵심 결정

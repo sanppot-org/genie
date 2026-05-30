@@ -248,13 +248,16 @@ class StockDailyCandleSeriesResponse(BaseModel):
 
 
 class ScreeningScoreBreakdown(BaseModel):
-    """5개 지표별 점수 (PER 20 + PBR 5 + 배당수익률 10 + 분기 5 + 연속 5 = 45)."""
+    """8개 지표별 점수 (PER 20 + PBR 5 + 배당 10 + 분기 5 + 연속 5 + 매입소각 7 + 소각비율 8 + 보유 5 = 65)."""
 
     per: int
     pbr: int
     dividend_yield: int
     quarterly_dividend: int
     consecutive_increase_years: int
+    regular_buyback: int
+    annual_cancel_ratio: int
+    treasury_holding: int
 
 
 class ScreeningRowResponse(BaseModel):
@@ -267,6 +270,9 @@ class ScreeningRowResponse(BaseModel):
     dividend_yield: float | None = None
     quarterly_dividend: bool
     consecutive_increase_years: int
+    regular_buyback: bool
+    annual_cancel_ratio: float | None = None
+    treasury_ratio: float | None = None
     scores: ScreeningScoreBreakdown
     total_score: int
 
@@ -278,4 +284,5 @@ class ScreeningResponse(BaseModel):
     total: int
     limit: int
     offset: int
+    max_score: int
     rows: list[ScreeningRowResponse]

@@ -34,9 +34,11 @@ def _row(ticker: str, total: int = 30) -> ScreeningRow:
         ticker=ticker, name=f"{ticker}_name",
         per=5.0, pbr=0.5, dividend_yield=4.0,
         quarterly_dividend=True, consecutive_increase_years=4,
+        regular_buyback=True, annual_cancel_ratio=3.0, treasury_ratio=1.0,
         scores=ScoreBreakdown(
             per=15, pbr=4, dividend_yield=5,
             quarterly_dividend=5, consecutive_increase_years=3,
+            regular_buyback=7, annual_cancel_ratio=8, treasury_holding=4,
         ),
         total_score=total,
     )
@@ -61,10 +63,18 @@ class TestScreeningAPI:
         assert body["total"] == 2
         assert body["limit"] == 50
         assert body["offset"] == 0
+        assert body["max_score"] == 65
         assert [r["ticker"] for r in body["rows"]] == ["A0001", "B0002"]
         assert body["rows"][0]["total_score"] == 45
         assert body["rows"][0]["scores"]["per"] == 15
         assert body["rows"][0]["quarterly_dividend"] is True
+        # 자사주 3개 지표 점수 + raw 전파
+        assert body["rows"][0]["scores"]["regular_buyback"] == 7
+        assert body["rows"][0]["scores"]["annual_cancel_ratio"] == 8
+        assert body["rows"][0]["scores"]["treasury_holding"] == 4
+        assert body["rows"][0]["regular_buyback"] is True
+        assert body["rows"][0]["annual_cancel_ratio"] == 3.0
+        assert body["rows"][0]["treasury_ratio"] == 1.0
 
         mock_screening_service.score_kr_stocks.assert_called_once_with(
             target_date=None, limit=50, offset=0,

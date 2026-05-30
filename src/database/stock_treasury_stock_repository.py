@@ -37,6 +37,27 @@ class StockTreasuryStockRepository(BaseRepository[StockTreasuryStock, int]):
             query = query.filter(StockTreasuryStock.stlm_dt <= to_date)
         return query.order_by(StockTreasuryStock.stlm_dt.asc()).all()
 
+    def latest_by_tickers(self, ticker_ids: list[int]) -> dict[int, tuple[int, float]]:
+        """다건 ticker의 최신(stlm_dt 최대) issued_shares·treasury_ratio. 쿼리 1회.
+
+        `DISTINCT ON (ticker_id)`로 종목별 가장 최근 결산 row만 반환.
+        결과 dict은 매칭된 ticker_id만 포함(treasury row 없는 종목은 키 자체가 없음).
+        """
+        if not ticker_ids:
+            return {}
+        rows = (
+            self.session.query(
+                StockTreasuryStock.ticker_id,
+                StockTreasuryStock.issued_shares,
+                StockTreasuryStock.treasury_ratio,
+            )
+            .filter(StockTreasuryStock.ticker_id.in_(ticker_ids))
+            .distinct(StockTreasuryStock.ticker_id)
+            .order_by(StockTreasuryStock.ticker_id, StockTreasuryStock.stlm_dt.desc())
+            .all()
+        )
+        return {row[0]: (row[1], row[2]) for row in rows}
+
     def bulk_upsert(self, entities: list[StockTreasuryStock]) -> None:
         """Postgres ON CONFLICT로 (ticker_id, stlm_dt) 키 일괄 UPSERT.
 

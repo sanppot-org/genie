@@ -12,6 +12,7 @@ OpenDartReader를 통해 종목코드로 기업개황·정기보고서 데이터
 from dataclasses import dataclass
 from datetime import date, datetime
 import logging
+import re
 
 from opendartreader import OpenDartReader
 import requests
@@ -55,11 +56,29 @@ class BuybackEvent:
     purpose: str | None
 
 
+@dataclass(frozen=True)
+class CancellationEvent:
+    """DART 주식소각결정 공시(자사주 소각)에서 추출한 이벤트."""
+
+    stock_code: str
+    rcept_no: str
+    report_nm: str
+    resolution_date: date     # 이사회결의일(결정일)
+    cancel_date: date | None  # 소각 예정일
+    common_shares: int | None
+    preferred_shares: int | None
+    cancel_amount: int | None
+    acquisition_method: str | None
+
+
 # DART event() 키워드 → 이벤트 타입 라벨
 _BUYBACK_KEYWORD_MAP: tuple[tuple[str, str], ...] = (
     ("자기주식취득", "ACQUISITION"),
     ("자기주식처분", "DISPOSAL"),
 )
+
+# 주식소각결정 공시명 판별 키워드 ("[기재정정] 주식소각결정", "(자회사의 주요경영사항) 주식소각결정" 변형 포함).
+_CANCELLATION_REPORT_KEYWORD = "주식소각결정"
 
 
 class DartCompanyClient:
@@ -199,6 +218,127 @@ class DartCompanyClient:
                 ))
 
         return results
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=2, min=2, max=10),
+        retry=retry_if_exception_type(requests.RequestException),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    def fetch_cancellation_events(
+            self, stock_code: str, from_date: date, to_date: date,
+    ) -> list[CancellationEvent]:
+        """주식소각결정 공시(자사주 소각) 일괄 조회.
+
+        `list()`로 접수일 범위 공시 목록을 받아 "주식소각결정" 공시만 필터한 뒤,
+        각 접수번호의 원문(document)을 파싱해 소각 수량·금액·예정일을 추출한다.
+
+        Args:
+            stock_code: 종목코드 (예: '005930')
+            from_date: 시작 접수일 (포함)
+            to_date: 종료 접수일 (포함)
+
+        Returns:
+            소각 이벤트 리스트. corp_code 매핑 실패 / 응답 없음은 빈 리스트.
+            필수필드(이사회결의일) 누락 행은 warning 후 skip(silent loss 방지).
+        """
+        start = from_date.strftime("%Y-%m-%d")
+        end = to_date.strftime("%Y-%m-%d")
+
+        try:
+            df = self._reader.list(stock_code, start, end)
+        except ValueError:
+            # corp_code 매핑 실패 — 신규 상장 직후 등
+            return []
+
+        if df is None or df.empty:
+            return []
+
+        results: list[CancellationEvent] = []
+        for _, row in df.iterrows():
+            report_nm = str(row.get("report_nm") or "").strip()
+            if _CANCELLATION_REPORT_KEYWORD not in report_nm:
+                continue
+
+            # 자회사 공시 배제: list() 결과의 stock_code가 대상과 다르면 제외.
+            row_stock_code = str(row.get("stock_code") or "").strip()
+            if row_stock_code and row_stock_code != stock_code:
+                continue
+
+            rcept_no = str(row.get("rcept_no") or "").strip()
+            if not rcept_no:
+                continue
+
+            doc = self._reader.document(rcept_no)
+            parsed = _parse_cancellation_document(doc)
+            if parsed is None or parsed.get("resolution_date") is None:
+                logger.warning(
+                    "주식소각결정 문서 파싱 실패 stock_code=%s rcept_no=%s report_nm=%s",
+                    stock_code, rcept_no, report_nm,
+                )
+                continue
+
+            results.append(CancellationEvent(
+                stock_code=stock_code,
+                rcept_no=rcept_no,
+                report_nm=report_nm[:128],
+                resolution_date=parsed["resolution_date"],
+                cancel_date=parsed.get("cancel_date"),
+                common_shares=parsed.get("common_shares"),
+                preferred_shares=parsed.get("preferred_shares"),
+                cancel_amount=parsed.get("cancel_amount"),
+                acquisition_method=parsed.get("acquisition_method"),
+            ))
+
+        return results
+
+
+def _parse_cancellation_document(doc: str) -> dict | None:
+    """주식소각결정 공시 원문(HTML)에서 소각 수량·금액·예정일·결의일 추출.
+
+    resolution_date(이사회결의일)가 없으면 None 반환(파싱 실패). 나머지는 None 허용.
+    """
+    if not doc:
+        return None
+
+    text = re.sub(r"<[^>]+>", " ", doc)
+    text = re.sub(r"\s+", " ", text)
+
+    result: dict = {}
+
+    # 소각 수량: "소각할 주식의 종류와 수" ~ "발행주식 총수" 구간에서만 추출
+    # (발행주식총수의 보통주/종류주와 혼동 방지).
+    section_match = re.search(
+        r"소각할 주식의 종류와 수(.*?)발행주식\s*총수", text
+    )
+    if section_match:
+        section = section_match.group(1)
+        common_match = re.search(r"보통주식\s*\(주\)\s*([\d,]+)", section)
+        preferred_match = re.search(r"종류주식\s*\(주\)\s*([\d,]+)", section)
+        result["common_shares"] = _parse_int(common_match.group(1)) if common_match else None
+        result["preferred_shares"] = _parse_int(preferred_match.group(1)) if preferred_match else None
+
+    amount_match = re.search(r"소각예정금액\(원\)\s*([\d,-]+)", text)
+    if amount_match:
+        result["cancel_amount"] = _parse_int(amount_match.group(1))
+
+    method_match = re.search(r"소각할 주식의 취득방법\s*(.+?)\s*\d+\.", text)
+    if method_match:
+        method = _normalize_text(method_match.group(1))
+        result["acquisition_method"] = method[:64] if method else None  # 컬럼 String(64) 정합
+
+    cancel_date_match = re.search(r"소각\s*예정일\s*(\d{4}-\d{2}-\d{2})", text)
+    if cancel_date_match:
+        result["cancel_date"] = _parse_dart_date(cancel_date_match.group(1))
+
+    resolution_match = re.search(r"이사회결의일\(결정일\)\s*(\d{4}-\d{2}-\d{2})", text)
+    result["resolution_date"] = _parse_dart_date(resolution_match.group(1)) if resolution_match else None
+
+    if result["resolution_date"] is None:
+        return None
+
+    return result
 
 
 def _parse_int(value: object) -> int | None:

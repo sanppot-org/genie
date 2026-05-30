@@ -58,6 +58,22 @@ function renderConsecutive(row: ScreeningRow) {
   return scoreCell(`${row.consecutive_increase_years}년`, row.scores.consecutive_increase_years);
 }
 
+function renderRegularBuyback(row: ScreeningRow) {
+  return scoreCell(row.regular_buyback ? "예" : "아니오", row.scores.regular_buyback);
+}
+
+function renderAnnualCancelRatio(row: ScreeningRow) {
+  const primary =
+    row.annual_cancel_ratio === null ? "N/A" : `${row.annual_cancel_ratio.toFixed(2)}%`;
+  return scoreCell(primary, row.scores.annual_cancel_ratio);
+}
+
+function renderTreasuryHolding(row: ScreeningRow) {
+  const primary =
+    row.treasury_ratio === null ? "N/A" : `${row.treasury_ratio.toFixed(2)}%`;
+  return scoreCell(primary, row.scores.treasury_holding);
+}
+
 type ScoreFormula = { title: string; rows: string[] };
 
 // 점수 공식 — 백엔드 SOT: src/service/screening_service.py 35–87
@@ -82,9 +98,25 @@ const SCORE_FORMULAS: Record<string, ScoreFormula> = {
     title: "연속 인상 (5점)",
     rows: ["≥ 10년 → 5점", "≥ 5년 → 4점", "≥ 3년 → 3점", "그 외 → 0점"],
   },
+  buyback: {
+    title: "정기 매입·소각 (7점)",
+    rows: [
+      "최근 1년 취득결정 OR 소각 → 7점",
+      "없음 → 0점",
+      "※ 매입·소각 결정 기준(실집행 미반영)",
+    ],
+  },
+  cancel: {
+    title: "연간 소각비율 (8점)",
+    rows: ["> 2% → 8점", "> 1.5% → 5점", "> 0.5% → 3점", "그 외 → 0점", "발행수 미상 → N/A(0)"],
+  },
+  holding: {
+    title: "자사주 보유비율 (5점)",
+    rows: ["0% → 5점", "< 2% → 4점", "< 5% → 2점", "그 외 → 0점", "데이터 없음 → N/A(0)"],
+  },
   total: {
-    title: "총점 (45점 만점)",
-    rows: ["PER + PBR + 배당% + 분기 + 연속 합산"],
+    title: "총점 (65점 만점)",
+    rows: ["PER + PBR + 배당% + 분기 + 연속 + 매입소각 + 소각비율 + 보유 합산"],
   },
 };
 
@@ -103,6 +135,9 @@ const COLUMNS: readonly Column[] = [
   { key: "div", label: "배당%", align: "text-right", sortKey: "dividend_yield" },
   { key: "quarterly", label: "분기", align: "text-right", sortKey: "quarterly_dividend" },
   { key: "consecutive", label: "연속", align: "text-right", sortKey: "consecutive_years" },
+  { key: "buyback", label: "매입소각", align: "text-right", sortKey: "regular_buyback" },
+  { key: "cancel", label: "소각비율", align: "text-right", sortKey: "annual_cancel_ratio" },
+  { key: "holding", label: "보유비율", align: "text-right", sortKey: "treasury_holding" },
   { key: "total", label: "총점", align: "text-right", sortKey: "total_score" },
 ];
 
@@ -204,7 +239,7 @@ export default function ScreeningPage() {
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">KR 주식 스크리닝</h1>
         <p className="text-sm text-muted-foreground">
-          PER · PBR · 배당수익률 · 분기 배당 · 연속 인상 5개 지표 점수 합산 (45점 만점). 컬럼 헤더 클릭으로 정렬.
+          PER · PBR · 배당수익률 · 분기 배당 · 연속 인상 · 정기 매입·소각 · 연간 소각비율 · 자사주 보유비율 8개 지표 점수 합산 ({data?.max_score ?? 65}점 만점). 컬럼 헤더 클릭으로 정렬.
         </p>
       </header>
 
@@ -370,6 +405,9 @@ export default function ScreeningPage() {
                   <td className="px-3 py-2 text-right">{renderDividendYield(row)}</td>
                   <td className="px-3 py-2 text-right">{renderQuarterly(row)}</td>
                   <td className="px-3 py-2 text-right">{renderConsecutive(row)}</td>
+                  <td className="px-3 py-2 text-right">{renderRegularBuyback(row)}</td>
+                  <td className="px-3 py-2 text-right">{renderAnnualCancelRatio(row)}</td>
+                  <td className="px-3 py-2 text-right">{renderTreasuryHolding(row)}</td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums">
                     {row.total_score}
                   </td>
