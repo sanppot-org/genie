@@ -278,6 +278,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
         IncomeStatementService,
         ticker_repository=ticker_repository,
         income_statement_repository=stock_income_statement_repository,
+        fundamental_repository=stock_fundamental_repository,
     )
     cancellation_sync_service = providers.Factory(
         CancellationSyncService,

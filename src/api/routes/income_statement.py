@@ -35,6 +35,8 @@ def _to_point(p: IncomeStatementPointData) -> IncomeStatementPoint:
         operating_profit=f(p.bsop_prti),
         ordinary_profit=f(p.op_prfi),
         net_income=f(p.thtr_ntin),
+        eps=p.eps,
+        per=p.per,
     )
 
 

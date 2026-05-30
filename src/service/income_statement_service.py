@@ -6,17 +6,19 @@
   '누적 매출 리셋(감소)' 지점으로 감지 → 3월 결산 등 비12월 결산도 대응. 그룹 첫 기는 누적=단일.
 """
 
+from bisect import bisect_right
+import calendar
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from decimal import Decimal
 
-from src.database.models import Ticker
+from src.database.models import StockFundamental, Ticker
+from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_income_statement_repository import StockIncomeStatementRepository
 from src.database.ticker_repository import TickerRepository
 from src.providers.kis_income_statement_client import PERIOD_ANNUAL, PERIOD_QUARTER
 from src.service.exceptions import ExceptionCode, GenieError
-
-_VALUE_FIELDS = ("sale_account", "sale_cost", "sale_totl_prfi", "bsop_prti", "op_prfi", "thtr_ntin")
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,8 @@ class IncomeStatementPointData:
     bsop_prti: Decimal | None
     op_prfi: Decimal | None
     thtr_ntin: Decimal | None
+    eps: float | None = None
+    per: float | None = None
 
 
 class IncomeStatementService:
@@ -39,9 +43,11 @@ class IncomeStatementService:
             self,
             ticker_repository: TickerRepository,
             income_statement_repository: StockIncomeStatementRepository,
+            fundamental_repository: StockFundamentalRepository,
     ) -> None:
         self._tickers = ticker_repository
         self._income = income_statement_repository
+        self._fundamentals = fundamental_repository
 
     def get_time_series(
             self,
@@ -73,7 +79,50 @@ class IncomeStatementService:
         elif period_type == PERIOD_QUARTER and single_quarter:
             points = _to_single_quarter(points)
 
+        funds = self._fundamentals.find_by_ticker(ticker.id)
+        points = _enrich_with_fundamentals(points, funds)
+
         return ticker, points
+
+
+def _enrich_with_fundamentals(
+        points: list[IncomeStatementPointData],
+        funds: list[StockFundamental],
+) -> list[IncomeStatementPointData]:
+    """각 결산기의 결산말일 시점 스냅샷(eps/per)을 point에 부여.
+
+    펀더멘털은 date 오름차순. 결산말일 이하 중 가장 최근 row를 bisect로 선택.
+    못 찾으면 eps/per은 None 유지.
+    """
+    if not points or not funds:
+        return points
+
+    fund_dates = [f.date for f in funds]
+    enriched: list[IncomeStatementPointData] = []
+    for p in points:
+        period_end = _fiscal_period_end(p.stac_yymm)
+        if period_end is None:
+            enriched.append(p)
+            continue
+        idx = bisect_right(fund_dates, period_end) - 1
+        if idx < 0:
+            enriched.append(p)
+            continue
+        f = funds[idx]
+        enriched.append(replace(p, eps=f.eps, per=f.per))
+    return enriched
+
+
+def _fiscal_period_end(stac_yymm: str) -> date | None:
+    """stac_yymm("YYYYMM") → 해당 월의 결산말일 date. 형식 불량이면 None."""
+    if len(stac_yymm) != 6 or not stac_yymm.isdigit():
+        return None
+    year = int(stac_yymm[:4])
+    month = int(stac_yymm[4:6])
+    if not (1 <= month <= 12):
+        return None
+    last_day = calendar.monthrange(year, month)[1]
+    return date(year, month, last_day)
 
 
 def _keep_fiscal_year_rows(points: list[IncomeStatementPointData]) -> list[IncomeStatementPointData]:
@@ -108,7 +157,12 @@ def _to_single_quarter(points: list[IncomeStatementPointData]) -> list[IncomeSta
         else:
             result.append(IncomeStatementPointData(
                 stac_yymm=cur.stac_yymm,
-                **{f: _sub(getattr(cur, f), getattr(prev, f)) for f in _VALUE_FIELDS},
+                sale_account=_sub(cur.sale_account, prev.sale_account),
+                sale_cost=_sub(cur.sale_cost, prev.sale_cost),
+                sale_totl_prfi=_sub(cur.sale_totl_prfi, prev.sale_totl_prfi),
+                bsop_prti=_sub(cur.bsop_prti, prev.bsop_prti),
+                op_prfi=_sub(cur.op_prfi, prev.op_prfi),
+                thtr_ntin=_sub(cur.thtr_ntin, prev.thtr_ntin),
             ))
         prev = cur
     return result

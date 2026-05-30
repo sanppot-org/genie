@@ -74,6 +74,8 @@ interface SummaryRow {
   netYoy: number | null;
   opMargin: number | null;
   netMargin: number | null;
+  eps: number | null;
+  per: number | null;
 }
 
 // 음수(적자)면 빨강
@@ -106,6 +108,8 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
         netYoy: calcYoy(p.net_income, base?.net_income ?? null),
         opMargin: ratio(p.revenue, p.operating_profit),
         netMargin: ratio(p.revenue, p.net_income),
+        eps: p.eps,
+        per: p.per,
       };
     })
     .reverse();
@@ -131,6 +135,8 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
             <th className={thYoy}>YoY</th>
             <th className={th}>영업이익률</th>
             <th className={th}>순이익률</th>
+            <th className={th}>EPS</th>
+            <th className={th}>PER</th>
           </tr>
         </thead>
         <tbody>
@@ -151,6 +157,10 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
               <td className={`${td} text-xs text-muted-foreground`}>
                 {row.netMargin !== null ? `${row.netMargin.toFixed(1)}%` : "-"}
               </td>
+              <td className={td}>
+                {row.eps !== null ? `${Math.round(row.eps).toLocaleString("ko-KR")}원` : "-"}
+              </td>
+              <td className={td}>{row.per !== null ? `${row.per.toFixed(1)}배` : "-"}</td>
             </tr>
           ))}
         </tbody>

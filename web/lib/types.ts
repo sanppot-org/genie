@@ -66,6 +66,8 @@ export interface IncomeStatementPoint {
   operating_profit: number | null;
   ordinary_profit: number | null;
   net_income: number | null;
+  eps: number | null;
+  per: number | null;
 }
 
 export interface IncomeStatementSeries {
