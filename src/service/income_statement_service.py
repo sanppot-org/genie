@@ -13,7 +13,8 @@ from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
 
-from src.database.models import StockFundamental, Ticker
+from src.database.models import StockDailyCandle, StockFundamental, Ticker
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_income_statement_repository import StockIncomeStatementRepository
 from src.database.ticker_repository import TickerRepository
@@ -34,6 +35,7 @@ class IncomeStatementPointData:
     thtr_ntin: Decimal | None
     eps: float | None = None
     per: float | None = None
+    price: float | None = None
 
 
 class IncomeStatementService:
@@ -44,10 +46,12 @@ class IncomeStatementService:
             ticker_repository: TickerRepository,
             income_statement_repository: StockIncomeStatementRepository,
             fundamental_repository: StockFundamentalRepository,
+            daily_candle_repository: StockDailyCandleRepository,
     ) -> None:
         self._tickers = ticker_repository
         self._income = income_statement_repository
         self._fundamentals = fundamental_repository
+        self._candles = daily_candle_repository
 
     def get_time_series(
             self,
@@ -81,6 +85,8 @@ class IncomeStatementService:
 
         funds = self._fundamentals.find_by_ticker(ticker.id)
         points = _enrich_with_fundamentals(points, funds)
+        candles = self._candles.find_by_ticker(ticker.id)
+        points = _enrich_with_price(points, candles)
 
         return ticker, points
 
@@ -110,6 +116,33 @@ def _enrich_with_fundamentals(
             continue
         f = funds[idx]
         enriched.append(replace(p, eps=f.eps, per=f.per))
+    return enriched
+
+
+def _enrich_with_price(
+        points: list[IncomeStatementPointData],
+        candles: list[StockDailyCandle],
+) -> list[IncomeStatementPointData]:
+    """각 결산기의 결산말일 시점 종가(주가)를 point에 부여.
+
+    일봉은 date 오름차순. 결산말일 이하 중 가장 최근 종가를 bisect로 선택(휴장일 보정).
+    못 찾으면 price는 None 유지. EPS/PER 결측(적자 등)과 무관하게 종가는 존재한다.
+    """
+    if not points or not candles:
+        return points
+
+    candle_dates = [c.date for c in candles]
+    enriched: list[IncomeStatementPointData] = []
+    for p in points:
+        period_end = _fiscal_period_end(p.stac_yymm)
+        if period_end is None:
+            enriched.append(p)
+            continue
+        idx = bisect_right(candle_dates, period_end) - 1
+        if idx < 0:
+            enriched.append(p)
+            continue
+        enriched.append(replace(p, price=float(candles[idx].close)))
     return enriched
 
 

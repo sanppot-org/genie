@@ -68,6 +68,7 @@ export interface IncomeStatementPoint {
   net_income: number | null;
   eps: number | null;
   per: number | null;
+  price: number | null;
 }
 
 export interface IncomeStatementSeries {

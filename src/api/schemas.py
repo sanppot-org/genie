@@ -115,6 +115,7 @@ class IncomeStatementPoint(BaseModel):
     net_income: float | None = None        # 당기순이익
     eps: float | None = None               # 주당순이익 (결산말일 펀더멘털 스냅샷)
     per: float | None = None               # 주가수익률 (결산말일 펀더멘털 스냅샷)
+    price: float | None = None             # 주가 종가 (결산말일 일봉 스냅샷)
 
 
 class IncomeStatementSeriesResponse(BaseModel):

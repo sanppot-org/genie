@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
 
-from src.database.models import StockFundamental, StockIncomeStatement
+from src.database.models import StockDailyCandle, StockFundamental, StockIncomeStatement
 from src.providers.kis_income_statement_client import PERIOD_ANNUAL, PERIOD_QUARTER
 from src.service.income_statement_service import IncomeStatementService
 
@@ -24,9 +24,16 @@ def _fund(d: date, eps: float, per: float) -> StockFundamental:
     return StockFundamental(ticker_id=1, date=d, eps=eps, per=per)
 
 
+def _candle(d: date, close: float) -> StockDailyCandle:
+    return StockDailyCandle(
+        ticker_id=1, date=d, open=close, high=close, low=close, close=close, volume=1,
+    )
+
+
 def _service(
     rows: list[StockIncomeStatement],
     funds: list[StockFundamental] | None = None,
+    candles: list[StockDailyCandle] | None = None,
 ) -> IncomeStatementService:
     ticker_repo = MagicMock()
     ticker_repo.find_by_ticker.return_value = MagicMock(id=1, ticker="005930", name="삼성전자")
@@ -34,7 +41,9 @@ def _service(
     income_repo.find_by_ticker.return_value = rows
     fundamental_repo = MagicMock()
     fundamental_repo.find_by_ticker.return_value = funds or []
-    return IncomeStatementService(ticker_repo, income_repo, fundamental_repo)
+    candle_repo = MagicMock()
+    candle_repo.find_by_ticker.return_value = candles or []
+    return IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo)
 
 
 def test_annual_drops_leading_non_fiscal_month_row() -> None:
@@ -132,3 +141,32 @@ def test_enrich_none_when_no_fundamental_before_period_end() -> None:
     assert by_yymm["202012"].eps is None
     assert by_yymm["202012"].per is None
     assert by_yymm["202312"].eps == 5000.0
+
+
+def test_enrich_price_snapshot_at_fiscal_period_end() -> None:
+    """결산말일 이하 가장 최근 일봉 종가가 주가로 붙는다(휴장일은 직전 영업일 보정)."""
+    rows = [
+        _row("202312", "100", PERIOD_ANNUAL),
+        _row("202412", "200", PERIOD_ANNUAL),
+    ]
+    candles = [
+        _candle(date(2023, 12, 28), 70000.0),  # 202312 결산말일(12/31=휴장) 이하 최근
+        _candle(date(2024, 1, 2), 71000.0),     # 202312 이후 → 무시
+        _candle(date(2024, 12, 30), 53000.0),   # 202412 결산말일 이하 최근
+    ]
+    _, points = _service(rows, candles=candles).get_time_series("005930", PERIOD_ANNUAL)
+
+    by_yymm = {p.stac_yymm: p for p in points}
+    assert by_yymm["202312"].price == 70000.0
+    assert by_yymm["202412"].price == 53000.0
+
+
+def test_enrich_price_none_when_no_candle_before_period_end() -> None:
+    """가장 오래된 일봉보다 앞선 결산기는 price None."""
+    rows = [_row("202012", "100", PERIOD_ANNUAL), _row("202312", "200", PERIOD_ANNUAL)]
+    candles = [_candle(date(2023, 12, 28), 70000.0)]
+    _, points = _service(rows, candles=candles).get_time_series("005930", PERIOD_ANNUAL)
+
+    by_yymm = {p.stac_yymm: p for p in points}
+    assert by_yymm["202012"].price is None
+    assert by_yymm["202312"].price == 70000.0

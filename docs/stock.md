@@ -99,6 +99,7 @@
 [x] 로컬에서 better stack 비활성화
 [x] 프로파일에 따라서 스케줄러 비활성화
 [x] 재무제표에 eps, per 추가 — 손익계산서 표에 EPS·PER 컬럼(결산말일 펀더멘털 스냅샷, 신규 수집 없이 stock_fundamentals 재사용)
+[x] 손익계산서 표에 주가 컬럼 — 결산말일 일봉 종가 스냅샷(stock_daily_candles bisect, 적자기업도 값 존재)
 [ ] 손익계산서 차트 영업이익, 순이익 가독성 높이기
 
 [ ] 스크리닝
