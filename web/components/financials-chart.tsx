@@ -2,9 +2,10 @@
 
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -223,7 +224,7 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
       <div className="overflow-x-auto">
         <div className="w-full" style={{ minWidth }}>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }} barCategoryGap="25%">
+            <ComposedChart data={data} margin={{ top: 8, right: 68, bottom: 0, left: 8 }} barCategoryGap="25%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" vertical={false} />
               <XAxis
                 dataKey="stac_yymm"
@@ -232,6 +233,14 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 interval={0}
               />
               <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 11 }}
+                tickFormatter={yAxisTick}
+                width={68}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
                 tick={{ fontSize: 11 }}
                 tickFormatter={yAxisTick}
                 width={68}
@@ -247,10 +256,17 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 iconSize={10}
                 wrapperStyle={{ fontSize: 12 }}
               />
-              <Bar dataKey="매출" fill={COLOR_REVENUE} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="영업이익" fill={COLOR_OP} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="순이익" fill={COLOR_NET} radius={[2, 2, 0, 0]} />
-            </BarChart>
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="매출"
+                stroke={COLOR_REVENUE}
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+              <Bar yAxisId="right" dataKey="영업이익" fill={COLOR_OP} radius={[2, 2, 0, 0]} />
+              <Bar yAxisId="right" dataKey="순이익" fill={COLOR_NET} radius={[2, 2, 0, 0]} />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
