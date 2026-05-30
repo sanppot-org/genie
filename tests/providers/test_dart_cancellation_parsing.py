@@ -39,6 +39,31 @@ def test_parse_samsung_cancellation_document() -> None:
     assert result["acquisition_method"] == "기취득 자기주식"
 
 
+# 나무가 190510 rcept_no=20250224900107 실측 — 라벨 변형:
+# "발행주식총수"(붙여씀), "보통주식(주)"(공백없음), "이사회결의일"(괄호 없음), 종류주 "-".
+_VARIANT_DOC = (
+    "1. 소각할 주식의 종류와 수 보통주식(주) 391,540 종류주식(주) - "
+    "2. 발행주식총수 보통주식(주) 15,473,797 종류주식(주) - "
+    "3. 1주당 가액(원) 500 4. 소각예정금액(원) 4,991,171,320 "
+    "5. 소각을 위한 자기주식 취득 예정기간 시작일 - 종료일 - "
+    "6. 소각할 주식의 취득방법 기취득 자기주식 7. 소각 예정일 2025-03-04 "
+    "8. 자기주식 취득 위탁 투자중개업자 - 9. 이사회결의일 2025-02-24 -사외이사 참석여부"
+)
+
+
+def test_parse_variant_label_format() -> None:
+    """'이사회결의일'(괄호 없음)·'발행주식총수'(붙여씀) 등 변형 양식도 파싱."""
+    result = _parse_cancellation_document(_VARIANT_DOC)
+
+    assert result is not None
+    assert result["common_shares"] == 391_540
+    assert result["preferred_shares"] is None  # 종류주 "-"
+    assert result["cancel_amount"] == 4_991_171_320
+    assert result["cancel_date"] == date(2025, 3, 4)
+    assert result["resolution_date"] == date(2025, 2, 24)  # 괄호 없는 라벨도 인식
+    assert result["acquisition_method"] == "기취득 자기주식"
+
+
 def test_parse_returns_none_when_resolution_date_missing() -> None:
     """필수필드(이사회결의일) 누락 시 None 반환."""
     doc = (

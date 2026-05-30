@@ -332,7 +332,8 @@ def _parse_cancellation_document(doc: str) -> dict | None:
     if cancel_date_match:
         result["cancel_date"] = _parse_dart_date(cancel_date_match.group(1))
 
-    resolution_match = re.search(r"이사회결의일\(결정일\)\s*(\d{4}-\d{2}-\d{2})", text)
+    # "이사회결의일(결정일)"(삼성 양식) / "이사회결의일"(다수 종목 양식) 모두 허용.
+    resolution_match = re.search(r"이사회결의일\s*(?:\(결정일\))?\s*(\d{4}-\d{2}-\d{2})", text)
     result["resolution_date"] = _parse_dart_date(resolution_match.group(1)) if resolution_match else None
 
     if result["resolution_date"] is None:
