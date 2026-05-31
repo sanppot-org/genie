@@ -119,8 +119,9 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
     })
     .reverse();
 
-  const th = "px-3 py-1.5 text-right font-normal whitespace-nowrap";
-  const thYoy = "px-2 py-1.5 text-right font-normal whitespace-nowrap text-[10px]";
+  // 세로 스크롤 시 제목행 고정(sticky top-0). 스크롤되는 본문이 비쳐 보이지 않게 불투명 bg-muted.
+  const th = "sticky top-0 z-10 bg-muted px-3 py-1.5 text-right font-normal whitespace-nowrap";
+  const thYoy = "sticky top-0 z-10 bg-muted px-2 py-1.5 text-right font-normal whitespace-nowrap text-[10px]";
   const td = "px-3 py-1.5 text-right tabular-nums whitespace-nowrap";
   const tdYoy = "px-2 py-1.5 text-right tabular-nums whitespace-nowrap text-[11px]";
 
@@ -130,8 +131,8 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
     <div className="max-h-80 w-fit min-w-[16rem] max-w-full resize-x overflow-auto rounded-md border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
-            <th className="sticky left-0 bg-muted/50 px-3 py-1.5 text-left font-normal">결산기</th>
+          <tr className="border-b text-xs text-muted-foreground">
+            <th className="sticky left-0 top-0 z-20 bg-muted px-3 py-1.5 text-left font-normal">결산기</th>
             <th className={th}>매출</th>
             <th className={thYoy}>YoY</th>
             <th className={th}>영업이익</th>
@@ -156,7 +157,7 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
             ].join(" ");
             return (
             <tr key={row.label} className={rowCls}>
-              <td className="sticky left-0 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
+              <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
                 {row.isEstimate ? (
                   <span className="flex items-center gap-1">
                     {row.label}
