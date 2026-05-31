@@ -65,6 +65,13 @@ function ratio(rev: number | null, val: number | null): number | null {
   return (val / rev) * 100;
 }
 
+// 배당성향 = DPS / EPS × 100. KIS 기타주요비율 payout_rate는 명세상 "비정상, 무시" 필드라
+// 쓰지 않고, 공시값과 일치하는 DPS/EPS 파생으로 계산. 적자/무이익(EPS<=0)이면 정의 안 됨.
+function payoutRatio(dps: number | null, eps: number | null): number | null {
+  if (dps === null || eps === null || eps <= 0) return null;
+  return (dps / eps) * 100;
+}
+
 interface SummaryRow {
   label: string;
   revenue: number | null;
@@ -150,6 +157,7 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
             <th className={th}>PER</th>
             <th className={th}>DPS</th>
             <th className={th}>시가배당율</th>
+            <th className={th}>배당성향</th>
           </tr>
         </thead>
         <tbody>
@@ -199,6 +207,11 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
               </td>
               <td className={`${td} text-xs text-muted-foreground`}>
                 {row.div !== null ? `${row.div.toFixed(2)}%` : "-"}
+              </td>
+              <td className={`${td} text-xs text-muted-foreground`}>
+                {payoutRatio(row.dps, row.eps) !== null
+                  ? `${payoutRatio(row.dps, row.eps)!.toFixed(1)}%`
+                  : "-"}
               </td>
             </tr>
             );
