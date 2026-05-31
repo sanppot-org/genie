@@ -115,6 +115,8 @@ class IncomeStatementPoint(BaseModel):
     net_income: float | None = None        # 당기순이익
     eps: float | None = None               # 주당순이익 (결산말일 펀더멘털 스냅샷, 추정행은 컨센서스)
     per: float | None = None               # 주가수익률 (결산말일 펀더멘털 스냅샷, 추정행은 컨센서스)
+    dps: float | None = None               # 주당배당금 (결산말일 펀더멘털 스냅샷, 추정행은 None)
+    div: float | None = None               # 시가배당율(%) (결산말일 펀더멘털 스냅샷, 추정행은 None)
     price: float | None = None             # 주가 종가 (결산말일 일봉 스냅샷, 추정행은 None)
     is_estimate: bool = False              # True=컨센서스 추정(2026E 등), False=확정 실적
 

@@ -292,7 +292,7 @@ export default function Home() {
 
           <section className="space-y-2 pt-2">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <h3 className="font-medium">손익계산서</h3>
+              <h3 className="font-medium">재무 요약</h3>
               <div className="flex gap-1">
                 {(["annual", "quarter"] as const).map((p) => (
                   <button

@@ -39,6 +39,8 @@ class IncomeStatementPointData:
     thtr_ntin: Decimal | None
     eps: float | None = None
     per: float | None = None
+    dps: float | None = None
+    div: float | None = None
     price: float | None = None
     is_estimate: bool = False
 
@@ -167,7 +169,7 @@ def _enrich_with_fundamentals(
             enriched.append(p)
             continue
         f = funds[idx]
-        enriched.append(replace(p, eps=f.eps, per=f.per))
+        enriched.append(replace(p, eps=f.eps, per=f.per, dps=f.dps, div=f.div))
     return enriched
 
 

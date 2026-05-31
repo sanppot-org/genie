@@ -78,6 +78,8 @@ interface SummaryRow {
   price: number | null;
   eps: number | null;
   per: number | null;
+  dps: number | null;
+  div: number | null;
   isEstimate: boolean;
 }
 
@@ -114,6 +116,8 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
         price: p.price,
         eps: p.eps,
         per: p.per,
+        dps: p.dps,
+        div: p.div,
         isEstimate: p.is_estimate,
       };
     })
@@ -144,6 +148,8 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
             <th className={th}>주가</th>
             <th className={th}>EPS</th>
             <th className={th}>PER</th>
+            <th className={th}>DPS</th>
+            <th className={th}>시가배당율</th>
           </tr>
         </thead>
         <tbody>
@@ -188,6 +194,12 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
                 {row.eps !== null ? `${Math.round(row.eps).toLocaleString("ko-KR")}원` : "-"}
               </td>
               <td className={td}>{row.per !== null ? `${row.per.toFixed(1)}배` : "-"}</td>
+              <td className={td}>
+                {row.dps !== null ? `${Math.round(row.dps).toLocaleString("ko-KR")}원` : "-"}
+              </td>
+              <td className={`${td} text-xs text-muted-foreground`}>
+                {row.div !== null ? `${row.div.toFixed(2)}%` : "-"}
+              </td>
             </tr>
             );
           })}

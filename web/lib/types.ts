@@ -68,6 +68,8 @@ export interface IncomeStatementPoint {
   net_income: number | null;
   eps: number | null;
   per: number | null;
+  dps: number | null;
+  div: number | null;
   price: number | null;
   is_estimate: boolean;
 }

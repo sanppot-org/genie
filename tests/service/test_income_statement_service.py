@@ -21,8 +21,8 @@ def _row(stac_yymm: str, sale: str, period_type: str) -> StockIncomeStatement:
     )
 
 
-def _fund(d: date, eps: float, per: float) -> StockFundamental:
-    return StockFundamental(ticker_id=1, date=d, eps=eps, per=per)
+def _fund(d: date, eps: float, per: float, dps: float = 0.0, div: float = 0.0) -> StockFundamental:
+    return StockFundamental(ticker_id=1, date=d, eps=eps, per=per, dps=dps, div=div)
 
 
 def _candle(d: date, close: float) -> StockDailyCandle:
@@ -140,17 +140,21 @@ def test_enrich_eps_per_snapshot_at_fiscal_period_end() -> None:
         _row("202412", "200", PERIOD_ANNUAL),
     ]
     funds = [
-        _fund(date(2023, 12, 28), eps=5000.0, per=12.5),  # 202312 결산말일 이하 최근
+        _fund(date(2023, 12, 28), eps=5000.0, per=12.5, dps=1444.0, div=2.5),  # 202312 결산말일 이하 최근
         _fund(date(2024, 1, 3), eps=5100.0, per=13.0),    # 202312 이후 → 무시
-        _fund(date(2024, 12, 27), eps=6000.0, per=15.0),  # 202412 결산말일 이하 최근
+        _fund(date(2024, 12, 27), eps=6000.0, per=15.0, dps=1500.0, div=2.8),  # 202412 결산말일 이하 최근
     ]
     _, points = _service(rows, funds).get_time_series("005930", PERIOD_ANNUAL)
 
     by_yymm = {p.stac_yymm: p for p in points}
     assert by_yymm["202312"].eps == 5000.0
     assert by_yymm["202312"].per == 12.5
+    assert by_yymm["202312"].dps == 1444.0
+    assert by_yymm["202312"].div == 2.5
     assert by_yymm["202412"].eps == 6000.0
     assert by_yymm["202412"].per == 15.0
+    assert by_yymm["202412"].dps == 1500.0
+    assert by_yymm["202412"].div == 2.8
 
 
 def test_enrich_none_when_no_fundamental_before_period_end() -> None:

@@ -37,6 +37,8 @@ def _to_point(p: IncomeStatementPointData) -> IncomeStatementPoint:
         net_income=f(p.thtr_ntin),
         eps=p.eps,
         per=p.per,
+        dps=p.dps,
+        div=p.div,
         price=p.price,
         is_estimate=p.is_estimate,
     )
