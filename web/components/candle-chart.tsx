@@ -11,6 +11,7 @@ import {
   type ISeriesApi,
   type LineData,
   type LogicalRange,
+  type MouseEventParams,
   type WhitespaceData,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
@@ -35,6 +36,25 @@ const MA_COLOR: Record<MaPeriod, string> = {
   120: "#9c27b0",
 };
 
+// 한국식: 상승=빨강 / 하락=파랑 (등락률·종가 강조색)
+const UP = "#d24f45";
+const DOWN = "#1261c4";
+
+// 상단 고정 레전드(HTS 스타일): hover한 봉(없으면 최신봉)의 OHLC·등락률·거래량 + 켜진 보조지표.
+interface LegendData {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  changePct: number | null; // 전봉 종가 대비
+  volume: number;
+  ma: Partial<Record<MaPeriod, number>>; // hover 시점 MA 값 (hover 밖이면 비움)
+  per: number | null;
+  pbr: number | null;
+  div: number | null;
+}
+
 /** 단순이동평균 (러닝썸 O(N)). 앞 n-1봉은 생략 → 선이 그 지점부터 시작. */
 function sma(points: CandlePoint[], n: number): LineData[] {
   const out: LineData[] = [];
@@ -45,6 +65,53 @@ function sma(points: CandlePoint[], n: number): LineData[] {
     if (i >= n - 1) out.push({ time: points[i].date, value: sum / n });
   }
   return out;
+}
+
+// 상단 고정 레전드 오버레이. 종가·등락률만 등락색, 켜진 보조지표만 노출.
+function LegendOverlay({
+  d,
+  maOn,
+  perOn,
+  pbrOn,
+  divOn,
+}: {
+  d: LegendData;
+  maOn: Record<MaPeriod, boolean>;
+  perOn: boolean;
+  pbrOn: boolean;
+  divOn: boolean;
+}) {
+  const up = d.changePct != null ? d.changePct >= 0 : d.close >= d.open;
+  const color = up ? UP : DOWN;
+  const won = (v: number) => Math.round(v).toLocaleString("ko-KR");
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded bg-white/85 px-2 py-1 text-xs tabular-nums shadow-sm">
+      <span className="font-medium">{d.date}</span>
+      <span className="text-muted-foreground">시 {won(d.open)}</span>
+      <span className="text-muted-foreground">고 {won(d.high)}</span>
+      <span className="text-muted-foreground">저 {won(d.low)}</span>
+      <span>
+        종 <span style={{ color }}>{won(d.close)}</span>
+      </span>
+      {d.changePct != null && (
+        <span style={{ color }}>
+          {d.changePct >= 0 ? "+" : ""}
+          {d.changePct.toFixed(2)}%
+        </span>
+      )}
+      <span className="text-muted-foreground">거래량 {d.volume.toLocaleString("ko-KR")}</span>
+      {MA.map((n) =>
+        maOn[n] && d.ma[n] != null ? (
+          <span key={n} style={{ color: MA_COLOR[n] }}>
+            MA{n} {won(d.ma[n]!)}
+          </span>
+        ) : null,
+      )}
+      {perOn && d.per != null && <span style={{ color: "#0ea5e9" }}>PER {d.per.toFixed(2)}</span>}
+      {pbrOn && d.pbr != null && <span style={{ color: "#8b5cf6" }}>PBR {d.pbr.toFixed(2)}</span>}
+      {divOn && d.div != null && <span style={{ color: "#10b981" }}>DIV {d.div.toFixed(2)}%</span>}
+    </div>
+  );
 }
 
 interface Props {
@@ -74,6 +141,9 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   const [perOn, setPerOn] = useState(false);
   const [pbrOn, setPbrOn] = useState(false);
   const [divOn, setDivOn] = useState(false);
+  const [legend, setLegend] = useState<LegendData | null>(null);
+  // crosshair 핸들러는 마운트 1회 생성 → 최신 points를 ref로 읽어 인덱싱·등락률 계산.
+  const pointsRef = useRef(points);
   const didFitRef = useRef(false);
   // 초기값 true: 첫 데이터+fitContent 완료(Effect B 끝에서 해제) 전까지
   // 마운트·리사이즈·fitContent 정착 중 허위 확장 트리거를 차단.
@@ -86,6 +156,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
   useEffect(() => {
     onNeedMoreRef.current = onNeedMore;
     hasMoreRef.current = hasMore ?? false;
+    pointsRef.current = points;
   });
 
   // Effect A: 차트·캔들 시리즈·구독을 마운트당 1회 생성.
@@ -150,6 +221,45 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
 
+    // crosshair 이동 → hover한 봉(차트 밖이면 최신봉)으로 상단 레전드 갱신.
+    const onCrosshair = (param: MouseEventParams) => {
+      const pts = pointsRef.current;
+      if (pts.length === 0) return;
+      // param.logical은 hover 중인 봉의 인덱스(데이터 순서 == pts 순서, whitespace 없음).
+      const hovering = param.time != null && param.logical != null;
+      const idx = hovering ? (param.logical as number) : pts.length - 1;
+      if (idx < 0 || idx >= pts.length) return;
+      const p = pts[idx];
+      const prev = idx > 0 ? pts[idx - 1] : null;
+      const changePct = prev && prev.close ? ((p.close - prev.close) / prev.close) * 100 : null;
+
+      // 보조지표는 hover 봉 시점값을 crosshair seriesData에서 읽음(차트 밖이면 비움).
+      const sd = param.seriesData;
+      const line = (s: ISeriesApi<"Line"> | null): number | null => {
+        const d = hovering && s ? sd.get(s) : undefined;
+        return d && "value" in d ? (d.value as number) : null;
+      };
+      const ma: Partial<Record<MaPeriod, number>> = {};
+      MA.forEach((n, k) => {
+        const v = line(maRefs.current[k]);
+        if (v != null) ma[n] = v;
+      });
+      setLegend({
+        date: p.date,
+        open: p.open,
+        high: p.high,
+        low: p.low,
+        close: p.close,
+        changePct,
+        volume: p.volume,
+        ma,
+        per: line(perRef.current),
+        pbr: line(pbrRef.current),
+        div: line(divRef.current),
+      });
+    };
+    chart.subscribeCrosshairMove(onCrosshair);
+
     // contentRect.width = 레이아웃이 정한 컨테이너 박스 폭.
     // chart가 el 안에 table을 주입해도 el(w-full) content-box 폭은
     // 부모 기준이라 영향 없음 → 좁게 고착되는 피드백 루프 방지.
@@ -161,6 +271,7 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
 
     return () => {
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
+      chart.unsubscribeCrosshairMove(onCrosshair);
       ro.disconnect();
       chart.remove();
       chartRef.current = null;
@@ -206,6 +317,22 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
     } else if (prev) {
       chart.timeScale().setVisibleRange(prev);
     }
+    // hover 전 기본 표시: 최신봉 OHLC·등락률·거래량 (보조지표는 hover 시점에만 채움).
+    const last = points[points.length - 1];
+    const prevBar = points.length > 1 ? points[points.length - 2] : null;
+    setLegend({
+      date: last.date,
+      open: last.open,
+      high: last.high,
+      low: last.low,
+      close: last.close,
+      changePct: prevBar && prevBar.close ? ((last.close - prevBar.close) / prevBar.close) * 100 : null,
+      volume: last.volume,
+      ma: {},
+      per: null,
+      pbr: null,
+      div: null,
+    });
     loadingRef.current = false;
   }, [points]);
 
@@ -379,7 +506,12 @@ export function CandleChart({ points, perPoints, onNeedMore, hasMore }: Props) {
           <span style={{ color: "#10b981" }}>●</span> DIV
         </Button>
       </div>
-      <div ref={ref} className="w-full" style={{ height: CHART_HEIGHT }} />
+      <div className="relative w-full">
+        {legend && (
+          <LegendOverlay d={legend} maOn={maOn} perOn={perOn} pbrOn={pbrOn} divOn={divOn} />
+        )}
+        <div ref={ref} className="w-full" style={{ height: CHART_HEIGHT }} />
+      </div>
     </div>
   );
 }
