@@ -98,6 +98,7 @@ export interface ScreeningRow {
   name: string;
   per: number | null;
   pbr: number | null;
+  roe: number | null;
   dividend_yield: number | null;
   quarterly_dividend: boolean;
   consecutive_increase_years: number;
@@ -121,6 +122,7 @@ export type ScreeningSortBy =
   | "total_score"
   | "per"
   | "pbr"
+  | "roe"
   | "dividend_yield"
   | "quarterly_dividend"
   | "consecutive_years"

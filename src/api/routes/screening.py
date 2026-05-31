@@ -83,6 +83,7 @@ def _to_response(result: ScreeningResult) -> ScreeningResponse:
                 name=r.name,
                 per=r.per,
                 pbr=r.pbr,
+                roe=r.roe,
                 dividend_yield=r.dividend_yield,
                 quarterly_dividend=r.quarterly_dividend,
                 consecutive_increase_years=r.consecutive_increase_years,

@@ -132,6 +132,7 @@ const COLUMNS: readonly Column[] = [
   { key: "ticker", label: "종목", align: "text-left", sortKey: null },
   { key: "per", label: "PER", align: "text-right", sortKey: "per" },
   { key: "pbr", label: "PBR", align: "text-right", sortKey: "pbr" },
+  { key: "roe", label: "ROE", align: "text-right", sortKey: "roe" },
   { key: "div", label: "배당%", align: "text-right", sortKey: "dividend_yield" },
   { key: "quarterly", label: "분기", align: "text-right", sortKey: "quarterly_dividend" },
   { key: "consecutive", label: "연속", align: "text-right", sortKey: "consecutive_years" },
@@ -402,6 +403,7 @@ export default function ScreeningPage() {
                   </td>
                   <td className="px-3 py-2 text-right">{renderPer(row)}</td>
                   <td className="px-3 py-2 text-right">{renderPbr(row)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{formatPercent(row.roe, 1)}</td>
                   <td className="px-3 py-2 text-right">{renderDividendYield(row)}</td>
                   <td className="px-3 py-2 text-right">{renderQuarterly(row)}</td>
                   <td className="px-3 py-2 text-right">{renderConsecutive(row)}</td>

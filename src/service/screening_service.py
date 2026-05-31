@@ -15,13 +15,14 @@ from typing import Literal
 from src.constants import AssetType
 from src.database.stock_buyback_event_repository import StockBuybackEventRepository
 from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
+from src.database.stock_financial_ratio_repository import StockFinancialRatioRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.dividend_service import DividendService
 
 ScreeningSortBy = Literal[
-    "total_score", "per", "pbr", "dividend_yield",
+    "total_score", "per", "pbr", "roe", "dividend_yield",
     "quarterly_dividend", "consecutive_years", "ticker",
     "regular_buyback", "annual_cancel_ratio", "treasury_holding",
 ]
@@ -31,6 +32,7 @@ _SORT_ATTR_MAP: dict[str, str] = {
     "total_score": "total_score",
     "per": "per",
     "pbr": "pbr",
+    "roe": "roe",
     "dividend_yield": "dividend_yield",
     "quarterly_dividend": "quarterly_dividend",
     "consecutive_years": "consecutive_increase_years",
@@ -149,6 +151,7 @@ class ScreeningRow:
     name: str
     per: float | None
     pbr: float | None
+    roe: float | None
     dividend_yield: float | None
     quarterly_dividend: bool
     consecutive_increase_years: int
@@ -275,6 +278,7 @@ class ScreeningService:
             buyback_event_repository: StockBuybackEventRepository,
             cancellation_event_repository: StockCancellationEventRepository,
             treasury_stock_repository: StockTreasuryStockRepository,
+            financial_ratio_repository: StockFinancialRatioRepository,
     ) -> None:
         self._tickers = ticker_repository
         self._fundamentals = fundamental_repository
@@ -282,6 +286,7 @@ class ScreeningService:
         self._buybacks = buyback_event_repository
         self._cancellations = cancellation_event_repository
         self._treasuries = treasury_stock_repository
+        self._financial_ratios = financial_ratio_repository
 
     def score_kr_stocks(
             self,
@@ -326,12 +331,17 @@ class ScreeningService:
         acq_ids = self._buybacks.acquisition_ticker_ids_since(ticker_ids, window_from)
         treasury_map = self._treasuries.latest_by_tickers(ticker_ids)
 
+        # ROE = KIS 공식 최신 연간 ROE(%). 재무비율 row 없으면 None.
+        roe_map = self._financial_ratios.find_latest_roe_by_tickers(ticker_ids)
+
         rows: list[ScreeningRow] = []
         for t in tickers:
             f = fundamentals.get(t.id)
             per = f.per if f is not None else None
             pbr = f.pbr if f is not None else None
             div = f.div if f is not None else None
+            # ROE = KIS 공식 최신 연간 ROE(%). 재무비율 row 없는 종목은 None.
+            roe = roe_map.get(t.id)
             is_q = quarterly_map.get(t.id, False)
             streak = streak_map.get(t.id, 0)
 
@@ -382,6 +392,7 @@ class ScreeningService:
                 name=t.name,
                 per=per,
                 pbr=pbr,
+                roe=roe,
                 dividend_yield=div,
                 quarterly_dividend=is_q,
                 consecutive_increase_years=streak,

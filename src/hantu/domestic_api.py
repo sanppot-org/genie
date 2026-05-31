@@ -12,6 +12,7 @@ from src.hantu.model.domestic import (
     chart,
     dividend,
     estimate_perform,
+    financial_ratio,
     income_statement,
     order,
     psbl_order,
@@ -187,6 +188,37 @@ class HantuDomesticAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return income_statement.ResponseBody.model_validate(res.json())
+
+    def financial_ratio(self, ticker: str, div_cls_code: str = "0") -> financial_ratio.ResponseBody:
+        """국내주식 재무비율 조회 — 결산기별 ROE/성장률/부채비율 등.
+
+        단일 호출에 결산기별 시계열 반환 → tr_cont 연속조회 불필요.
+
+        Args:
+            ticker: 종목코드 (6자리, 예: '005930')
+            div_cls_code: 분류 구분 ('0': 년 — 연간만 수집)
+
+        Returns:
+            financial_ratio.ResponseBody: output(결산기별 재무비율 리스트).
+        """
+        url = f"{self.url_base}/uapi/domestic-stock/v1/finance/financial-ratio"
+
+        header = financial_ratio.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = financial_ratio.RequestQueryParam(
+            FID_DIV_CLS_CODE=div_cls_code,
+            fid_input_iscd=ticker,
+        )
+
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+
+        self._validate_response(res)
+
+        return financial_ratio.ResponseBody.model_validate(res.json())
 
     def estimate_perform(self, ticker: str) -> estimate_perform.ResponseBody:
         """국내주식 종목추정실적 조회 — 증권사 컨센서스 기반 연간 추정(확정 3 + 추정 2년).

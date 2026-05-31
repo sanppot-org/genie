@@ -25,6 +25,7 @@ from src.service.buyback_sync_service import BuybackSyncService
 from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_sync_service import DividendSyncService
+from src.service.financial_ratio_sync_service import FinancialRatioSyncService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.income_statement_sync_service import IncomeStatementSyncService
 from src.service.ticker_sync_service import TickerSyncService
@@ -292,6 +293,31 @@ def sync_kr_stock_income_statements(
         mark_rollback_only()
         logger.exception("손익계산서 동기화 실패")
         slack_client.send_status(f"손익계산서 동기화 실패: {e}")
+
+
+@db_scoped
+@inject
+def sync_kr_stock_financial_ratios(
+        service: FinancialRatioSyncService = Provide[ApplicationContainer.financial_ratio_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """KR 주식 재무비율(ROE·성장률·부채비율 등) 동기화 (주 1회, 매주 월요일 19:45 KST).
+
+    재무는 분기/연간 갱신이라 주 1회로 충분. 증분 가드(skip_current)로 이미 최신 사업보고서를
+    커버한 종목은 호출 생략. 청크 커밋이라 부분 진행도 보존되며 멱등 재실행 안전.
+    초기 전종목 백필은 scripts/backfill_financial_ratios.py 사용.
+    """
+    try:
+        result = service.sync(skip_current=True)
+        logger.info(
+            "재무비율 동기화 완료 tickers=%d skipped_current=%d api_fail=%d rows_upserted=%d chunks_fail=%d",
+            result.ticker_count, result.skipped_current, result.api_calls_failed,
+            result.rows_upserted, result.chunks_failed,
+        )
+    except Exception as e:
+        mark_rollback_only()
+        logger.exception("재무비율 동기화 실패")
+        slack_client.send_status(f"재무비율 동기화 실패: {e}")
 
 
 @db_scoped

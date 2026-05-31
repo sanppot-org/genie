@@ -361,6 +361,40 @@ class StockIncomeStatement(Base, TimestampMixin):
         return f"<StockIncomeStatement(ticker_id={self.ticker_id}, period={self.period_type}, stac_yymm={self.stac_yymm})>"
 
 
+class StockFinancialRatio(Base, TimestampMixin):
+    """KIS 국내주식 재무비율 — 결산기별 ROE/성장률/부채비율 등 시계열.
+
+    KR_STOCK 대상. stac_yymm(결산년월)별 1 row(연간만 수집).
+    값은 스케일 없는 % 또는 원 그대로(KIS 원본). 결측/파싱실패는 NULL.
+    동일 (ticker_id, stac_yymm) 재호출 시 UPSERT(실적 정정 반영).
+    """
+
+    __tablename__ = "stock_financial_ratios"
+
+    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), nullable=True)
+    ticker_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickers.id", name="fk_stock_financial_ratios_ticker_id"), nullable=False
+    )
+    stac_yymm: Mapped[str] = mapped_column(String(6), nullable=False, comment="결산년월 YYYYMM")
+    roe: Mapped[float | None] = mapped_column(Float, nullable=True, comment="ROE(%)")
+    debt_ratio: Mapped[float | None] = mapped_column(Float, nullable=True, comment="부채비율(%)")
+    reserve_rate: Mapped[float | None] = mapped_column(Float, nullable=True, comment="유보비율(%)")
+    revenue_growth: Mapped[float | None] = mapped_column(Float, nullable=True, comment="매출액 증가율(%)")
+    op_growth: Mapped[float | None] = mapped_column(Float, nullable=True, comment="영업이익 증가율(%)")
+    net_growth: Mapped[float | None] = mapped_column(Float, nullable=True, comment="순이익 증가율(%)")
+    eps: Mapped[float | None] = mapped_column(Float, nullable=True, comment="EPS(원)")
+    bps: Mapped[float | None] = mapped_column(Float, nullable=True, comment="BPS(원)")
+    sps: Mapped[float | None] = mapped_column(Float, nullable=True, comment="주당매출액(원)")
+
+    __table_args__ = (
+        PrimaryKeyConstraint("ticker_id", "stac_yymm"),
+        Index("ix_stock_financial_ratios_ticker_id_stac_yymm", "ticker_id", "stac_yymm"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StockFinancialRatio(ticker_id={self.ticker_id}, stac_yymm={self.stac_yymm}, roe={self.roe})>"
+
+
 class StockDailyCandle(Base, TimestampMixin):
     """KR 주식 일자별 OHLCV (pykrx get_market_ohlcv).
 

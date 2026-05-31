@@ -11,6 +11,7 @@ from src.database.models import (
     StockBuybackEvent,
     StockCancellationEvent,
     StockDividend,
+    StockFinancialRatio,
     StockFundamental,
     StockTreasuryStock,
     Ticker,
@@ -18,6 +19,7 @@ from src.database.models import (
 from src.database.stock_buyback_event_repository import StockBuybackEventRepository
 from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
 from src.database.stock_dividend_repository import StockDividendRepository
+from src.database.stock_financial_ratio_repository import StockFinancialRatioRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
@@ -98,6 +100,7 @@ def screening_setup(session: Session) -> ScreeningService:
     buyback_repo = StockBuybackEventRepository(session)
     cancel_repo = StockCancellationEventRepository(session)
     treasury_repo = StockTreasuryStockRepository(session)
+    ratio_repo = StockFinancialRatioRepository(session)
 
     target_date = date(2026, 5, 15)
 
@@ -135,6 +138,10 @@ def screening_setup(session: Session) -> ScreeningService:
         ticker_id=t1.id, stlm_dt=date(2025, 12, 31), reprt_code="11011",
         issued_shares=1_000_000, treasury_shares=10_000, treasury_ratio=1.0,
     )])
+    # A: KIS 공식 최신 연간 ROE(202512)=17.07.
+    ratio_repo.bulk_upsert([
+        StockFinancialRatio(ticker_id=t1.id, stac_yymm="202512", roe=17.07),
+    ])
 
     # 중간 점수: 평균 PER, PBR 1.0 (PBR 0점), 보통 배당
     t2 = ticker_repo.save(Ticker(
@@ -178,6 +185,7 @@ def screening_setup(session: Session) -> ScreeningService:
         buyback_event_repository=buyback_repo,
         cancellation_event_repository=cancel_repo,
         treasury_stock_repository=treasury_repo,
+        financial_ratio_repository=ratio_repo,
     )
 
 
@@ -220,6 +228,16 @@ class TestScoreKrStocks:
         # 정렬 검증: total_score 내림차순
         scores = [r.total_score for r in result.rows]
         assert scores == sorted(scores, reverse=True)
+
+    def test_roe_uses_latest_annual_financial_ratio(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """ROE는 KIS 공식 연간 ROE(financial_ratio repo)를 주입. row 없는 종목은 None."""
+        result = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        a = next(r for r in result.rows if r.ticker == "A00001")
+        assert a.roe == 17.07   # KIS 공식 ROE (EPS/BPS 근사 아님)
+        b = next(r for r in result.rows if r.ticker == "B00002")
+        assert b.roe is None    # 재무비율 row 없음
 
     def test_loss_company_per_is_zero(
             self, screening_setup: ScreeningService,
@@ -595,6 +613,7 @@ class TestScoreKrStocksEmptyDb:
             buyback_event_repository=StockBuybackEventRepository(session),
             cancellation_event_repository=StockCancellationEventRepository(session),
             treasury_stock_repository=StockTreasuryStockRepository(session),
+            financial_ratio_repository=StockFinancialRatioRepository(session),
         )
         result = service.score_kr_stocks()
         assert result.total == 0

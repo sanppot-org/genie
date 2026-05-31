@@ -273,6 +273,7 @@ class ScreeningRowResponse(BaseModel):
     name: str
     per: float | None = None
     pbr: float | None = None
+    roe: float | None = None
     dividend_yield: float | None = None
     quarterly_dividend: bool
     consecutive_increase_years: int

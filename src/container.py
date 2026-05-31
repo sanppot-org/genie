@@ -23,6 +23,7 @@ from src.database.stock_buyback_event_repository import StockBuybackEventReposit
 from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
+from src.database.stock_financial_ratio_repository import StockFinancialRatioRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_income_statement_repository import StockIncomeStatementRepository
 from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
@@ -34,6 +35,7 @@ from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
 from src.providers.kis_company_client import KisCompanyClient
 from src.providers.kis_estimate_client import KisEstimateClient
+from src.providers.kis_financial_ratio_client import KisFinancialRatioClient
 from src.providers.kis_income_statement_client import KisIncomeStatementClient
 from src.providers.pykrx_daily_candle_client import PykrxDailyCandleClient
 from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
@@ -48,6 +50,7 @@ from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_service import DividendService
 from src.service.dividend_sync_service import DividendSyncService
+from src.service.financial_ratio_sync_service import FinancialRatioSyncService
 from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.income_statement_service import IncomeStatementService
@@ -129,6 +132,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
     stock_buyback_event_repository = providers.Factory(StockBuybackEventRepository, session=_session)
     stock_cancellation_event_repository = providers.Factory(StockCancellationEventRepository, session=_session)
     stock_income_statement_repository = providers.Factory(StockIncomeStatementRepository, session=_session)
+    stock_financial_ratio_repository = providers.Factory(StockFinancialRatioRepository, session=_session)
 
     # Google Sheet Clients
     data_google_sheet_client = providers.Singleton(GoogleSheetClient, google_sheet_config, sheet_name="auto_data")
@@ -270,11 +274,17 @@ class ApplicationContainer(containers.DeclarativeContainer):
         client=dart_company_client,
     )
     kis_income_statement_client = providers.Singleton(KisIncomeStatementClient, hantu_domestic_api)
+    kis_financial_ratio_client = providers.Singleton(KisFinancialRatioClient, hantu_domestic_api)
     kis_estimate_client = providers.Singleton(KisEstimateClient, hantu_domestic_api)
     income_statement_sync_service = providers.Factory(
         IncomeStatementSyncService,
         database=database,
         kis_client=kis_income_statement_client,
+    )
+    financial_ratio_sync_service = providers.Factory(
+        FinancialRatioSyncService,
+        database=database,
+        kis_client=kis_financial_ratio_client,
     )
     income_statement_service = providers.Factory(
         IncomeStatementService,
@@ -297,4 +307,5 @@ class ApplicationContainer(containers.DeclarativeContainer):
         buyback_event_repository=stock_buyback_event_repository,
         cancellation_event_repository=stock_cancellation_event_repository,
         treasury_stock_repository=stock_treasury_stock_repository,
+        financial_ratio_repository=stock_financial_ratio_repository,
     )

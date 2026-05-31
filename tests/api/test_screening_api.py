@@ -32,7 +32,7 @@ def client(mock_screening_service: MagicMock) -> Generator[TestClient, None, Non
 def _row(ticker: str, total: int = 30) -> ScreeningRow:
     return ScreeningRow(
         ticker=ticker, name=f"{ticker}_name",
-        per=5.0, pbr=0.5, dividend_yield=4.0,
+        per=5.0, pbr=0.5, roe=12.5, dividend_yield=4.0,
         quarterly_dividend=True, consecutive_increase_years=4,
         regular_buyback=True, annual_cancel_ratio=3.0, treasury_ratio=1.0,
         scores=ScoreBreakdown(
