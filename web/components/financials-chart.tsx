@@ -78,6 +78,7 @@ interface SummaryRow {
   price: number | null;
   eps: number | null;
   per: number | null;
+  isEstimate: boolean;
 }
 
 // 음수(적자)면 빨강
@@ -113,6 +114,7 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
         price: p.price,
         eps: p.eps,
         per: p.per,
+        isEstimate: p.is_estimate,
       };
     })
     .reverse();
@@ -144,10 +146,27 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.label} className="border-b last:border-0">
+          {rows.map((row, i) => {
+            // rows는 최신순(추정행이 상단). 추정 블록과 확정 블록 경계에 굵은 구분선.
+            const isBoundary = row.isEstimate && i + 1 < rows.length && !rows[i + 1].isEstimate;
+            const rowCls = [
+              "border-b last:border-0",
+              row.isEstimate ? "italic text-muted-foreground bg-muted/20" : "",
+              isBoundary ? "border-b-2 border-b-border" : "",
+            ].join(" ");
+            return (
+            <tr key={row.label} className={rowCls}>
               <td className="sticky left-0 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
-                {row.label}
+                {row.isEstimate ? (
+                  <span className="flex items-center gap-1">
+                    {row.label}
+                    <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[10px] font-normal not-italic text-amber-600 dark:text-amber-400">
+                      예상
+                    </span>
+                  </span>
+                ) : (
+                  row.label
+                )}
               </td>
               <td className={`${td} font-medium`}>{fmtAmount(row.revenue)}</td>
               <td className={`${tdYoy} ${yoyCls(row.revYoy)}`}>{pct(row.revYoy)}</td>
@@ -169,7 +188,8 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
               </td>
               <td className={td}>{row.per !== null ? `${row.per.toFixed(1)}배` : "-"}</td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -214,12 +234,15 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
     return <p className="text-sm text-muted-foreground">재무 데이터 없음</p>;
   }
 
-  const data = points.map((p) => ({
-    stac_yymm: p.stac_yymm,
-    매출: p.revenue,
-    영업이익: p.operating_profit,
-    순이익: p.net_income,
-  }));
+  // 차트는 확정 실적만(추정치는 표에만 표시).
+  const data = points
+    .filter((p) => !p.is_estimate)
+    .map((p) => ({
+      stac_yymm: p.stac_yymm,
+      매출: p.revenue,
+      영업이익: p.operating_profit,
+      순이익: p.net_income,
+    }));
 
   // 좁은 화면에서 막대가 뭉개지지 않도록 데이터 기수에 비례한 최소 폭을 주고,
   // 부모보다 넓어지면 가로 스크롤. 데스크톱(넓은 부모)에서는 w-full로 채운다.

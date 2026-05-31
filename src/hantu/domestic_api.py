@@ -11,6 +11,7 @@ from src.hantu.model.domestic import (
     balance,
     chart,
     dividend,
+    estimate_perform,
     income_statement,
     order,
     psbl_order,
@@ -186,6 +187,33 @@ class HantuDomesticAPI(HantuBaseAPI):
         self._validate_response(res)
 
         return income_statement.ResponseBody.model_validate(res.json())
+
+    def estimate_perform(self, ticker: str) -> estimate_perform.ResponseBody:
+        """국내주식 종목추정실적 조회 — 증권사 컨센서스 기반 연간 추정(확정 3 + 추정 2년).
+
+        애널리스트 미커버 종목은 rt_cd=0이나 output 전부 빈 응답.
+
+        Args:
+            ticker: 종목코드 (6자리, 예: '005930')
+
+        Returns:
+            estimate_perform.ResponseBody: output2(손익)/output3(비율)/output4(기간).
+        """
+        url = f"{self.url_base}/uapi/domestic-stock/v1/quotations/estimate-perform"
+
+        header = estimate_perform.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+        )
+
+        param = estimate_perform.RequestQueryParam(SHT_CD=ticker)
+
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+
+        self._validate_response(res)
+
+        return estimate_perform.ResponseBody.model_validate(res.json())
 
     def sell_market_order(self, ticker: str, quantity: int) -> order.ResponseBody:
         """시장가 매도 주문

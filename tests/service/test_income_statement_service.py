@@ -5,6 +5,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 from src.database.models import StockDailyCandle, StockFundamental, StockIncomeStatement
+from src.providers.kis_estimate_client import EstimatePointData
 from src.providers.kis_income_statement_client import PERIOD_ANNUAL, PERIOD_QUARTER
 from src.service.income_statement_service import IncomeStatementService
 
@@ -30,10 +31,25 @@ def _candle(d: date, close: float) -> StockDailyCandle:
     )
 
 
+def _estimate(stac_yymm: str, is_estimate: bool, revenue: str) -> EstimatePointData:
+    v = Decimal(revenue)
+    return EstimatePointData(
+        stac_yymm=stac_yymm,
+        is_estimate=is_estimate,
+        revenue=v,
+        operating_profit=v,
+        net_income=v,
+        eps=float(v),
+        per=10.0,
+    )
+
+
 def _service(
     rows: list[StockIncomeStatement],
     funds: list[StockFundamental] | None = None,
     candles: list[StockDailyCandle] | None = None,
+    estimates: list[EstimatePointData] | None = None,
+    estimate_raises: bool = False,
 ) -> IncomeStatementService:
     ticker_repo = MagicMock()
     ticker_repo.find_by_ticker.return_value = MagicMock(id=1, ticker="005930", name="삼성전자")
@@ -43,7 +59,16 @@ def _service(
     fundamental_repo.find_by_ticker.return_value = funds or []
     candle_repo = MagicMock()
     candle_repo.find_by_ticker.return_value = candles or []
-    return IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo)
+    estimate_client = None
+    if estimates is not None or estimate_raises:
+        estimate_client = MagicMock()
+        if estimate_raises:
+            estimate_client.fetch.side_effect = RuntimeError("KIS down")
+        else:
+            estimate_client.fetch.return_value = estimates
+    return IncomeStatementService(
+        ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client,
+    )
 
 
 def test_annual_drops_leading_non_fiscal_month_row() -> None:
@@ -170,3 +195,66 @@ def test_enrich_price_none_when_no_candle_before_period_end() -> None:
     by_yymm = {p.stac_yymm: p for p in points}
     assert by_yymm["202012"].price is None
     assert by_yymm["202312"].price == 70000.0
+
+
+# ── 예상실적(컨센서스 추정) append ────────────────────────────────────────────
+_ANNUAL_ROWS = [
+    _row("202312", "100", PERIOD_ANNUAL),
+    _row("202412", "200", PERIOD_ANNUAL),
+    _row("202512", "300", PERIOD_ANNUAL),
+]
+# 확정연도 매출이 DB와 일치 → 안전가드 통과
+_GOOD_ESTIMATES = [
+    _estimate("202312", False, "100"),
+    _estimate("202412", False, "200"),
+    _estimate("202512", False, "300"),
+    _estimate("202612", True, "400"),
+    _estimate("202712", True, "500"),
+]
+
+
+def test_annual_appends_estimate_rows() -> None:
+    """연간 뷰: 확정 행 뒤에 추정 행(2026E/2027E) append, is_estimate=True."""
+    _, points = _service(_ANNUAL_ROWS, estimates=_GOOD_ESTIMATES).get_time_series("005930", PERIOD_ANNUAL)
+
+    assert [p.stac_yymm for p in points] == ["202312", "202412", "202512", "202612", "202712"]
+    assert [p.is_estimate for p in points] == [False, False, False, True, True]
+    e2026 = points[3]
+    assert e2026.sale_account == Decimal("400")
+    assert e2026.eps == 400.0
+    assert e2026.price is None  # 미래 → 주가 없음
+
+
+def test_quarter_does_not_append_estimates() -> None:
+    """분기 뷰: 추정치는 연간만 존재 → append 안 함."""
+    rows = [_row("202503", "50", PERIOD_QUARTER), _row("202506", "120", PERIOD_QUARTER)]
+    _, points = _service(rows, estimates=_GOOD_ESTIMATES).get_time_series("005930", PERIOD_QUARTER)
+
+    assert all(not p.is_estimate for p in points)
+
+
+def test_estimate_appends_even_when_confirmed_revenue_differs() -> None:
+    """금융지주처럼 추정 매출 정의가 손익계산서와 달라도(≈3배 차이) 추정 행은 붙는다.
+
+    estimate=영업수익 vs income-statement=총영업수익이라 cross-source 대조는 무의미.
+    """
+    financial = [
+        _estimate("202312", False, "232759"),  # 손익계산서(_ANNUAL_ROWS=100)와 전혀 다름
+        _estimate("202412", False, "241166"),
+        _estimate("202512", False, "224597"),
+        _estimate("202612", True, "231461"),
+        _estimate("202712", True, "244928"),
+    ]
+    _, points = _service(_ANNUAL_ROWS, estimates=financial).get_time_series("086790", PERIOD_ANNUAL)
+
+    estimates = [p for p in points if p.is_estimate]
+    assert [p.stac_yymm for p in estimates] == ["202612", "202712"]
+    assert estimates[0].sale_account == Decimal("231461")
+
+
+def test_estimate_best_effort_on_client_error() -> None:
+    """estimate client 예외 → 추정 없이 확정 행만 정상 반환(상세조회 유지)."""
+    _, points = _service(_ANNUAL_ROWS, estimate_raises=True).get_time_series("005930", PERIOD_ANNUAL)
+
+    assert [p.stac_yymm for p in points] == ["202312", "202412", "202512"]
+    assert all(not p.is_estimate for p in points)

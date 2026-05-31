@@ -38,6 +38,7 @@ def _to_point(p: IncomeStatementPointData) -> IncomeStatementPoint:
         eps=p.eps,
         per=p.per,
         price=p.price,
+        is_estimate=p.is_estimate,
     )
 
 

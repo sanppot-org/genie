@@ -33,6 +33,7 @@ from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.dart_company_client import DartCompanyClient
 from src.providers.hantu_candle_client import HantuDomesticCandleClient
 from src.providers.kis_company_client import KisCompanyClient
+from src.providers.kis_estimate_client import KisEstimateClient
 from src.providers.kis_income_statement_client import KisIncomeStatementClient
 from src.providers.pykrx_daily_candle_client import PykrxDailyCandleClient
 from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
@@ -269,6 +270,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
         client=dart_company_client,
     )
     kis_income_statement_client = providers.Singleton(KisIncomeStatementClient, hantu_domestic_api)
+    kis_estimate_client = providers.Singleton(KisEstimateClient, hantu_domestic_api)
     income_statement_sync_service = providers.Factory(
         IncomeStatementSyncService,
         database=database,
@@ -280,6 +282,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
         income_statement_repository=stock_income_statement_repository,
         fundamental_repository=stock_fundamental_repository,
         daily_candle_repository=stock_daily_candle_repository,
+        estimate_client=kis_estimate_client,
     )
     cancellation_sync_service = providers.Factory(
         CancellationSyncService,

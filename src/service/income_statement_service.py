@@ -12,19 +12,23 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
+import logging
 
 from src.database.models import StockDailyCandle, StockFundamental, Ticker
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_income_statement_repository import StockIncomeStatementRepository
 from src.database.ticker_repository import TickerRepository
+from src.providers.kis_estimate_client import KisEstimateClient
 from src.providers.kis_income_statement_client import PERIOD_ANNUAL, PERIOD_QUARTER
 from src.service.exceptions import ExceptionCode, GenieError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class IncomeStatementPointData:
-    """결산기별 손익계산서 1건 (가공 후)."""
+    """결산기별 손익계산서 1건 (가공 후). is_estimate=True는 컨센서스 추정(2026E 등)."""
 
     stac_yymm: str
     sale_account: Decimal | None
@@ -36,6 +40,7 @@ class IncomeStatementPointData:
     eps: float | None = None
     per: float | None = None
     price: float | None = None
+    is_estimate: bool = False
 
 
 class IncomeStatementService:
@@ -47,11 +52,13 @@ class IncomeStatementService:
             income_statement_repository: StockIncomeStatementRepository,
             fundamental_repository: StockFundamentalRepository,
             daily_candle_repository: StockDailyCandleRepository,
+            estimate_client: KisEstimateClient | None = None,
     ) -> None:
         self._tickers = ticker_repository
         self._income = income_statement_repository
         self._fundamentals = fundamental_repository
         self._candles = daily_candle_repository
+        self._estimates = estimate_client
 
     def get_time_series(
             self,
@@ -88,7 +95,52 @@ class IncomeStatementService:
         candles = self._candles.find_by_ticker(ticker.id)
         points = _enrich_with_price(points, candles)
 
+        # 예상실적은 연간(추정치는 연간만 존재)에만 best-effort로 덧붙인다.
+        if period_type == PERIOD_ANNUAL:
+            points = self._append_estimates(points, ticker.ticker)
+
         return ticker, points
+
+    def _append_estimates(
+            self,
+            points: list[IncomeStatementPointData],
+            ticker_code: str,
+    ) -> list[IncomeStatementPointData]:
+        """컨센서스 추정 기간(2026E 등)을 확정 행 뒤에 덧붙인다(best-effort).
+
+        - estimate client 미주입/조회 실패/미커버 종목 → 원본 그대로(표시 안 함).
+        - 위치 고정 매핑은 섹터 무관 안정 확인됨(client 참조). 금융지주는 매출 정의가
+          손익계산서와 달라 cross-source 대조 불가 → 별도 검증 없이 그대로 덧붙인다.
+        """
+        if self._estimates is None:
+            return points
+        try:
+            fetched = self._estimates.fetch(ticker_code)
+        except Exception as e:  # noqa: BLE001 — 표시용 best-effort, 상세조회는 계속돼야 함
+            logger.warning("추정실적 조회 실패 ticker=%s: %r", ticker_code, e)
+            return points
+        if not fetched:
+            return points
+
+        existing = {p.stac_yymm for p in points}
+        estimates = [
+            IncomeStatementPointData(
+                stac_yymm=e.stac_yymm,
+                sale_account=e.revenue,
+                sale_cost=None,
+                sale_totl_prfi=None,
+                bsop_prti=e.operating_profit,
+                op_prfi=None,
+                thtr_ntin=e.net_income,
+                eps=e.eps,
+                per=e.per,
+                price=None,
+                is_estimate=True,
+            )
+            for e in fetched
+            if e.is_estimate and e.stac_yymm not in existing
+        ]
+        return points + estimates
 
 
 def _enrich_with_fundamentals(
