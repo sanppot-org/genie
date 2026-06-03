@@ -4,6 +4,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+import pytest
+
 from src.database.models import StockDailyCandle, StockFundamental, StockIncomeStatement
 from src.providers.kis_estimate_client import EstimatePointData
 from src.providers.kis_income_statement_client import PERIOD_ANNUAL, PERIOD_QUARTER
@@ -226,7 +228,7 @@ def test_annual_appends_estimate_rows() -> None:
     e2026 = points[3]
     assert e2026.sale_account == Decimal("400")
     assert e2026.eps == 400.0
-    assert e2026.price is None  # 미래 → 주가 없음
+    assert e2026.price is None  # 캔들 없음 → 최근 종가 없음 → None
 
 
 def test_quarter_does_not_append_estimates() -> None:
@@ -262,3 +264,170 @@ def test_estimate_best_effort_on_client_error() -> None:
 
     assert [p.stac_yymm for p in points] == ["202312", "202412", "202512"]
     assert all(not p.is_estimate for p in points)
+
+
+def test_estimate_price_and_forward_per_from_latest_close() -> None:
+    """예상치 행: price=최근 종가, per=최근종가/예상EPS(forward PER)."""
+    candles = [
+        _candle(date(2024, 12, 30), 53000.0),
+        _candle(date(2025, 3, 28), 55000.0),  # 가장 최근 종가
+    ]
+    estimates = [
+        _estimate("202612", True, "400"),   # eps=400.0, per=10.0
+        _estimate("202712", True, "500"),   # eps=500.0, per=10.0
+    ]
+    _, points = _service(_ANNUAL_ROWS, candles=candles, estimates=estimates).get_time_series("005930", PERIOD_ANNUAL)
+
+    est_rows = [p for p in points if p.is_estimate]
+    assert len(est_rows) == 2
+    # price = 최근 종가
+    assert est_rows[0].price == 55000.0
+    assert est_rows[1].price == 55000.0
+    # per = 최근종가 / 예상EPS
+    assert est_rows[0].per == pytest.approx(55000.0 / 400.0)
+    assert est_rows[1].per == pytest.approx(55000.0 / 500.0)
+
+
+def test_estimate_derived_eps_per_when_e_eps_none() -> None:
+    """e.eps=None 금융지주 등: base_eps·base_ni로 예상EPS 도출 후 forward PER 계산."""
+    from src.providers.kis_estimate_client import EstimatePointData
+
+    # 확정 행: eps=5000, net_income=10000(억원)
+    rows_with_ni = [
+        _row("202312", "100", PERIOD_ANNUAL),
+        _row("202412", "200", PERIOD_ANNUAL),
+        _row("202512", "300", PERIOD_ANNUAL),
+    ]
+    # 펀더멘털로 202512 eps=5000 부여
+    funds = [_fund(date(2025, 12, 30), eps=5000.0, per=10.0)]
+    # 202512 thtr_ntin(net_income) = 10000
+    from src.database.models import StockIncomeStatement
+    rows_with_ni[2] = StockIncomeStatement(
+        ticker_id=1,
+        period_type=PERIOD_ANNUAL,
+        stac_yymm="202512",
+        sale_account=Decimal("300"),
+        bsop_prti=Decimal("300"),
+        thtr_ntin=Decimal("10000"),  # 억원
+    )
+
+    # 추정행: e.eps=None, e.net_income=12000(억원)
+    est_no_eps = EstimatePointData(
+        stac_yymm="202612",
+        is_estimate=True,
+        revenue=Decimal("400"),
+        operating_profit=Decimal("400"),
+        net_income=Decimal("12000"),
+        eps=None,
+        per=9.0,
+    )
+    candles = [_candle(date(2025, 12, 30), 60000.0)]
+
+    estimate_client = MagicMock()
+    estimate_client.fetch.return_value = [est_no_eps]
+
+    ticker_repo = MagicMock()
+    ticker_repo.find_by_ticker.return_value = MagicMock(id=1, ticker="086790", name="하나금융지주")
+    income_repo = MagicMock()
+    income_repo.find_by_ticker.return_value = rows_with_ni
+    fundamental_repo = MagicMock()
+    fundamental_repo.find_by_ticker.return_value = funds
+    candle_repo = MagicMock()
+    candle_repo.find_by_ticker.return_value = candles
+
+    svc = IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client)
+    _, points = svc.get_time_series("086790", PERIOD_ANNUAL)
+
+    est_rows = [p for p in points if p.is_estimate]
+    assert len(est_rows) == 1
+    expected_eps = 5000.0 * (12000.0 / 10000.0)  # = 6000.0
+    assert est_rows[0].eps == pytest.approx(expected_eps)
+    assert est_rows[0].per == pytest.approx(60000.0 / expected_eps)
+
+
+def test_estimate_derived_eps_none_when_no_base() -> None:
+    """base(eps/ni)를 구할 수 없으면 예상EPS=None, PER은 컨센서스 per 폴백."""
+    from src.providers.kis_estimate_client import EstimatePointData
+
+    est_no_eps = EstimatePointData(
+        stac_yymm="202612",
+        is_estimate=True,
+        revenue=Decimal("400"),
+        operating_profit=Decimal("400"),
+        net_income=Decimal("12000"),
+        eps=None,
+        per=9.0,
+    )
+    # 펀더멘털/캔들 없음 → base_eps=None
+    estimate_client = MagicMock()
+    estimate_client.fetch.return_value = [est_no_eps]
+
+    ticker_repo = MagicMock()
+    ticker_repo.find_by_ticker.return_value = MagicMock(id=1, ticker="086790", name="하나금융지주")
+    income_repo = MagicMock()
+    income_repo.find_by_ticker.return_value = _ANNUAL_ROWS
+    fundamental_repo = MagicMock()
+    fundamental_repo.find_by_ticker.return_value = []
+    candle_repo = MagicMock()
+    candle_repo.find_by_ticker.return_value = []
+
+    svc = IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client)
+    _, points = svc.get_time_series("086790", PERIOD_ANNUAL)
+
+    est_rows = [p for p in points if p.is_estimate]
+    assert len(est_rows) == 1
+    assert est_rows[0].eps is None
+    assert est_rows[0].per == 9.0  # 컨센서스 per 폴백
+
+
+def test_estimate_per_fallback_when_eps_none_or_zero() -> None:
+    """예상EPS가 None이거나 0이면 컨센서스 per(e.per)로 폴백."""
+    candles = [_candle(date(2025, 3, 28), 55000.0)]
+
+    # eps=0 케이스: _estimate 헬퍼가 float(revenue)를 eps로 쓰므로 직접 생성
+    from src.providers.kis_estimate_client import EstimatePointData
+
+    est_zero_eps = EstimatePointData(
+        stac_yymm="202612",
+        is_estimate=True,
+        revenue=Decimal("400"),
+        operating_profit=Decimal("400"),
+        net_income=Decimal("400"),
+        eps=0.0,
+        per=12.5,
+    )
+    est_none_eps = EstimatePointData(
+        stac_yymm="202712",
+        is_estimate=True,
+        revenue=Decimal("500"),
+        operating_profit=Decimal("500"),
+        net_income=Decimal("500"),
+        eps=None,
+        per=13.0,
+    )
+
+    estimate_client = MagicMock()
+    estimate_client.fetch.return_value = [est_zero_eps, est_none_eps]
+
+    from src.service.income_statement_service import IncomeStatementService
+    ticker_repo = MagicMock()
+    ticker_repo.find_by_ticker.return_value = MagicMock(id=1, ticker="005930", name="삼성전자")
+    income_repo = MagicMock()
+    income_repo.find_by_ticker.return_value = _ANNUAL_ROWS
+    fundamental_repo = MagicMock()
+    fundamental_repo.find_by_ticker.return_value = []
+    candle_repo = MagicMock()
+    candle_repo.find_by_ticker.return_value = candles
+
+    svc = IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client)
+    _, points = svc.get_time_series("005930", PERIOD_ANNUAL)
+
+    est_rows = [p for p in points if p.is_estimate]
+    assert len(est_rows) == 2
+    # eps=0 → 폴백
+    assert est_rows[0].per == 12.5
+    # eps=None → 폴백
+    assert est_rows[1].per == 13.0
+    # price는 두 경우 모두 최근 종가
+    assert est_rows[0].price == 55000.0
+    assert est_rows[1].price == 55000.0

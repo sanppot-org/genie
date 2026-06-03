@@ -99,7 +99,16 @@ class IncomeStatementService:
 
         # 예상실적은 연간(추정치는 연간만 존재)에만 best-effort로 덧붙인다.
         if period_type == PERIOD_ANNUAL:
-            points = self._append_estimates(points, ticker.ticker)
+            latest_close = float(candles[-1].close) if candles else None
+            # 최근 확정 행 중 eps·net_income 모두 non-null인 가장 최근 행을 base로 사용.
+            base_eps: float | None = None
+            base_ni: float | None = None
+            for p in reversed(points):
+                if not p.is_estimate and p.eps is not None and p.thtr_ntin is not None:
+                    base_eps = p.eps
+                    base_ni = float(p.thtr_ntin)
+                    break
+            points = self._append_estimates(points, ticker.ticker, latest_close, base_eps, base_ni)
 
         return ticker, points
 
@@ -107,12 +116,17 @@ class IncomeStatementService:
             self,
             points: list[IncomeStatementPointData],
             ticker_code: str,
+            latest_close: float | None = None,
+            base_eps: float | None = None,
+            base_ni: float | None = None,
     ) -> list[IncomeStatementPointData]:
         """컨센서스 추정 기간(2026E 등)을 확정 행 뒤에 덧붙인다(best-effort).
 
         - estimate client 미주입/조회 실패/미커버 종목 → 원본 그대로(표시 안 함).
         - 위치 고정 매핑은 섹터 무관 안정 확인됨(client 참조). 금융지주는 매출 정의가
           손익계산서와 달라 cross-source 대조 불가 → 별도 검증 없이 그대로 덧붙인다.
+        - e.eps 없는 금융지주 등은 base_eps/base_ni로 예상EPS를 도출(주식수 일정 가정):
+          예상EPS = base_eps × (예상순이익 / base_ni), 예상PER = 최근종가 / 예상EPS.
         """
         if self._estimates is None:
             return points
@@ -125,24 +139,41 @@ class IncomeStatementService:
             return points
 
         existing = {p.stac_yymm for p in points}
-        estimates = [
-            IncomeStatementPointData(
-                stac_yymm=e.stac_yymm,
-                sale_account=e.revenue,
+        result: list[IncomeStatementPointData] = []
+        for est in fetched:
+            if not est.is_estimate or est.stac_yymm in existing:
+                continue
+            # EPS 결정: est.eps 있으면 사용, 없으면 base로 도출
+            if est.eps is not None:
+                eps: float | None = est.eps
+            elif (
+                base_eps is not None
+                and base_ni not in (None, 0)
+                and est.net_income is not None
+            ):
+                eps = base_eps * (float(est.net_income) / float(base_ni))  # type: ignore[arg-type]
+            else:
+                eps = None
+            # PER 결정: 도출된 eps 기준 forward PER, 계산 불가 시 컨센서스 per 폴백
+            per: float | None = (
+                (latest_close / eps)
+                if (latest_close is not None and eps is not None and eps != 0)
+                else est.per
+            )
+            result.append(IncomeStatementPointData(
+                stac_yymm=est.stac_yymm,
+                sale_account=est.revenue,
                 sale_cost=None,
                 sale_totl_prfi=None,
-                bsop_prti=e.operating_profit,
+                bsop_prti=est.operating_profit,
                 op_prfi=None,
-                thtr_ntin=e.net_income,
-                eps=e.eps,
-                per=e.per,
-                price=None,
+                thtr_ntin=est.net_income,
+                eps=eps,
+                per=per,
+                price=latest_close,
                 is_estimate=True,
-            )
-            for e in fetched
-            if e.is_estimate and e.stac_yymm not in existing
-        ]
-        return points + estimates
+            ))
+        return points + result
 
 
 def _enrich_with_fundamentals(

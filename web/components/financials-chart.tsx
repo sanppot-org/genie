@@ -3,9 +3,11 @@
 import {
   Bar,
   CartesianGrid,
+  Cell,
   ComposedChart,
   Legend,
   Line,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -314,26 +316,31 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
     return <p className="text-sm text-muted-foreground">재무 데이터 없음</p>;
   }
 
-  // 차트는 확정 실적만(추정치는 표에만 표시).
-  const data = points
-    .filter((p) => !p.is_estimate)
-    .map((p) => ({
-      stac_yymm: p.stac_yymm,
-      매출: p.revenue,
-      영업이익: p.operating_profit,
-      순이익: p.net_income,
-    }));
+  // 차트는 확정 + 추정치 모두 포함(추정치는 음영/반투명으로 구분).
+  const data = points.map((p) => ({
+    stac_yymm: p.stac_yymm,
+    매출: p.revenue,
+    영업이익: p.operating_profit,
+    순이익: p.net_income,
+    isEstimate: p.is_estimate,
+  }));
 
-  const perShareData = points
-    .filter((p) => !p.is_estimate)
-    .map((p) => ({
-      stac_yymm: p.stac_yymm,
-      주가: p.price,
-      배당: p.dps,
-      유보: p.eps !== null && p.eps !== undefined ? p.eps - (p.dps ?? 0) : null,
-    }));
+  const perShareData = points.map((p) => ({
+    stac_yymm: p.stac_yymm,
+    주가: p.price,
+    배당: p.dps,
+    유보: p.eps !== null && p.eps !== undefined ? p.eps - (p.dps ?? 0) : null,
+    isEstimate: p.is_estimate,
+  }));
 
   const hasOverPayout = perShareData.some((d) => d.유보 !== null && d.유보 < 0);
+
+  // 추정 구간 경계: 첫 추정 행 ~ 마지막 행.
+  const firstEst = points.find((p) => p.is_estimate)?.stac_yymm;
+  const estRange =
+    firstEst != null
+      ? { x1: firstEst, x2: points[points.length - 1].stac_yymm }
+      : null;
 
   // 좁은 화면에서 막대가 뭉개지지 않도록 데이터 기수에 비례한 최소 폭을 주고,
   // 부모보다 넓어지면 가로 스크롤. 데스크톱(넓은 부모)에서는 w-full로 채운다.
@@ -376,6 +383,16 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 iconSize={10}
                 wrapperStyle={{ fontSize: 12 }}
               />
+              {estRange && (
+                <ReferenceArea
+                  yAxisId="left"
+                  x1={estRange.x1}
+                  x2={estRange.x2}
+                  fill="#f59e0b"
+                  fillOpacity={0.08}
+                  label={{ value: "예상", position: "insideTop", fontSize: 11, fill: "#b45309" }}
+                />
+              )}
               <Line
                 yAxisId="left"
                 type="monotone"
@@ -384,8 +401,16 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 strokeWidth={2}
                 dot={{ r: 3 }}
               />
-              <Bar yAxisId="right" dataKey="영업이익" fill={COLOR_OP} radius={[2, 2, 0, 0]} />
-              <Bar yAxisId="right" dataKey="순이익" fill={COLOR_NET} radius={[2, 2, 0, 0]} />
+              <Bar yAxisId="right" dataKey="영업이익" fill={COLOR_OP} radius={[2, 2, 0, 0]}>
+                {data.map((d, i) => (
+                  <Cell key={i} fillOpacity={d.isEstimate ? 0.4 : 1} />
+                ))}
+              </Bar>
+              <Bar yAxisId="right" dataKey="순이익" fill={COLOR_NET} radius={[2, 2, 0, 0]}>
+                {data.map((d, i) => (
+                  <Cell key={i} fillOpacity={d.isEstimate ? 0.4 : 1} />
+                ))}
+              </Bar>
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -425,8 +450,26 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 iconSize={10}
                 wrapperStyle={{ fontSize: 12 }}
               />
-              <Bar yAxisId="pershare" dataKey="배당" stackId="eps" fill={COLOR_DPS} />
-              <Bar yAxisId="pershare" dataKey="유보" stackId="eps" fill={COLOR_EPS} radius={[2, 2, 0, 0]} />
+              {estRange && (
+                <ReferenceArea
+                  yAxisId="price"
+                  x1={estRange.x1}
+                  x2={estRange.x2}
+                  fill="#f59e0b"
+                  fillOpacity={0.08}
+                  label={{ value: "예상", position: "insideTop", fontSize: 11, fill: "#b45309" }}
+                />
+              )}
+              <Bar yAxisId="pershare" dataKey="배당" stackId="eps" fill={COLOR_DPS}>
+                {perShareData.map((d, i) => (
+                  <Cell key={i} fillOpacity={d.isEstimate ? 0.4 : 1} />
+                ))}
+              </Bar>
+              <Bar yAxisId="pershare" dataKey="유보" stackId="eps" fill={COLOR_EPS} radius={[2, 2, 0, 0]}>
+                {perShareData.map((d, i) => (
+                  <Cell key={i} fillOpacity={d.isEstimate ? 0.4 : 1} />
+                ))}
+              </Bar>
               <Line
                 yAxisId="price"
                 type="monotone"
