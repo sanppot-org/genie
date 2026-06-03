@@ -18,6 +18,9 @@ import type { IncomeStatementPoint, IncomeStatementSeries } from "@/lib/types";
 const COLOR_REVENUE = "#3b82f6"; // blue-500
 const COLOR_OP = "#10b981"; // emerald-500
 const COLOR_NET = "#f59e0b"; // amber-500
+const COLOR_PRICE = "#475569"; // slate-600
+const COLOR_EPS = "#8b5cf6"; // violet-500
+const COLOR_DPS = "#14b8a6"; // teal-500
 
 // 결산기(3계열 막대) 한 그룹당 최소 폭(px). 좁은 화면에서 막대가 뭉개지지 않게 가로 스크롤 기준.
 const PX_PER_GROUP = 46;
@@ -222,6 +225,57 @@ function SummaryTable({ points, isAnnual }: { points: IncomeStatementPoint[]; is
   );
 }
 
+// ── 주가·EPS·DPS 전용 툴팁 ──────────────────────────────────────────────────
+interface PerShareTooltipProps {
+  active?: boolean;
+  payload?: { name: string; value: number | null; color: string }[];
+  label?: string;
+  isAnnual: boolean;
+}
+
+function PerShareTooltip({ active, payload, label, isAnnual }: PerShareTooltipProps) {
+  if (!active || !payload || payload.length === 0 || !label) return null;
+
+  const find = (name: string) => payload.find((p) => p.name === name)?.value ?? null;
+  const 주가 = find("주가");
+  const 배당 = find("배당");
+  const 유보 = find("유보");
+  // 유보(=EPS-DPS)가 null이면 그 행의 EPS 자체가 null. 유보가 있을 때만 EPS=유보+배당으로 역산.
+  const eps = 유보 !== null ? 유보 + (배당 ?? 0) : null;
+
+  function fmtWon(v: number | null): string {
+    if (v === null || v === undefined) return "-";
+    return `${Math.round(v).toLocaleString("ko-KR")}원`;
+  }
+
+  return (
+    <div className="rounded-md border bg-background px-3 py-2 text-sm shadow-md">
+      <p className="mb-1 font-medium">{fmtPeriod(label, isAnnual)}</p>
+      <p className="flex justify-between gap-4 tabular-nums">
+        <span style={{ color: COLOR_PRICE }}>주가</span>
+        <span>{fmtWon(주가)}</span>
+      </p>
+      <p className="flex justify-between gap-4 tabular-nums">
+        <span style={{ color: COLOR_EPS }}>EPS</span>
+        <span>{fmtWon(eps)}</span>
+      </p>
+      <p className="flex justify-between gap-4 tabular-nums">
+        <span style={{ color: COLOR_DPS }}>배당(DPS)</span>
+        <span>{fmtWon(배당)}</span>
+      </p>
+      {(() => {
+        const pr = payoutRatio(배당, eps);
+        return (
+          <p className="flex justify-between gap-4 tabular-nums">
+            <span className="text-muted-foreground">배당성향</span>
+            <span>{pr !== null ? `${pr.toFixed(1)}%` : "-"}</span>
+          </p>
+        );
+      })()}
+    </div>
+  );
+}
+
 // ── 커스텀 툴팁 ──────────────────────────────────────────────────────────────
 interface TooltipPayloadItem {
   name: string;
@@ -269,6 +323,17 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
       영업이익: p.operating_profit,
       순이익: p.net_income,
     }));
+
+  const perShareData = points
+    .filter((p) => !p.is_estimate)
+    .map((p) => ({
+      stac_yymm: p.stac_yymm,
+      주가: p.price,
+      배당: p.dps,
+      유보: p.eps !== null && p.eps !== undefined ? p.eps - (p.dps ?? 0) : null,
+    }));
+
+  const hasOverPayout = perShareData.some((d) => d.유보 !== null && d.유보 < 0);
 
   // 좁은 화면에서 막대가 뭉개지지 않도록 데이터 기수에 비례한 최소 폭을 주고,
   // 부모보다 넓어지면 가로 스크롤. 데스크톱(넓은 부모)에서는 w-full로 채운다.
@@ -325,6 +390,61 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
           </ResponsiveContainer>
         </div>
       </div>
+
+      <p className="text-sm text-muted-foreground">주가 · EPS · 배당</p>
+      <div className="overflow-x-auto">
+        <div className="w-full" style={{ minWidth }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <ComposedChart data={perShareData} margin={{ top: 8, right: 68, bottom: 0, left: 8 }} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.15)" vertical={false} />
+              <XAxis
+                dataKey="stac_yymm"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v: string) => fmtPeriod(v, isAnnual)}
+                interval={0}
+              />
+              <YAxis
+                yAxisId="price"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v: number) => v.toLocaleString("ko-KR")}
+                width={68}
+              />
+              <YAxis
+                yAxisId="pershare"
+                orientation="right"
+                tick={{ fontSize: 11 }}
+                tickFormatter={(v: number) => v.toLocaleString("ko-KR")}
+                width={68}
+              />
+              <Tooltip
+                content={<PerShareTooltip isAnnual={isAnnual} />}
+                cursor={{ fill: "rgba(0,0,0,0.04)" }}
+              />
+              <Legend
+                iconType="square"
+                iconSize={10}
+                wrapperStyle={{ fontSize: 12 }}
+              />
+              <Bar yAxisId="pershare" dataKey="배당" stackId="eps" fill={COLOR_DPS} />
+              <Bar yAxisId="pershare" dataKey="유보" stackId="eps" fill={COLOR_EPS} radius={[2, 2, 0, 0]} />
+              <Line
+                yAxisId="price"
+                type="monotone"
+                dataKey="주가"
+                stroke={COLOR_PRICE}
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {hasOverPayout && (
+        <p className="text-xs text-muted-foreground">
+          ※ 배당이 EPS를 초과하거나 적자인 기간은 막대 높이가 EPS와 다르게 보일 수 있습니다.
+        </p>
+      )}
 
       <SummaryTable points={points} isAnnual={isAnnual} />
     </div>
