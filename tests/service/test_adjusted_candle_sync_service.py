@@ -163,3 +163,78 @@ class TestSyncAll:
         assert result.api_failed == 1
         assert result.failed_tickers == ["005930"]
         assert result.tickers_updated == 1               # 000660 정상
+
+
+def _seed_split(db: Database) -> None:
+    """005930에 분할(종가 70000→1400, ratio 0.02) + 000660 정상."""
+    session = db.get_session()
+    try:
+        tr = TickerRepository(session)
+        sam = tr.save(Ticker(ticker="005930", name="삼성전자",
+                             asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value))
+        sk = tr.save(Ticker(ticker="000660", name="SK하이닉스",
+                            asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value))
+        cr = StockDailyCandleRepository(session)
+        cr.bulk_upsert([
+            StockDailyCandle(ticker_id=sam.id, date=date(2024, 1, 2), open=70000, high=71000,
+                             low=69500, close=70000, volume=12_000_000, trade_value=None),
+            StockDailyCandle(ticker_id=sam.id, date=date(2024, 1, 3), open=1400, high=1430,
+                             low=1390, close=1400, volume=600_000_000, trade_value=None),  # 분할
+            StockDailyCandle(ticker_id=sk.id, date=date(2024, 1, 2), open=130000, high=131000,
+                             low=129000, close=130000, volume=3_000_000, trade_value=None),
+            StockDailyCandle(ticker_id=sk.id, date=date(2024, 1, 3), open=130500, high=132000,
+                             low=130000, close=131000, volume=3_500_000, trade_value=None),  # 정상
+        ])
+        session.commit()
+    finally:
+        session.close()
+
+
+class TestSplitDetection:
+    def test_분할_종목만_감지(self, db: Database) -> None:
+        _seed_split(db)
+        session = db.get_session()
+        try:
+            repo = StockDailyCandleRepository(session)
+            sam_id = TickerRepository(session).find_by_ticker("005930").id
+            sk_id = TickerRepository(session).find_by_ticker("000660").id
+
+            ids = repo.find_split_candidate_ticker_ids(date(2024, 1, 3))
+
+            assert sam_id in ids        # 분할(0.02)
+            assert sk_id not in ids      # 정상(1.008)
+        finally:
+            session.close()
+
+    def test_since_이전_급변_제외(self, db: Database) -> None:
+        """분할일이 since 이전이면 후보에서 제외."""
+        _seed_split(db)
+        session = db.get_session()
+        try:
+            repo = StockDailyCandleRepository(session)
+            ids = repo.find_split_candidate_ticker_ids(date(2024, 1, 4))  # 01-03 분할 < since
+            assert ids == set()
+        finally:
+            session.close()
+
+
+class TestReadjustRecentSplits:
+    def test_감지_종목_재백필(self, db: Database, client: MagicMock) -> None:
+        _seed_split(db)
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.readjust_recent_splits(lookback_days=10, now=date(2024, 1, 3))
+
+        assert result.api_attempted == 1                 # 005930만
+        called = [c.args[0] for c in client.fetch_adjusted_by_ticker.call_args_list]
+        assert called == ["005930"]
+        assert _adj_close(db, "005930", date(2024, 1, 3)) == 1436
+
+    def test_후보_없으면_noop(self, db: Database, client: MagicMock) -> None:
+        _seed(db)  # 분할 없는 시드
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.readjust_recent_splits(lookback_days=10, now=date(2024, 1, 3))
+
+        assert result.api_attempted == 0
+        client.fetch_adjusted_by_ticker.assert_not_called()

@@ -25,8 +25,20 @@ codex + architect 교차검증 반영.
 - **부분 보정 가시성**: result에 `existing`/`partial`(updated<existing) + WARN 로깅 → 2014 이전 네이버 미커버 구간 모니터링.
 - 오프라인 스크립트 `scripts/backfill_adjusted_candles.py`(--ticker/--only-stale/--throttle-sec, 독립 프로세스). 검증: backend 902 passed, dev E2E(배치 sync 005930 830행, partial 0).
 
-### Phase 2b~2d (미착수)
-스케줄러 분할 감지 재보정(신규일 raw close/prev<0.55 종목만 전체 재백필 — 네이버 back-adjusted라 새 분할 시 과거 전체 변동) + 월간 안전망, 프론트 수정주가/원주가·로그 토글, prod 마이그레이션 배포(017 + 전종목 백필 1회). adj_volume은 네이버 소스라 KRX 원거래량과 차이 있음(종가는 정확 일치, 표시 영향 경미).
+### Phase 2b (완료, 2026-06-03): 분할 감지 자동 재보정
+codex + architect 교차검증 반영.
+- **별도 cron task `readjust_kr_stock_splits`**(일봉 sync 16:58 직후 **17:10** 평일) — 일봉 task에 인라인 금지(책임/실패알림 격리, 기존 sync task 골격 복제). `@db_scoped @inject` + service만 호출.
+- **감지**: `find_split_candidate_ticker_ids(since)` — raw 종가가 직전 거래일 대비 밴드 밖(`<0.6` or `>1.7`, KR ±30% 초과 = 분할·병합·권리락·감자) 종목. LAG 윈도우 + buffer(since-10일)로 경계일 prev 보존, division 없이 곱셈 비교. **raw 기준**(adj는 back-adjust돼 절벽 제거됨→감지 불가). `stock_daily_candles`는 일반 테이블(하이퍼테이블 아님), 일일 1회·소범위라 date 인덱스 없이 seq-scan 허용.
+- **재보정**: `readjust_recent_splits(lookback_days=10)` = 감지(자체 session_scope) → `sync(ticker_codes=[후보])` 재사용(전체 adj overwrite — 네이버 back-adjusted라 분할 시 과거 전체 변동). lookback=실행 누락 방어 마진. 거짓양성은 멱등 재백필이라 무해, 거짓음성은 안전망.
+- **신규일 adj 별도 처리 없음**: 비분할 종목 신규일은 adj NULL→raw 폴백(계수1=정확). 일봉 bulk_upsert는 adj_* 미갱신(보존 확인).
+- **세션 정합**: `Database.session_scope()`는 `self.SessionLocal()` 새 세션이라 `@db_scoped` request-scope 토큰과 독립 → task가 자체 session_scope 서비스 호출해도 안전(2a와 동형).
+- 검증: backend 906 passed, mypy/ruff, dev PG E2E(윈도우 감지쿼리 동작, 005930 후보0=분할없음 정확).
+
+### 안전망 (운영, 앱 스케줄러 미사용)
+전종목 재백필은 장시간 executor 점유·prod 커넥션 풀 이력([[project_db_session_leak]]) 고려해 **앱 스케줄러 인라인 대신** 기존 오프라인 스크립트 `scripts/backfill_adjusted_candles.py`를 **분기 1회 OS cron/수동** 실행으로 운영(미감지 분할·네이버 소스 정정 흡수). architect/codex 합의.
+
+### Phase 2c~2d (미착수)
+프론트 수정주가/원주가·로그 스케일 토글, prod 마이그레이션 배포(017 + 전종목 백필 1회 + 분기 재백필 cron 등록). adj_volume은 네이버 소스라 KRX 원거래량과 차이(종가는 정확 일치, 표시 영향 경미).
 
 ## 2026-05-30: 자사주 소각 수집 + 스크리너 자사주 점수(3지표)
 

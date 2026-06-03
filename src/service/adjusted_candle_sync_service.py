@@ -13,7 +13,7 @@
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 import time
 
@@ -146,6 +146,27 @@ class AdjustedCandleSyncService:
             result.tickers_updated, result.rows_updated, result.partial_tickers,
         )
         return result
+
+    # ----- 분할 감지 재보정 (2b: 일일 cron) -----
+    def readjust_recent_splits(
+        self, lookback_days: int = 10, now: date | None = None
+    ) -> AdjustedSyncResult:
+        """최근 구간에 분할·병합 신호(raw 종가 급변)가 있는 종목만 전체 adj 재백필.
+
+        네이버 수정주가는 최신 기준 back-adjusted라 신규 분할 시 과거 adj_*가 소급 변경됨.
+        only_stale skip은 이를 감지 못 하므로, raw 종가 급변으로 후보를 찾아 종목 전체를
+        overwrite한다. lookback_days는 휴장·다운타임으로 인한 실행 누락 방어 마진.
+        """
+        today = now or datetime.now(KST).date()
+        since = today - timedelta(days=lookback_days)
+        with self._database.session_scope() as session:
+            candidate_ids = StockDailyCandleRepository(session).find_split_candidate_ticker_ids(since)
+        if not candidate_ids:
+            logger.info("분할 감지 재보정: 후보 없음 (since=%s)", since)
+            return AdjustedSyncResult(0, 0, 0, 0, 0, 0, 0, [])
+        codes = [code for tid, code in self._load_targets(None) if tid in candidate_ids]
+        logger.info("분할 감지 재보정: 후보 %d종목 재백필 — %s", len(codes), ",".join(codes))
+        return self.sync(ticker_codes=codes, now=today)
 
     # ----- 공통 -----
     def _process_ticker(self, ticker_id: int, ticker_code: str, to_date: date) -> tuple[int, int, int]:

@@ -1,14 +1,20 @@
 """StockDailyCandle Repository."""
 
-from datetime import date
+from datetime import date, timedelta
 import logging
 
+from sqlalchemy import func, or_
 from sqlalchemy.dialects.postgresql import insert
 
 from src.database.base_repository import BaseRepository
 from src.database.models import StockDailyCandle
 
 logger = logging.getLogger(__name__)
+
+# 분할/병합 감지: 직전 거래일 대비 raw 종가 비율 밴드. KR 일일 가격제한 ±30%라
+# 0.6배 미만 급락(분할·권리락·감자)·1.7배 초과 급등(병합)은 코퍼레이트 액션 신호.
+_SPLIT_RATIO_LOW = 0.6
+_SPLIT_RATIO_HIGH = 1.7
 
 
 class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
@@ -127,6 +133,51 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
         rows = (
             self.session.query(StockDailyCandle.ticker_id)
             .filter(StockDailyCandle.adj_close.isnot(None))
+            .distinct()
+            .all()
+        )
+        return {r[0] for r in rows}
+
+    def find_split_candidate_ticker_ids(
+        self,
+        since: date,
+        low: float = _SPLIT_RATIO_LOW,
+        high: float = _SPLIT_RATIO_HIGH,
+    ) -> set[int]:
+        """since 이후 raw 종가가 직전 거래일 대비 밴드 밖으로 급변한 ticker_id 집합.
+
+        분할·병합·권리락·감자 등 코퍼레이트 액션 후보(네이버 수정주가 소급 변경 대상).
+        LAG로 종목별 직전 거래일 종가를 구하고, 경계일의 직전값이 윈도우 밖이 되지 않도록
+        스캔 범위를 since보다 buffer만큼 앞에서 시작한다. 비교는 division 없이 곱셈으로.
+        raw close 기준(adj는 back-adjust돼 절벽이 이미 제거됨 → 감지 불가).
+        """
+        scan_from = since - timedelta(days=10)
+        prev_close = func.lag(StockDailyCandle.close).over(
+            partition_by=StockDailyCandle.ticker_id,
+            order_by=StockDailyCandle.date,
+        ).label("prev_close")
+        windowed = (
+            self.session.query(
+                StockDailyCandle.ticker_id.label("ticker_id"),
+                StockDailyCandle.date.label("date"),
+                StockDailyCandle.close.label("close"),
+                prev_close,
+            )
+            .filter(StockDailyCandle.date >= scan_from)
+            .subquery()
+        )
+        rows = (
+            self.session.query(windowed.c.ticker_id)
+            .filter(
+                windowed.c.date >= since,
+                windowed.c.prev_close.isnot(None),
+                windowed.c.prev_close > 0,
+                windowed.c.close > 0,
+                or_(
+                    windowed.c.close < low * windowed.c.prev_close,
+                    windowed.c.close > high * windowed.c.prev_close,
+                ),
+            )
             .distinct()
             .all()
         )

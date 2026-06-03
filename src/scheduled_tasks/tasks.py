@@ -21,6 +21,7 @@ from src.providers.pykrx_ticker_client import EmptyPykrxResponseError
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.scheduled_tasks.scope import db_scoped, mark_rollback_only
+from src.service.adjusted_candle_sync_service import AdjustedCandleSyncService
 from src.service.buyback_sync_service import BuybackSyncService
 from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
@@ -370,3 +371,31 @@ def sync_kr_stock_daily_candles(
         mark_rollback_only()
         logger.exception("일봉 동기화 실패")
         slack_client.send_status(f"일봉 동기화 실패 ({target_date}): {e}")
+
+
+@db_scoped
+@inject
+def readjust_kr_stock_splits(
+        service: AdjustedCandleSyncService = Provide[ApplicationContainer.adjusted_candle_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """분할·병합 감지 후 해당 종목 수정주가 재보정 (일봉 동기화 직후, 평일).
+
+    네이버 수정주가는 최신 기준 back-adjusted라 신규 분할 시 과거 adj_*가 소급 변경됨.
+    최근 구간 raw 종가 급변 종목만 골라 전체 adj를 재백필한다. 후보가 없으면 no-op.
+    """
+    try:
+        result = service.readjust_recent_splits()
+        if result.api_attempted > 0:
+            logger.info(
+                "분할 감지 재보정 완료 candidates=%d updated=%d failed=%d rows=%d",
+                result.api_attempted, result.tickers_updated, result.api_failed, result.rows_updated,
+            )
+            if result.failed_tickers:
+                slack_client.send_status(
+                    f"수정주가 재보정 일부 실패: {','.join(result.failed_tickers)}"
+                )
+    except Exception as e:
+        mark_rollback_only()
+        logger.exception("분할 감지 재보정 실패")
+        slack_client.send_status(f"분할 감지 재보정 실패: {e}")
