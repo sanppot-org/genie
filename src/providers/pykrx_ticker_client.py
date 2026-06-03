@@ -5,6 +5,7 @@ from datetime import date
 import logging
 
 from dotenv import load_dotenv
+import pandas as pd
 from pykrx import stock
 from tenacity import (
     before_sleep_log,
@@ -70,13 +71,17 @@ class PykrxTickerClient:
         """KOSPI + KOSDAQ 종목 정보 조회."""
         yyyymmdd = _to_yyyymmdd(base_date)
         results: list[PykrxTickerInfo] = []
+        seen: set[str] = set()
         for market in _STOCK_MARKETS:
             tickers: list[str] = stock.get_market_ticker_list(yyyymmdd, market=market)
             for ticker in tickers:
+                if ticker in seen:
+                    continue
+                seen.add(ticker)
                 results.append(
                     PykrxTickerInfo(
                         ticker=ticker,
-                        name=stock.get_market_ticker_name(ticker),
+                        name=_coerce_name(stock.get_market_ticker_name(ticker)),
                         asset_type=AssetType.KR_STOCK,
                     )
                 )
@@ -87,14 +92,20 @@ class PykrxTickerClient:
         """ETF 종목 정보 조회."""
         yyyymmdd = _to_yyyymmdd(base_date)
         tickers: list[str] = stock.get_etf_ticker_list(yyyymmdd)
-        return [
-            PykrxTickerInfo(
-                ticker=ticker,
-                name=stock.get_etf_ticker_name(ticker),
-                asset_type=AssetType.KR_ETF,
+        results: list[PykrxTickerInfo] = []
+        seen: set[str] = set()
+        for ticker in tickers:
+            if ticker in seen:
+                continue
+            seen.add(ticker)
+            results.append(
+                PykrxTickerInfo(
+                    ticker=ticker,
+                    name=_coerce_name(stock.get_etf_ticker_name(ticker)),
+                    asset_type=AssetType.KR_ETF,
+                )
             )
-            for ticker in tickers
-        ]
+        return results
 
     @retry(
         stop=stop_after_attempt(3),
@@ -113,6 +124,24 @@ class PykrxTickerClient:
         if not results:
             raise EmptyPykrxResponseError("pykrx returned empty ticker list — possible KRX outage")
         return results
+
+
+def _coerce_name(name: object) -> str:
+    """pykrx 종목명을 단일 문자열로 정규화한다.
+
+    KRX 응답에 같은 단축코드(ticker)를 가진 행이 여러 개 존재하면
+    `df.loc[ticker, "종목명"]`이 스칼라가 아닌 `pandas.Series`를 반환한다.
+    이 경우 첫 값을 취해 DB adapt 실패(`can't adapt type 'Series'`)를 방지한다.
+
+    빈 Series나 결측(NaN/None)은 빈 문자열로 정규화한다. `str(nan)`이
+    `"nan"` 문자열로 DB에 저장되는 silent corruption을 막기 위함이다.
+    """
+    if isinstance(name, pd.Series):
+        name = name.iloc[0] if not name.empty else None
+    # None 또는 NaN(float, self-inequality) → 빈 문자열. `str(nan)` 저장 방지.
+    if name is None or (isinstance(name, float) and name != name):
+        return ""
+    return str(name)
 
 
 def _to_yyyymmdd(base_date: date | None) -> str | None:

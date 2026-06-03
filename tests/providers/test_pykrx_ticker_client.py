@@ -52,17 +52,42 @@ class TestPykrxTickerClient:
     def test_fetch_all_concatenates_stocks_and_etfs(self) -> None:
         """fetch_all은 주식 다음 ETF 순서로 합쳐서 반환한다."""
         with (
-            patch("src.providers.pykrx_ticker_client.stock.get_market_ticker_list", return_value=["005930"]),
-            patch("src.providers.pykrx_ticker_client.stock.get_market_ticker_name", return_value="삼성전자"),
+            patch(
+                "src.providers.pykrx_ticker_client.stock.get_market_ticker_list",
+                side_effect=lambda _, market: {"KOSPI": ["005930"], "KOSDAQ": ["000660"]}[market],
+            ),
+            patch(
+                "src.providers.pykrx_ticker_client.stock.get_market_ticker_name",
+                side_effect=lambda code: {"005930": "삼성전자", "000660": "SK하이닉스"}[code],
+            ),
             patch("src.providers.pykrx_ticker_client.stock.get_etf_ticker_list", return_value=["069500"]),
             patch("src.providers.pykrx_ticker_client.stock.get_etf_ticker_name", return_value="KODEX 200"),
         ):
             result = PykrxTickerClient().fetch_all(base_date=date(2026, 5, 15))
 
-        # KOSPI/KOSDAQ 두 시장 호출 → 같은 종목이 두 번. ETF 한 번.
+        # 주식(KOSPI+KOSDAQ) 2개 + ETF 1개.
         assert len(result) == 3
         assert result[0].asset_type == AssetType.KR_STOCK
         assert result[-1] == PykrxTickerInfo(ticker="069500", name="KODEX 200", asset_type=AssetType.KR_ETF)
+
+    def test_fetch_etf_tickers_dedupes_and_coerces_series_name(self) -> None:
+        """KRX가 같은 단축코드 행을 중복 반환해 종목명이 Series로 와도,
+        ticker는 1번만 반환하고 종목명은 단일 문자열로 정규화한다.
+
+        프로덕션 버그(`can't adapt type 'Series'`) 회귀 방지 테스트.
+        """
+        import pandas as pd
+
+        dup_name = pd.Series(["PLUS 삼성전자선물단일종목인버스2X"] * 9)
+        with (
+            patch("src.providers.pykrx_ticker_client.stock.get_etf_ticker_list", return_value=["0193L0", "0193L0"]),
+            patch("src.providers.pykrx_ticker_client.stock.get_etf_ticker_name", return_value=dup_name),
+        ):
+            result = PykrxTickerClient().fetch_etf_tickers(base_date=date(2026, 5, 15))
+
+        assert result == [
+            PykrxTickerInfo(ticker="0193L0", name="PLUS 삼성전자선물단일종목인버스2X", asset_type=AssetType.KR_ETF),
+        ]
 
     def test_to_entity_maps_stock_info(self) -> None:
         """KR_STOCK PykrxTickerInfo가 Ticker 엔티티로 매핑된다."""
