@@ -81,3 +81,32 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
         )
 
         self.session.execute(stmt)
+
+    def update_adjusted(
+        self, ticker_id: int, adjusted_by_date: dict[date, tuple[float, float, float, float, int]]
+    ) -> int:
+        """기존 (ticker_id, date) row의 adj_* 컬럼만 UPDATE.
+
+        원주가(open~close)는 KRX 원본으로 불변 보존하고 수정주가만 덮어쓴다.
+        값 튜플은 (open, high, low, close, volume). DB에 없는 날짜는 무시(원주가 미존재 과거는 fabricate 안 함).
+        반환: 실제 갱신된 row 수.
+        """
+        if not adjusted_by_date:
+            return 0
+
+        rows = (
+            self.session.query(StockDailyCandle)
+            .filter(
+                StockDailyCandle.ticker_id == ticker_id,
+                StockDailyCandle.date.in_(list(adjusted_by_date.keys())),
+            )
+            .all()
+        )
+        for row in rows:
+            o, h, low_, c, v = adjusted_by_date[row.date]
+            row.adj_open = o
+            row.adj_high = h
+            row.adj_low = low_
+            row.adj_close = c
+            row.adj_volume = v
+        return len(rows)

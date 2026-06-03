@@ -415,6 +415,13 @@ class StockDailyCandle(Base, TimestampMixin):
     close: Mapped[float] = mapped_column(Float, nullable=False, comment="종가")
     volume: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="거래량(주)")
     trade_value: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="거래대금(원)")
+    # 수정주가(액면분할·무상증자 소급 반영, 네이버 소스). 원주가(open~close)는 KRX 원본으로 불변 보존.
+    # 백필 전 row는 NULL → 조회 시 원주가 폴백.
+    adj_open: Mapped[float | None] = mapped_column(Float, nullable=True, comment="수정 시가")
+    adj_high: Mapped[float | None] = mapped_column(Float, nullable=True, comment="수정 고가")
+    adj_low: Mapped[float | None] = mapped_column(Float, nullable=True, comment="수정 저가")
+    adj_close: Mapped[float | None] = mapped_column(Float, nullable=True, comment="수정 종가")
+    adj_volume: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="수정 거래량(분할배수 반영)")
 
     __table_args__ = (
         PrimaryKeyConstraint("date", "ticker_id"),

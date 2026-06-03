@@ -33,6 +33,18 @@ class PykrxDailyCandleSnapshot:
     trade_value: int | None
 
 
+@dataclass(frozen=True)
+class PykrxAdjustedCandle:
+    """pykrx 종목별 수정주가 일봉 (네이버 소스, adjusted=True)."""
+
+    date: date
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: int
+
+
 class PykrxDailyCandleClient:
     """pykrx `stock.get_market_ohlcv(date, market='ALL')` 래퍼.
 
@@ -79,3 +91,46 @@ class PykrxDailyCandleClient:
             )
             for idx, row in df.iterrows()
         ]
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=10, min=10, max=60),
+        retry=retry_if_exception_type(EmptyPykrxResponseError),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+        reraise=True,
+    )
+    def fetch_adjusted_by_ticker(
+        self, ticker: str, from_date: date, to_date: date
+    ) -> list[PykrxAdjustedCandle]:
+        """종목별 수정주가 일봉(네이버 소스). 거래정지(전 컬럼 0) row는 스킵.
+
+        - `get_market_ohlcv_by_date(adjusted=True)`는 네이버 소스 → KRX 인증 불필요.
+        - 액면분할 준비 거래정지 기간에는 시/고/저/거래량=0, 종가만 carry-forward 되므로 스킵.
+        - 빈 응답은 외부 장애로 간주 → 재시도.
+        """
+        df = stock.get_market_ohlcv_by_date(
+            _to_yyyymmdd(from_date), _to_yyyymmdd(to_date), ticker, adjusted=True
+        )
+        if df is None or df.empty:
+            raise EmptyPykrxResponseError(
+                f"pykrx get_market_ohlcv_by_date(adjusted) returned empty — ticker={ticker}"
+            )
+
+        result: list[PykrxAdjustedCandle] = []
+        for idx, row in df.iterrows():
+            open_ = float(row["시가"])
+            volume = int(row["거래량"])
+            # 거래정지/액면분할 준비 기간: OHLV·거래량 0 → 의미 없는 row, 스킵
+            if open_ == 0 and volume == 0:
+                continue
+            result.append(
+                PykrxAdjustedCandle(
+                    date=pd.Timestamp(idx).date(),
+                    open=open_,
+                    high=float(row["고가"]),
+                    low=float(row["저가"]),
+                    close=float(row["종가"]),
+                    volume=volume,
+                )
+            )
+        return result

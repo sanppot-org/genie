@@ -99,7 +99,10 @@ class IncomeStatementService:
 
         # 예상실적은 연간(추정치는 연간만 존재)에만 best-effort로 덧붙인다.
         if period_type == PERIOD_ANNUAL:
-            latest_close = float(candles[-1].close) if candles else None
+            latest_close = (
+                float(candles[-1].adj_close if candles[-1].adj_close is not None else candles[-1].close)
+                if candles else None
+            )
             # 최근 확정 행 중 eps·net_income 모두 non-null인 가장 최근 행을 base로 사용.
             base_eps: float | None = None
             base_ni: float | None = None
@@ -212,6 +215,8 @@ def _enrich_with_price(
 
     일봉은 date 오름차순. 결산말일 이하 중 가장 최근 종가를 bisect로 선택(휴장일 보정).
     못 찾으면 price는 None 유지. EPS/PER 결측(적자 등)과 무관하게 종가는 존재한다.
+    수정주가(adj_close)가 있으면 우선 사용 — 액면분할 전 원종가가 결산기 주가/PER에
+    섞여 추세가 왜곡되는 문제를 방지. adj_close 미백필 시 원종가로 폴백.
     """
     if not points or not candles:
         return points
@@ -227,7 +232,8 @@ def _enrich_with_price(
         if idx < 0:
             enriched.append(p)
             continue
-        enriched.append(replace(p, price=float(candles[idx].close)))
+        c = candles[idx]
+        enriched.append(replace(p, price=float(c.adj_close if c.adj_close is not None else c.close)))
     return enriched
 
 

@@ -123,6 +123,7 @@ export default function Home() {
         ticker: selected!.ticker,
         from,
         to,
+        price: "adjusted", // 액면분할 절벽 제거(수정주가). 미백필 종목은 서버가 원주가 폴백.
       }).then((r) => r.data),
     enabled: Boolean(selected),
     placeholderData: keepPreviousData,
@@ -171,6 +172,7 @@ export default function Home() {
       apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
         ticker: selected!.ticker,
         interval: "month",
+        price: "adjusted",
       }).then((r) => r.data),
     enabled: Boolean(preferred),
     placeholderData: keepPreviousData,
@@ -182,6 +184,7 @@ export default function Home() {
       apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
         ticker: commonTicker!,
         interval: "month",
+        price: "adjusted",
       }).then((r) => r.data),
     enabled: Boolean(preferred && commonTicker),
     placeholderData: keepPreviousData,

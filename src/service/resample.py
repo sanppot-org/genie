@@ -30,10 +30,13 @@ def _bucket_key(d: date, interval: Interval) -> tuple[int, ...]:
 
 
 def resample_candles(
-    rows: list[StockDailyCandle],
+    rows: list[StockDailyCandle] | list[StockDailyCandle | AggregatedCandle],
     interval: Interval,
 ) -> list[StockDailyCandle | AggregatedCandle]:
-    """day → 원본 그대로, week/month → 버킷 집계 AggregatedCandle 리스트."""
+    """day → 원본 그대로, week/month → 버킷 집계 AggregatedCandle 리스트.
+
+    입력은 원주가(StockDailyCandle) 또는 수정주가 치환(AggregatedCandle) 혼용 가능.
+    """
     if not rows:
         return []
     if interval == "day":

@@ -67,3 +67,51 @@ class TestStockDailyCandleService:
 
         with pytest.raises(GenieError):
             service.get_time_series("999999", None, None)
+
+    def test_price_adjusted_수정주가_반환(self, session: Session, samsung: Ticker) -> None:
+        """adj_* 백필된 row는 price=adjusted 조회 시 수정주가를 반환한다."""
+        candle_repo = StockDailyCandleRepository(session)
+        # 1/2 row에만 수정주가 채움 (분할 보정 시뮬레이션: 원종가 70500 → 수정 1410)
+        candle_repo.update_adjusted(
+            samsung.id, {date(2024, 1, 2): (1400.0, 1420.0, 1390.0, 1410.0, 600_000_000)}
+        )
+        service = StockDailyCandleService(
+            ticker_repository=TickerRepository(session),
+            daily_candle_repository=candle_repo,
+        )
+
+        _, rows = service.get_time_series("005930", None, None, price="adjusted")
+
+        # 1/2: 수정주가, 1/3: 미백필 → 원주가 폴백
+        assert rows[0].close == 1410.0
+        assert rows[0].volume == 600_000_000
+        assert rows[1].close == 71800  # adj_close NULL → 원주가
+        assert rows[1].volume == 15_000_000
+
+    def test_price_raw_기본값_원주가(self, session: Session, samsung: Ticker) -> None:
+        """기본(raw)은 수정주가가 있어도 원주가를 반환한다."""
+        candle_repo = StockDailyCandleRepository(session)
+        candle_repo.update_adjusted(
+            samsung.id, {date(2024, 1, 2): (1400.0, 1420.0, 1390.0, 1410.0, 600_000_000)}
+        )
+        service = StockDailyCandleService(
+            ticker_repository=TickerRepository(session),
+            daily_candle_repository=candle_repo,
+        )
+
+        _, rows = service.get_time_series("005930", None, None)  # 기본 raw
+
+        assert rows[0].close == 70500
+        assert rows[0].volume == 12_000_000
+
+    def test_update_adjusted_미존재_날짜_무시(self, session: Session, samsung: Ticker) -> None:
+        """DB에 없는 날짜는 갱신 대상에서 제외하고, 매칭된 row 수만 반환한다."""
+        candle_repo = StockDailyCandleRepository(session)
+        updated = candle_repo.update_adjusted(
+            samsung.id,
+            {
+                date(2024, 1, 2): (1400.0, 1420.0, 1390.0, 1410.0, 600_000_000),
+                date(2099, 12, 31): (1.0, 1.0, 1.0, 1.0, 1),  # 미존재
+            },
+        )
+        assert updated == 1

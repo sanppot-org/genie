@@ -8,6 +8,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query
 
 from src.api.schemas import (
+    AdjustedBackfillResponse,
     CandleData,
     CollectCandlesRequest,
     CollectCandlesResponse,
@@ -20,6 +21,7 @@ from src.api.schemas import (
 )
 from src.constants import KST
 from src.container import ApplicationContainer
+from src.service.adjusted_candle_backfill_service import AdjustedCandleBackfillService
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
@@ -134,16 +136,43 @@ def get_kr_stock_daily_candles(
         from_: str | None = Query(default=None, alias="from", pattern=r"^\d{8}$"),
         to: str | None = Query(default=None, pattern=r"^\d{8}$"),
         interval: Literal["day", "week", "month"] = Query(default="day"),
+        price: Literal["raw", "adjusted"] = Query(
+            default="raw", description="raw=원주가(KRX), adjusted=수정주가(액면분할 보정)"
+        ),
         service: StockDailyCandleService = Depends(Provide[ApplicationContainer.stock_daily_candle_service]),
 ) -> GenieResponse[StockDailyCandleSeriesResponse]:
     """KR 주식 일봉 시계열 (date 오름차순). 종목 미발견 시 404."""
     from_date = datetime.strptime(from_, "%Y%m%d").date() if from_ else None
     to_date = datetime.strptime(to, "%Y%m%d").date() if to else None
-    t, rows = service.get_time_series(ticker, from_date, to_date, interval)
+    t, rows = service.get_time_series(ticker, from_date, to_date, interval, price)
     return GenieResponse(
         data=StockDailyCandleSeriesResponse(
             ticker=t.ticker,
             name=t.name,
             points=[StockDailyCandlePoint.model_validate(r) for r in rows],
+        )
+    )
+
+
+@router.post(
+    "/candles/kr-stock/backfill-adjusted",
+    response_model=GenieResponse[AdjustedBackfillResponse],
+)
+@inject
+def backfill_adjusted_candles(
+        ticker: str = Query(min_length=1, max_length=20, description="ticker 코드"),
+        service: AdjustedCandleBackfillService = Depends(
+            Provide[ApplicationContainer.adjusted_candle_backfill_service]
+        ),
+) -> GenieResponse[AdjustedBackfillResponse]:
+    """종목별 수정주가를 네이버에서 가져와 기존 일봉 row의 adj_* 컬럼을 채운다. 종목 미발견 시 404."""
+    result = service.backfill(ticker)
+    return GenieResponse(
+        data=AdjustedBackfillResponse(
+            ticker=result.ticker,
+            fetched=result.fetched,
+            updated=result.updated,
+            from_date=result.from_date,
+            to_date=result.to_date,
         )
     )

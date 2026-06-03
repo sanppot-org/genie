@@ -261,6 +261,16 @@ class StockDailyCandleSeriesResponse(BaseModel):
     points: list[StockDailyCandlePoint]
 
 
+class AdjustedBackfillResponse(BaseModel):
+    """수정주가 백필 결과."""
+
+    ticker: str
+    fetched: int
+    updated: int
+    from_date: date | None = None
+    to_date: date | None = None
+
+
 class ScreeningScoreBreakdown(BaseModel):
     """8개 지표별 점수 (PER 20 + PBR 5 + 배당 10 + 분기 5 + 연속 5 + 매입소각 7 + 소각비율 8 + 보유 5 = 65)."""
 

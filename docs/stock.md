@@ -95,7 +95,7 @@
   [x] 테스트 — `DailyCandleSyncService` 3케이스(매핑/미매핑/no_trade, 휴장일 전파, 멱등) + API 2케이스
   [x] 스케줄러 등록 — `sync_kr_stock_daily_candles` cron 17:10 mon-fri (ticker 16:48 → fundamental 17:00 → 일봉 17:10)
 
-[ ] 액면분할 후 주가
+[x] 액면분할 후 주가 — 수정주가(adjusted) 차트. `stock_daily_candles`에 `adj_*` 컬럼(alembic 017, nullable, 원주가 보존), `PykrxDailyCandleClient.fetch_adjusted_by_ticker`(네이버 소스·인증불필요, 0값 거래정지 row 스킵), `AdjustedCandleBackfillService` + 수동 API `POST /api/candles/kr-stock/backfill-adjusted?ticker=`, 조회 API `price=raw|adjusted`(기본 raw, 프론트는 adjusted), 재무표 결산주가도 adj_close 우선(분할 전 원종가 혼입 버그 수정). 네이버 일봉은 ~2014년부터. [ ] Phase 2: 전종목 백필 배치·스케줄러 주기 재보정·prod 마이그레이션
 [x] 로컬에서 better stack 비활성화
 [x] 프로파일에 따라서 스케줄러 비활성화
 [x] 재무제표에 eps, per 추가 — 손익계산서 표에 EPS·PER 컬럼(결산말일 펀더멘털 스냅샷, 신규 수집 없이 stock_fundamentals 재사용)

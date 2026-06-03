@@ -1,5 +1,24 @@
 의사결정 기록
 
+## 2026-06-03: 수정주가(adjusted) 차트 — 액면분할 절벽 제거 (Phase 1)
+
+### 배경
+삼성전자(005930) 장기 차트가 2018-05 50:1 액면분할로 265만원→5.3만원 절벽. 원인: 수집이 `get_market_ohlcv(market="ALL")` 일별 전종목 스냅샷 누적 → DB에 **원주가(분할 미보정)** 저장. 로그 스케일은 해결책 아님(분할은 비율변화가 아닌 레벨 점프).
+
+### 핵심 결정
+- **데이터 소스**: pykrx `get_market_ohlcv_by_date(ticker, adjusted=True)` = **네이버 금융**(원주가 KRX와 출처 다름). **KRX 인증 불필요**. 종목별·구간별 호출(bulk ALL은 수정주가 미지원). 네이버 일봉은 **~2014년부터** 제공.
+- **모델**: 원주가(`open~close`, KRX) **불변 보존**, 수정주가는 **별도 컬럼** `adj_open/high/low/close/adj_volume`(alembic 017, nullable ADD COLUMN=잠금 최소). 분할 이벤트 테이블/쿼리타임 보정(안 C)은 Phase 2.
+- **백필**: `AdjustedCandleBackfillService` — 기존 (ticker_id, date) row의 `adj_*`만 UPDATE(원주가 미존재 과거는 fabricate 안 함). 거래정지(OHLV·거래량 0) row 스킵. 수동 API `POST /candles/kr-stock/backfill-adjusted?ticker=`.
+- **조회**: API/서비스 `price=raw|adjusted` 파라미터. **기본 raw**(Public API 하위호환), 프론트가 명시적으로 adjusted 요청. adjusted는 row를 `AggregatedCandle`로 치환(adj NULL이면 원주가 폴백) → resample/스키마/프론트 무변경.
+- **부수 버그 수정**: `income_statement_service._enrich_with_price`가 결산주가를 원종가로 매칭 → 분할 전 원종가가 PER/주가 추세에 혼입되던 왜곡. `adj_close` 우선으로 수정.
+- **분리 불필요 근거**: `stock_daily_candles`는 표시 전용(소비처=차트 API + 재무표). 백테스트는 `CandleDaily`, 자동매매 전략은 Upbit 데이터 사용 → 이 테이블 미참조. 매매/표시 물리분리 불필요(원주가 보존만으로 충분).
+
+### 검토
+codex + architect 교차검증(로그스케일 기각·B안 합의), pykrx 데이터 레벨 검증(연봉 2014~2024 연속·0값 3건), 로컬 Postgres E2E(017 마이그레이션 → 005930 백필 830/830 → raw=adj 0불일치). 백엔드 899 + 신규 테스트, mypy/ruff/프론트 lint·build 통과.
+
+### Phase 2 (미착수)
+전종목 백필 배치, 스케줄러 주기적 재보정(분할 감지 종목만 — 네이버 back-adjusted라 새 분할 시 과거 전체 변동), 프론트 수정주가/원주가·로그 토글, prod 마이그레이션 배포. adj_volume은 네이버 소스라 KRX 원거래량과 차이 있음(표시 영향 경미).
+
 ## 2026-05-30: 자사주 소각 수집 + 스크리너 자사주 점수(3지표)
 
 ### 핵심 결정

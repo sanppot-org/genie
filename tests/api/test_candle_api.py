@@ -497,7 +497,7 @@ def test_kr_stock_일봉_조회_정상(
     assert body["points"][0]["close"] == 70500.0
     assert body["points"][0]["trade_value"] == 850_000_000_000
     mock_stock_daily_candle_service.get_time_series.assert_called_once_with(
-        "005930", date(2024, 1, 1), date(2024, 1, 31), "day",
+        "005930", date(2024, 1, 1), date(2024, 1, 31), "day", "raw",
     )
 
 
@@ -514,8 +514,31 @@ def test_kr_stock_일봉_조회_interval_전달(
 
     assert response.status_code == 200
     mock_stock_daily_candle_service.get_time_series.assert_called_once_with(
-        "005930", None, None, "month",
+        "005930", None, None, "month", "raw",
     )
+
+
+def test_kr_stock_일봉_조회_price_adjusted_전달(
+        read_client: TestClient,
+        mock_stock_daily_candle_service: MagicMock,
+) -> None:
+    """price=adjusted 쿼리 파라미터가 서비스에 그대로 전달된다."""
+    ticker = MagicMock(spec=Ticker, ticker="005930")
+    ticker.name = "삼성전자"
+    mock_stock_daily_candle_service.get_time_series.return_value = (ticker, [])
+
+    response = read_client.get("/api/candles/kr-stock?ticker=005930&price=adjusted")
+
+    assert response.status_code == 200
+    mock_stock_daily_candle_service.get_time_series.assert_called_once_with(
+        "005930", None, None, "day", "adjusted",
+    )
+
+
+def test_kr_stock_일봉_조회_잘못된_price_422(read_client: TestClient) -> None:
+    """price가 raw/adjusted 외 값이면 422."""
+    response = read_client.get("/api/candles/kr-stock?ticker=005930&price=INVALID")
+    assert response.status_code == 422
 
 
 def test_kr_stock_일봉_조회_미발견_404(
