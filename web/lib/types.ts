@@ -5,6 +5,8 @@ export interface Ticker {
   asset_type: string;
   data_source: string;
   timezone: string | null;
+  is_preferred?: boolean;
+  common_ticker?: string | null;
 }
 
 export interface FundamentalPoint {

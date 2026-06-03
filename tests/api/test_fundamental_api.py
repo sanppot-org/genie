@@ -49,7 +49,22 @@ class TestGetFundamentalsAPI:
         assert body["points"][0]["date"] == "2024-01-02"
         assert body["points"][0]["per"] == 12.5
         mock_fundamental_service.get_time_series.assert_called_once_with(
-            "005930", date(2024, 1, 1), date(2024, 1, 31),
+            "005930", date(2024, 1, 1), date(2024, 1, 31), "day",
+        )
+
+    def test_정상_interval_전달(
+            self, client: TestClient, mock_fundamental_service: MagicMock,
+    ) -> None:
+        """interval=month 쿼리 파라미터가 서비스에 그대로 전달된다."""
+        ticker = MagicMock(spec=Ticker, ticker="005930")
+        ticker.name = "삼성전자"
+        mock_fundamental_service.get_time_series.return_value = (ticker, [])
+
+        response = client.get("/api/fundamentals?ticker=005930&interval=month")
+
+        assert response.status_code == 200
+        mock_fundamental_service.get_time_series.assert_called_once_with(
+            "005930", None, None, "month",
         )
 
     def test_미발견_ticker_404(

@@ -34,8 +34,22 @@ const FinancialsChart = dynamic(
   { ssr: false, loading: () => <p className="text-sm text-muted-foreground">불러오는 중...</p> },
 );
 
+const PreferredChart = dynamic(
+  () => import("@/components/preferred-chart").then((m) => m.PreferredChart),
+  { ssr: false, loading: () => <p className="text-sm text-muted-foreground">불러오는 중...</p> },
+);
+
 // 차트 좌측 팬 시 단계적으로 넓히는 lookback(년). 마지막 단계 이후는 ALL(from/to 생략).
 const STEPS = [1, 3, 10] as const;
+
+function isPreferredTicker(t: Ticker): boolean {
+  if (typeof t.is_preferred === "boolean") return t.is_preferred; // 백엔드 제공값 우선
+  return t.asset_type === "KR_STOCK" && /^\d{6}$/.test(t.ticker) && t.ticker[5] !== "0";
+}
+function commonTickerOf(t: Ticker): string | null {
+  if (t.common_ticker !== undefined) return t.common_ticker; // 백엔드 제공값 우선(보통주는 null)
+  return isPreferredTicker(t) ? t.ticker.slice(0, 5) + "0" : null;
+}
 
 function rangeFor(stepIdx: number): { from?: string; to?: string } {
   if (stepIdx >= STEPS.length) return {}; // ALL — apiGet이 undefined 파라미터 제외 → 백엔드 전체
@@ -57,6 +71,9 @@ export default function Home() {
   const [financialPeriod, setFinancialPeriod] = useState<"annual" | "quarter">("annual");
   const [financialSingle, setFinancialSingle] = useState(false);
   const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
+
+  const preferred = selected ? isPreferredTicker(selected) : false;
+  const commonTicker = selected ? commonTickerOf(selected) : null;
 
   // 첫 hydration 직후 1회 — selected 없고 recent 있으면 최신 종목 자동 선택.
   // 렌더 중 state 조정 패턴 (React 권장, 추가 렌더 없이 동기 반영).
@@ -133,6 +150,51 @@ export default function Home() {
         single: financialPeriod === "quarter" ? financialSingle : undefined,
       }).then((r) => r.data),
     enabled: Boolean(selected),
+    placeholderData: keepPreviousData,
+  });
+
+  // 우선주 차트는 전체 기간 1회 fetch (범위 UI는 PreferredChart 내부 소유).
+  const prefFundamentals = useQuery({
+    queryKey: ["pref-fundamentals", selected?.ticker],
+    queryFn: () =>
+      apiGet<GenieResponse<FundamentalSeries>>("/api/fundamentals", {
+        ticker: selected!.ticker,
+        interval: "month",
+      }).then((r) => r.data),
+    enabled: Boolean(preferred),
+    placeholderData: keepPreviousData,
+  });
+
+  const prefCandles = useQuery({
+    queryKey: ["pref-candles", selected?.ticker],
+    queryFn: () =>
+      apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
+        ticker: selected!.ticker,
+        interval: "month",
+      }).then((r) => r.data),
+    enabled: Boolean(preferred),
+    placeholderData: keepPreviousData,
+  });
+
+  const commonCandles = useQuery({
+    queryKey: ["common-candles", commonTicker],
+    queryFn: () =>
+      apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
+        ticker: commonTicker!,
+        interval: "month",
+      }).then((r) => r.data),
+    enabled: Boolean(preferred && commonTicker),
+    placeholderData: keepPreviousData,
+  });
+
+  const commonFundamentals = useQuery({
+    queryKey: ["common-fundamentals", commonTicker],
+    queryFn: () =>
+      apiGet<GenieResponse<FundamentalSeries>>("/api/fundamentals", {
+        ticker: commonTicker!,
+        interval: "month",
+      }).then((r) => r.data),
+    enabled: Boolean(preferred && commonTicker),
     placeholderData: keepPreviousData,
   });
 
@@ -248,7 +310,7 @@ export default function Home() {
               key={selected.ticker}
               points={candles.data.points}
               perPoints={
-                fundamentals.data?.ticker === selected.ticker
+                !preferred && fundamentals.data?.ticker === selected.ticker
                   ? fundamentals.data.points
                   : undefined
               }
@@ -290,60 +352,89 @@ export default function Home() {
             </section>
           )}
 
-          <section className="space-y-2 pt-2">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <h3 className="font-medium">재무 요약</h3>
-              <div className="flex gap-1">
-                {(["annual", "quarter"] as const).map((p) => (
+          {preferred ? (
+            <section className="space-y-2 pt-2">
+              <h3 className="text-sm font-medium">시가배당률 · 괴리율</h3>
+              {(prefFundamentals.isLoading || prefCandles.isLoading) && (
+                <p className="text-sm text-muted-foreground">불러오는 중...</p>
+              )}
+              {prefFundamentals.data &&
+                prefFundamentals.data.ticker === selected.ticker &&
+                prefCandles.data &&
+                prefCandles.data.ticker === selected.ticker && (
+                  <PreferredChart
+                    key={selected.ticker}
+                    fundamentals={prefFundamentals.data}
+                    candles={prefCandles.data}
+                    commonCandles={
+                      commonCandles.data?.ticker === commonTicker
+                        ? commonCandles.data
+                        : null
+                    }
+                    commonFundamentals={
+                      commonFundamentals.data?.ticker === commonTicker
+                        ? commonFundamentals.data
+                        : null
+                    }
+                  />
+                )}
+            </section>
+          ) : (
+            <section className="space-y-2 pt-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <h3 className="font-medium">재무 요약</h3>
+                <div className="flex gap-1">
+                  {(["annual", "quarter"] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setFinancialPeriod(p)}
+                      className={`rounded border px-2 py-0.5 text-xs ${
+                        financialPeriod === p
+                          ? "bg-foreground text-background"
+                          : "bg-background hover:bg-muted"
+                      }`}
+                    >
+                      {p === "annual" ? "연간" : "분기"}
+                    </button>
+                  ))}
+                </div>
+                {financialPeriod === "quarter" && (
                   <button
-                    key={p}
                     type="button"
-                    onClick={() => setFinancialPeriod(p)}
+                    onClick={() => setFinancialSingle((v) => !v)}
                     className={`rounded border px-2 py-0.5 text-xs ${
-                      financialPeriod === p
+                      financialSingle
                         ? "bg-foreground text-background"
                         : "bg-background hover:bg-muted"
                     }`}
                   >
-                    {p === "annual" ? "연간" : "분기"}
+                    단일분기
                   </button>
-                ))}
+                )}
+                <span className="text-xs text-muted-foreground">
+                  <span style={{ color: "#3b82f6" }}>●</span> 매출
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  <span style={{ color: "#10b981" }}>●</span> 영업이익
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  <span style={{ color: "#f59e0b" }}>●</span> 순이익
+                </span>
               </div>
-              {financialPeriod === "quarter" && (
-                <button
-                  type="button"
-                  onClick={() => setFinancialSingle((v) => !v)}
-                  className={`rounded border px-2 py-0.5 text-xs ${
-                    financialSingle
-                      ? "bg-foreground text-background"
-                      : "bg-background hover:bg-muted"
-                  }`}
-                >
-                  단일분기
-                </button>
+              {financials.isLoading && (
+                <p className="text-sm text-muted-foreground">불러오는 중...</p>
               )}
-              <span className="text-xs text-muted-foreground">
-                <span style={{ color: "#3b82f6" }}>●</span> 매출
-              </span>
-              <span className="text-xs text-muted-foreground">
-                <span style={{ color: "#10b981" }}>●</span> 영업이익
-              </span>
-              <span className="text-xs text-muted-foreground">
-                <span style={{ color: "#f59e0b" }}>●</span> 순이익
-              </span>
-            </div>
-            {financials.isLoading && (
-              <p className="text-sm text-muted-foreground">불러오는 중...</p>
-            )}
-            {financials.isError && (
-              <p className="text-sm text-red-600">
-                조회 실패: {(financials.error as Error).message}
-              </p>
-            )}
-            {financials.data && financials.data.ticker === selected.ticker && (
-              <FinancialsChart series={financials.data} />
-            )}
-          </section>
+              {financials.isError && (
+                <p className="text-sm text-red-600">
+                  조회 실패: {(financials.error as Error).message}
+                </p>
+              )}
+              {financials.data && financials.data.ticker === selected.ticker && (
+                <FinancialsChart series={financials.data} />
+              )}
+            </section>
+          )}
         </section>
       )}
     </main>

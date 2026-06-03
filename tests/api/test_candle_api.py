@@ -497,7 +497,24 @@ def test_kr_stock_일봉_조회_정상(
     assert body["points"][0]["close"] == 70500.0
     assert body["points"][0]["trade_value"] == 850_000_000_000
     mock_stock_daily_candle_service.get_time_series.assert_called_once_with(
-        "005930", date(2024, 1, 1), date(2024, 1, 31),
+        "005930", date(2024, 1, 1), date(2024, 1, 31), "day",
+    )
+
+
+def test_kr_stock_일봉_조회_interval_전달(
+        read_client: TestClient,
+        mock_stock_daily_candle_service: MagicMock,
+) -> None:
+    """interval=month 쿼리 파라미터가 서비스에 그대로 전달된다."""
+    ticker = MagicMock(spec=Ticker, ticker="005930")
+    ticker.name = "삼성전자"
+    mock_stock_daily_candle_service.get_time_series.return_value = (ticker, [])
+
+    response = read_client.get("/api/candles/kr-stock?ticker=005930&interval=month")
+
+    assert response.status_code == 200
+    mock_stock_daily_candle_service.get_time_series.assert_called_once_with(
+        "005930", None, None, "month",
     )
 
 

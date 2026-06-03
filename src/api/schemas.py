@@ -8,6 +8,7 @@ from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database import Ticker
 from src.service.candle_service import CollectMode
+from src.service.preferred_stock import common_code_of, is_preferred
 
 
 class SellResponse(BaseModel):
@@ -44,6 +45,8 @@ class TickerResponse(BaseModel):
     asset_type: AssetType
     data_source: DataSource
     timezone: str | None = None
+    is_preferred: bool = False
+    common_ticker: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,6 +55,9 @@ class TickerResponse(BaseModel):
         """Ticker 엔티티에서 응답 생성"""
         # DataSource는 str Enum이므로 값으로 멤버 조회
         source = DataSource(ticker.data_source)  # type: ignore[call-arg]
+        asset_type = AssetType(ticker.asset_type)
+        is_pref = is_preferred(ticker.ticker, asset_type)
+        common = common_code_of(ticker.ticker, asset_type)
         return cls(
             id=ticker.id,
             ticker=ticker.ticker,
@@ -59,6 +65,8 @@ class TickerResponse(BaseModel):
             asset_type=ticker.asset_type,
             data_source=source,
             timezone=source.timezone,
+            is_preferred=is_pref,
+            common_ticker=common,
         )
 
 

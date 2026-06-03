@@ -6,6 +6,7 @@ from src.database.models import StockDailyCandle, Ticker
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.exceptions import ExceptionCode, GenieError
+from src.service.resample import AggregatedCandle, Interval, resample_candles
 
 
 class StockDailyCandleService:
@@ -24,10 +25,12 @@ class StockDailyCandleService:
             ticker_code: str,
             from_date: date | None,
             to_date: date | None,
-    ) -> tuple[Ticker, list[StockDailyCandle]]:
+            interval: Interval = "day",
+    ) -> tuple[Ticker, list[StockDailyCandle | AggregatedCandle]]:
         """ticker 코드로 종목 + 일자 범위 일봉 반환. 종목 미발견 시 404."""
         ticker = self._tickers.find_by_ticker(ticker_code)
         if ticker is None:
             raise GenieError(code=ExceptionCode.NOT_FOUND, id=ticker_code)
         rows = self._candles.find_by_ticker(ticker.id, from_date, to_date)
-        return ticker, rows
+        resampled: list[StockDailyCandle | AggregatedCandle] = resample_candles(rows, interval)
+        return ticker, resampled

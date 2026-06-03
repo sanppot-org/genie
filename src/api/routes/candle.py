@@ -2,7 +2,7 @@
 # ruff: noqa: B008
 from dataclasses import asdict
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, Query
@@ -133,12 +133,13 @@ def get_kr_stock_daily_candles(
         ticker: str = Query(min_length=1, max_length=20, description="ticker 코드"),
         from_: str | None = Query(default=None, alias="from", pattern=r"^\d{8}$"),
         to: str | None = Query(default=None, pattern=r"^\d{8}$"),
+        interval: Literal["day", "week", "month"] = Query(default="day"),
         service: StockDailyCandleService = Depends(Provide[ApplicationContainer.stock_daily_candle_service]),
 ) -> GenieResponse[StockDailyCandleSeriesResponse]:
     """KR 주식 일봉 시계열 (date 오름차순). 종목 미발견 시 404."""
     from_date = datetime.strptime(from_, "%Y%m%d").date() if from_ else None
     to_date = datetime.strptime(to, "%Y%m%d").date() if to else None
-    t, rows = service.get_time_series(ticker, from_date, to_date)
+    t, rows = service.get_time_series(ticker, from_date, to_date, interval)
     return GenieResponse(
         data=StockDailyCandleSeriesResponse(
             ticker=t.ticker,
