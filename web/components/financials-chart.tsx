@@ -23,6 +23,7 @@ const COLOR_NET = "#f59e0b"; // amber-500
 const COLOR_PRICE = "#475569"; // slate-600
 const COLOR_EPS = "#8b5cf6"; // violet-500
 const COLOR_DPS = "#14b8a6"; // teal-500
+const COLOR_PER = "#0ea5e9"; // sky-500
 
 // 결산기(3계열 막대) 한 그룹당 최소 폭(px). 좁은 화면에서 막대가 뭉개지지 않게 가로 스크롤 기준.
 const PX_PER_GROUP = 46;
@@ -242,6 +243,7 @@ function PerShareTooltip({ active, payload, label, isAnnual }: PerShareTooltipPr
   const 주가 = find("주가");
   const 배당 = find("배당");
   const 유보 = find("유보");
+  const per = find("PER");
   // 유보(=EPS-DPS)가 null이면 그 행의 EPS 자체가 null. 유보가 있을 때만 EPS=유보+배당으로 역산.
   const eps = 유보 !== null ? 유보 + (배당 ?? 0) : null;
 
@@ -274,6 +276,10 @@ function PerShareTooltip({ active, payload, label, isAnnual }: PerShareTooltipPr
           </p>
         );
       })()}
+      <p className="flex justify-between gap-4 tabular-nums">
+        <span style={{ color: COLOR_PER }}>PER</span>
+        <span>{per !== null ? `${per.toFixed(1)}배` : "-"}</span>
+      </p>
     </div>
   );
 }
@@ -330,6 +336,7 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
     주가: p.price,
     배당: p.dps,
     유보: p.eps !== null && p.eps !== undefined ? p.eps - (p.dps ?? 0) : null,
+    PER: p.per ?? null,
     isEstimate: p.is_estimate,
   }));
 
@@ -416,7 +423,7 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">주가 · EPS · 배당</p>
+      <p className="text-sm text-muted-foreground">주가 · EPS · 배당 · PER</p>
       <div className="overflow-x-auto">
         <div className="w-full" style={{ minWidth }}>
           <ResponsiveContainer width="100%" height={280}>
@@ -441,6 +448,7 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 tickFormatter={(v: number) => v.toLocaleString("ko-KR")}
                 width={68}
               />
+              <YAxis yAxisId="per" orientation="right" hide />
               <Tooltip
                 content={<PerShareTooltip isAnnual={isAnnual} />}
                 cursor={{ fill: "rgba(0,0,0,0.04)" }}
@@ -477,6 +485,16 @@ export function FinancialsChart({ series }: { series: IncomeStatementSeries }) {
                 stroke={COLOR_PRICE}
                 strokeWidth={2}
                 dot={{ r: 3 }}
+              />
+              <Line
+                yAxisId="per"
+                type="monotone"
+                dataKey="PER"
+                stroke={COLOR_PER}
+                strokeWidth={2}
+                dot={false}
+                connectNulls={false}
+                name="PER"
               />
             </ComposedChart>
           </ResponsiveContainer>
