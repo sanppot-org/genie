@@ -21,7 +21,7 @@ from src.api.schemas import (
 )
 from src.constants import KST
 from src.container import ApplicationContainer
-from src.service.adjusted_candle_backfill_service import AdjustedCandleBackfillService
+from src.service.adjusted_candle_sync_service import AdjustedCandleSyncService
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
@@ -161,17 +161,19 @@ def get_kr_stock_daily_candles(
 @inject
 def backfill_adjusted_candles(
         ticker: str = Query(min_length=1, max_length=20, description="ticker 코드"),
-        service: AdjustedCandleBackfillService = Depends(
-            Provide[ApplicationContainer.adjusted_candle_backfill_service]
+        service: AdjustedCandleSyncService = Depends(
+            Provide[ApplicationContainer.adjusted_candle_sync_service]
         ),
 ) -> GenieResponse[AdjustedBackfillResponse]:
     """종목별 수정주가를 네이버에서 가져와 기존 일봉 row의 adj_* 컬럼을 채운다. 종목 미발견 시 404."""
-    result = service.backfill(ticker)
+    result = service.backfill_one(ticker)
     return GenieResponse(
         data=AdjustedBackfillResponse(
             ticker=result.ticker,
             fetched=result.fetched,
             updated=result.updated,
+            existing=result.existing,
+            partial=result.partial,
             from_date=result.from_date,
             to_date=result.to_date,
         )

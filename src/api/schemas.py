@@ -267,6 +267,8 @@ class AdjustedBackfillResponse(BaseModel):
     ticker: str
     fetched: int
     updated: int
+    existing: int = 0
+    partial: bool = False
     from_date: date | None = None
     to_date: date | None = None
 

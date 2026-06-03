@@ -16,8 +16,17 @@
 ### 검토
 codex + architect 교차검증(로그스케일 기각·B안 합의), pykrx 데이터 레벨 검증(연봉 2014~2024 연속·0값 3건), 로컬 Postgres E2E(017 마이그레이션 → 005930 백필 830/830 → raw=adj 0불일치). 백엔드 899 + 신규 테스트, mypy/ruff/프론트 lint·build 통과.
 
-### Phase 2 (미착수)
-전종목 백필 배치, 스케줄러 주기적 재보정(분할 감지 종목만 — 네이버 back-adjusted라 새 분할 시 과거 전체 변동), 프론트 수정주가/원주가·로그 토글, prod 마이그레이션 배포. adj_volume은 네이버 소스라 KRX 원거래량과 차이 있음(표시 영향 경미).
+### Phase 2a (완료, 2026-06-03): 전종목 백필 배치
+codex + architect 교차검증 반영.
+- **단일 `AdjustedCandleSyncService`(Database 주입)로 통합** — 기존 단건 `AdjustedCandleBackfillService` 흡수·삭제. 단건 `backfill_one`(API/스크립트 --ticker) + 배치 `sync`(스크립트) 공통 `_process_ticker`. 청크 경계=1종목(종목별 UPDATE 모델이라 종목 묶음 무의미), 종목당 독립 session_scope 커밋, 네이버 호출은 트랜잭션 밖 → 중단 후 재개·멱등.
+- **`date.in_(수천)` 제거**: `update_adjusted_from_rows(rows, mapping)`로 find_by_ticker 1회 로드 + 메모리 매칭(IN 플래닝/재조회 비용 제거).
+- **throttle_sec=0.3**: 네이버 비공식 endpoint 연속 ~2,800콜 차단 회피(최우선 운영 리스크).
+- **only_stale**: `ticker_ids_with_adjusted()` 1쿼리 집계로 skip(재개용, "신규 분할 재보정 감지 아님" — 2b 담당).
+- **부분 보정 가시성**: result에 `existing`/`partial`(updated<existing) + WARN 로깅 → 2014 이전 네이버 미커버 구간 모니터링.
+- 오프라인 스크립트 `scripts/backfill_adjusted_candles.py`(--ticker/--only-stale/--throttle-sec, 독립 프로세스). 검증: backend 902 passed, dev E2E(배치 sync 005930 830행, partial 0).
+
+### Phase 2b~2d (미착수)
+스케줄러 분할 감지 재보정(신규일 raw close/prev<0.55 종목만 전체 재백필 — 네이버 back-adjusted라 새 분할 시 과거 전체 변동) + 월간 안전망, 프론트 수정주가/원주가·로그 토글, prod 마이그레이션 배포(017 + 전종목 백필 1회). adj_volume은 네이버 소스라 KRX 원거래량과 차이 있음(종가는 정확 일치, 표시 영향 경미).
 
 ## 2026-05-30: 자사주 소각 수집 + 스크리너 자사주 점수(3지표)
 

@@ -1,0 +1,165 @@
+"""Tests for AdjustedCandleSyncService (단건 + 전종목 배치)."""
+
+from datetime import date
+from unittest.mock import MagicMock
+
+import pytest
+
+from src.common.data_adapter import DataSource
+from src.constants import AssetType
+from src.database.database import Database
+from src.database.models import StockDailyCandle, Ticker
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
+from src.database.ticker_repository import TickerRepository
+from src.providers.pykrx_daily_candle_client import PykrxAdjustedCandle, PykrxDailyCandleClient
+from src.service.adjusted_candle_sync_service import AdjustedCandleSyncService
+from src.service.exceptions import GenieError
+
+
+def _seed(db: Database) -> None:
+    """005930(2건) + 000660(1건) 시드 후 커밋."""
+    session = db.get_session()
+    try:
+        tr = TickerRepository(session)
+        sam = tr.save(Ticker(ticker="005930", name="삼성전자",
+                             asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value))
+        sk = tr.save(Ticker(ticker="000660", name="SK하이닉스",
+                            asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value))
+        cr = StockDailyCandleRepository(session)
+        cr.bulk_upsert([
+            StockDailyCandle(ticker_id=sam.id, date=date(2024, 1, 2), open=70000, high=71000,
+                             low=69500, close=70500, volume=12_000_000, trade_value=None),
+            StockDailyCandle(ticker_id=sam.id, date=date(2024, 1, 3), open=70500, high=72000,
+                             low=70000, close=71800, volume=15_000_000, trade_value=None),
+            StockDailyCandle(ticker_id=sk.id, date=date(2024, 1, 2), open=130000, high=131000,
+                             low=129000, close=130500, volume=3_000_000, trade_value=None),
+        ])
+        session.commit()
+    finally:
+        session.close()
+
+
+def _adj(code: str, frm: date, to: date) -> list[PykrxAdjustedCandle]:
+    """ticker별 네이버 수정주가 모킹."""
+    if code == "005930":
+        return [
+            PykrxAdjustedCandle(date=date(2024, 1, 2), open=1400, high=1420, low=1390, close=1410, volume=600_000_000),
+            PykrxAdjustedCandle(date=date(2024, 1, 3), open=1410, high=1440, low=1400, close=1436, volume=750_000_000),
+        ]
+    if code == "000660":
+        return [
+            PykrxAdjustedCandle(date=date(2024, 1, 2), open=2600, high=2620, low=2580, close=2610, volume=150_000_000),
+        ]
+    return []
+
+
+@pytest.fixture
+def client() -> MagicMock:
+    m = MagicMock(spec=PykrxDailyCandleClient)
+    m.fetch_adjusted_by_ticker.side_effect = _adj
+    return m
+
+
+def _adj_close(db: Database, ticker: str, d: date) -> float | None:
+    session = db.get_session()
+    try:
+        tid = TickerRepository(session).find_by_ticker(ticker).id
+        rows = StockDailyCandleRepository(session).find_by_ticker(tid)
+        return next((r.adj_close for r in rows if r.date == d), None)
+    finally:
+        session.close()
+
+
+class TestBackfillOne:
+    def test_단건_백필_adj_갱신(self, db: Database, client: MagicMock) -> None:
+        _seed(db)
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.backfill_one("005930", now=date(2024, 1, 3))
+
+        assert result.fetched == 2
+        assert result.updated == 2
+        assert result.existing == 2
+        assert result.partial is False
+        assert _adj_close(db, "005930", date(2024, 1, 2)) == 1410
+
+    def test_부분_보정_partial_플래그(self, db: Database) -> None:
+        """네이버가 기존 row 일부만 커버하면 partial=True."""
+        _seed(db)
+        client = MagicMock(spec=PykrxDailyCandleClient)
+        client.fetch_adjusted_by_ticker.return_value = [
+            PykrxAdjustedCandle(date=date(2024, 1, 2), open=1400, high=1420, low=1390, close=1410, volume=600_000_000),
+        ]  # 1/3 누락 → existing=2, updated=1
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.backfill_one("005930", now=date(2024, 1, 3))
+
+        assert result.existing == 2
+        assert result.updated == 1
+        assert result.partial is True
+
+    def test_미발견_ticker_404(self, db: Database, client: MagicMock) -> None:
+        _seed(db)
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+        with pytest.raises(GenieError):
+            service.backfill_one("999999")
+
+
+class TestSyncAll:
+    def test_전종목_백필(self, db: Database, client: MagicMock) -> None:
+        _seed(db)
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.sync(now=date(2024, 1, 3))
+
+        assert result.ticker_count == 2
+        assert result.api_attempted == 2
+        assert result.api_failed == 0
+        assert result.tickers_updated == 2
+        assert result.rows_updated == 3  # 005930 2건 + 000660 1건
+        assert _adj_close(db, "005930", date(2024, 1, 3)) == 1436
+        assert _adj_close(db, "000660", date(2024, 1, 2)) == 2610
+
+    def test_only_stale_이미_백필_종목_skip(self, db: Database, client: MagicMock) -> None:
+        _seed(db)
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+        # 005930만 먼저 백필
+        service.backfill_one("005930", now=date(2024, 1, 3))
+        client.fetch_adjusted_by_ticker.reset_mock()
+
+        result = service.sync(only_stale=True, now=date(2024, 1, 3))
+
+        assert result.skipped_already == 1               # 005930 skip
+        assert result.api_attempted == 1                 # 000660만
+        # 005930은 재호출 안 됨
+        called = [c.args[0] for c in client.fetch_adjusted_by_ticker.call_args_list]
+        assert "005930" not in called
+        assert "000660" in called
+
+    def test_ticker_codes_지정(self, db: Database, client: MagicMock) -> None:
+        _seed(db)
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.sync(ticker_codes=["000660"], now=date(2024, 1, 3))
+
+        assert result.ticker_count == 1
+        assert result.tickers_updated == 1
+
+    def test_종목_실패_격리(self, db: Database) -> None:
+        """한 종목 네이버 호출 실패해도 다른 종목은 처리되고 실패는 집계."""
+        _seed(db)
+        client = MagicMock(spec=PykrxDailyCandleClient)
+
+        def _side(code: str, frm: date, to: date) -> list[PykrxAdjustedCandle]:
+            if code == "005930":
+                raise RuntimeError("naver blocked")
+            return _adj(code, frm, to)
+
+        client.fetch_adjusted_by_ticker.side_effect = _side
+        service = AdjustedCandleSyncService(db, client, throttle_sec=0)
+
+        result = service.sync(now=date(2024, 1, 3))
+
+        assert result.api_failed == 1
+        assert result.failed_tickers == ["005930"]
+        assert result.tickers_updated == 1               # 000660 정상

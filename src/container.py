@@ -43,7 +43,7 @@ from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
-from src.service.adjusted_candle_backfill_service import AdjustedCandleBackfillService
+from src.service.adjusted_candle_sync_service import AdjustedCandleSyncService
 from src.service.buyback_sync_service import BuybackSyncService
 from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.candle_query_service import CandleQueryService
@@ -253,11 +253,10 @@ class ApplicationContainer(containers.DeclarativeContainer):
         ticker_repository=ticker_repository,
         daily_candle_repository=stock_daily_candle_repository,
     )
-    adjusted_candle_backfill_service = providers.Factory(
-        AdjustedCandleBackfillService,
+    adjusted_candle_sync_service = providers.Factory(
+        AdjustedCandleSyncService,
+        database=database,
         client=pykrx_daily_candle_client,
-        ticker_repository=ticker_repository,
-        daily_candle_repository=stock_daily_candle_repository,
     )
     dividend_sync_service = providers.Factory(
         DividendSyncService,
