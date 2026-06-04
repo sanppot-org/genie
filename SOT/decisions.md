@@ -34,8 +34,12 @@ codex + architect 교차검증 반영.
 - **세션 정합**: `Database.session_scope()`는 `self.SessionLocal()` 새 세션이라 `@db_scoped` request-scope 토큰과 독립 → task가 자체 session_scope 서비스 호출해도 안전(2a와 동형).
 - 검증: backend 906 passed, mypy/ruff, dev PG E2E(윈도우 감지쿼리 동작, 005930 후보0=분할없음 정확).
 
-### 안전망 (운영, 앱 스케줄러 미사용)
-전종목 재백필은 장시간 executor 점유·prod 커넥션 풀 이력([[project_db_session_leak]]) 고려해 **앱 스케줄러 인라인 대신** 기존 오프라인 스크립트 `scripts/backfill_adjusted_candles.py`를 **분기 1회 OS cron/수동** 실행으로 운영(미감지 분할·네이버 소스 정정 흡수). architect/codex 합의.
+### 안전망 (앱 스케줄러, 분기) — 2026-06-04 결정 변경
+전종목 재백필 안전망을 **OS cron → 앱 스케줄러 인라인**으로 변경(사용자 결정). 근거:
+git 단일 소스(schedules.py)·OS crontab 관리 불필요·타 sync 잡과 일관. 원래의 "장시간 executor 점유" 우려는 이 경우 실질적이지 않음 — ① 분기 1회 **03:00**(트레이딩 7~21시·타 sync 16~19시대와 무충돌), ② ThreadPoolExecutor(max_workers=5)에서 1워커만 점유(여분 4), ③ **종목당 독립 session_scope 커밋이라 커넥션을 churn**(1.5h 점유 아님)이므로 [[project_db_session_leak]] 풀 고갈 패턴과 무관.
+- task `resync_all_adjusted_candles`(@db_scoped, `sync(only_stale=False)` 전수 overwrite), cron `month=1,4,7,10 day=1 03:00`.
+- `ScheduleConfig`에 옵셔널 `misfire_grace_time` 추가 → 분기 잡은 **3600초**(03:00 재시작/부하로 인한 분기 누락 방지; job_defaults 60초로는 부족).
+- 오프라인 스크립트 `scripts/backfill_adjusted_candles.py`는 수동/초기 백필용으로 유지.
 
 ### Phase 2c~2d (미착수)
 프론트 수정주가/원주가·로그 스케일 토글, prod 마이그레이션 배포(017 + 전종목 백필 1회 + 분기 재백필 cron 등록). adj_volume은 네이버 소스라 KRX 원거래량과 차이(종가는 정확 일치, 표시 영향 경미).

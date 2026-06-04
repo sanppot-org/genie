@@ -399,3 +399,33 @@ def readjust_kr_stock_splits(
         mark_rollback_only()
         logger.exception("분할 감지 재보정 실패")
         slack_client.send_status(f"분할 감지 재보정 실패: {e}")
+
+
+@db_scoped
+@inject
+def resync_all_adjusted_candles(
+        service: AdjustedCandleSyncService = Provide[ApplicationContainer.adjusted_candle_sync_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """전종목 수정주가 재백필 안전망 (분기 1회, 새벽).
+
+    일일 분할 감지가 놓친 케이스(임계 안쪽 소규모 이벤트·네이버 소스 사후 정정·
+    미실행 구간)를 전수 재백필로 흡수. only_stale=False로 전 종목 overwrite(멱등).
+    종목당 독립 커밋이라 커넥션을 churn하며, 장시간이라도 풀을 점유하지 않는다.
+    """
+    try:
+        result = service.sync(only_stale=False)
+        logger.info(
+            "전종목 수정주가 안전망 완료 attempted=%d updated=%d failed=%d rows=%d partial=%d",
+            result.api_attempted, result.tickers_updated, result.api_failed,
+            result.rows_updated, result.partial_tickers,
+        )
+        if result.failed_tickers:
+            slack_client.send_status(
+                f"수정주가 안전망 일부 실패({len(result.failed_tickers)}종목): "
+                f"{','.join(result.failed_tickers[:20])}"
+            )
+    except Exception as e:
+        mark_rollback_only()
+        logger.exception("전종목 수정주가 안전망 실패")
+        slack_client.send_status(f"수정주가 안전망 실패: {e}")

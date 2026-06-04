@@ -6,6 +6,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from src.scheduled_tasks.tasks import (
     readjust_kr_stock_splits,
     report,
+    resync_all_adjusted_candles,
     sync_kr_stock_buybacks,
     sync_kr_stock_cancellations,
     sync_kr_stock_daily_candles,
@@ -75,6 +76,13 @@ def get_schedules() -> list[ScheduleConfig]:
             trigger=CronTrigger(hour=17, minute=10, day_of_week="mon-fri"),
             id="readjust_kr_stock_splits",
             name="한국 주식 분할 감지 수정주가 재보정",
+        ),
+        ScheduleConfig(
+            func=resync_all_adjusted_candles,
+            trigger=CronTrigger(month="1,4,7,10", day=1, hour=3, minute=0),
+            id="resync_all_adjusted_candles",
+            name="한국 주식 수정주가 전종목 재백필(분기 안전망)",
+            misfire_grace_time=3600,  # 03:00 재시작/부하로 인한 분기 누락 방지(1시간 유예)
         ),
         ScheduleConfig(
             func=sync_kr_stock_treasury_stocks,
