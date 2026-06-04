@@ -97,6 +97,7 @@
 
 [x] 액면분할 후 주가 — 수정주가(adjusted) 차트. `stock_daily_candles`에 `adj_*` 컬럼(alembic 017, nullable, 원주가 보존), `PykrxDailyCandleClient.fetch_adjusted_by_ticker`(네이버 소스·인증불필요, 0값 거래정지 row 스킵), `AdjustedCandleBackfillService` + 수동 API `POST /api/candles/kr-stock/backfill-adjusted?ticker=`, 조회 API `price=raw|adjusted`(기본 raw, 프론트는 adjusted), 재무표 결산주가도 adj_close 우선(분할 전 원종가 혼입 버그 수정). 네이버 일봉은 ~2014년부터. [ ] Phase 2: 전종목 백필 배치·스케줄러 주기 재보정·prod 마이그레이션
 [x] 주당지표 액면분할 보정 — 재무요약 EPS·DPS는 `_adjust_per_share_for_split`(fundamental 스냅샷 날짜의 factor=adj_close/close, eps·dps·bps 동일 factor → 배당성향·PBR 비율 보존). 배당이력(`DividendService.get_history`)도 각 record_date factor로 DPS 환산해 분할 절벽 제거(삼성 2018-03 17,700→354). BPS는 데이터 계층만 보정(현재 API/프론트 미노출). 연속배당인상 단건 `consecutive_dividend_increase_years`는 record_date factor로 DPS 환산 후 비교. **단, screening 전종목 `_bulk`는 성능(전종목 캔들 스캔 과도)상 보정 미적용 → 분할연도 연속인상 판정 왜곡 가능(알려진 한계).**
+  - **[알려진 한계] ~2014년 이전은 미보정**: 네이버 수정주가 일봉이 종목별로 대체로 2014년(삼성은 2014 중반)부터만 제공돼, 그 이전 구간은 `adj_close`가 NULL → ① 차트 주가는 `price=adjusted`여도 원주가로 폴백, ② 재무요약 EPS·DPS·BPS도 해당 시점 캔들에 factor가 없어 원본 유지. 결과적으로 **2013↔2014 경계에 분할 절벽이 남는다**(삼성 005930: 2013 EPS 154,020 / 주가 1,372,000 = 원본). 해결안(가장 이른 adj factor f₀를 과거로 역추정)은 사용자 판단으로 보류 — 미커버 구간 분할 시 오차 가능 + 효용 대비 복잡도. 더 긴 수정주가 소스(FinanceDataReader 등) 전환은 별도 검토.
 [x] 로컬에서 better stack 비활성화
 [x] 프로파일에 따라서 스케줄러 비활성화
 [x] 재무제표에 eps, per 추가 — 손익계산서 표에 EPS·PER 컬럼(결산말일 펀더멘털 스냅샷, 신규 수집 없이 stock_fundamentals 재사용)
