@@ -18,6 +18,7 @@ from src.database.models import (
 )
 from src.database.stock_buyback_event_repository import StockBuybackEventRepository
 from src.database.stock_cancellation_event_repository import StockCancellationEventRepository
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.stock_financial_ratio_repository import StockFinancialRatioRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
@@ -181,7 +182,7 @@ def screening_setup(session: Session) -> ScreeningService:
     return ScreeningService(
         ticker_repository=ticker_repo,
         fundamental_repository=fund_repo,
-        dividend_service=DividendService(div_repo, ticker_repo),
+        dividend_service=DividendService(div_repo, ticker_repo, StockDailyCandleRepository(session)),
         buyback_event_repository=buyback_repo,
         cancellation_event_repository=cancel_repo,
         treasury_stock_repository=treasury_repo,
@@ -609,6 +610,7 @@ class TestScoreKrStocksEmptyDb:
             fundamental_repository=StockFundamentalRepository(session),
             dividend_service=DividendService(
                 StockDividendRepository(session), TickerRepository(session),
+                StockDailyCandleRepository(session),
             ),
             buyback_event_repository=StockBuybackEventRepository(session),
             cancellation_event_repository=StockCancellationEventRepository(session),

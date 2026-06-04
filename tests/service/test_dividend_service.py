@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from src.common.data_adapter import DataSource
 from src.constants import AssetType
-from src.database.models import StockDividend, Ticker
+from src.database.models import StockDailyCandle, StockDividend, Ticker
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.dividend_service import DividendService
@@ -29,8 +30,21 @@ def repo(session: Session) -> StockDividendRepository:
 
 
 @pytest.fixture
+def candle_repo(session: Session) -> StockDailyCandleRepository:
+    return StockDailyCandleRepository(session)
+
+
+@pytest.fixture
 def service(repo: StockDividendRepository, session: Session) -> DividendService:
-    return DividendService(repo, TickerRepository(session))
+    return DividendService(repo, TickerRepository(session), StockDailyCandleRepository(session))
+
+
+def _candle(ticker_id: int, d: date, close: float, adj_close: float | None) -> StockDailyCandle:
+    return StockDailyCandle(
+        ticker_id=ticker_id, date=d,
+        open=close, high=close, low=close, close=close, volume=1,
+        adj_close=adj_close,
+    )
 
 
 def _row(ticker_id: int, record_date: date, dps: float, kind: str = "SETTLE") -> StockDividend:
@@ -308,6 +322,36 @@ class TestGetHistory:
     ) -> None:
         _, rows = service.get_history("005930")
         assert rows == []
+
+    def test_split_adjusts_dps_to_today_share_base(
+            self, repo: StockDividendRepository, candle_repo: StockDailyCandleRepository,
+            service: DividendService, ticker_id: int,
+    ) -> None:
+        # 삼성 50:1 액면분할(2018-05): 분할 전 record_date는 factor=adj/close=0.02로 환산돼
+        # 분할 후 DPS와 동일 좌표계로 연속화된다. 17,700 × 0.02 = 354.
+        # bulk_upsert는 adj_* 컬럼을 안 쓰므로 save로 적재(원주가+수정주가 함께).
+        candle_repo.save(_candle(ticker_id, date(2018, 3, 30), close=2607000, adj_close=52140))  # factor 0.02
+        candle_repo.save(_candle(ticker_id, date(2018, 6, 29), close=51900, adj_close=51900))      # factor 1.0
+        repo.bulk_upsert([
+            _row(ticker_id, date(2018, 3, 30), 17700, kind="QUARTERLY"),
+            _row(ticker_id, date(2018, 6, 29), 354, kind="QUARTERLY"),
+        ])
+
+        _, rows = service.get_history("005930")
+
+        assert [round(r.dps, 2) for r in rows] == [354.0, 354.0]
+
+    def test_keeps_raw_dps_when_adj_close_missing(
+            self, repo: StockDividendRepository, candle_repo: StockDailyCandleRepository,
+            service: DividendService, ticker_id: int,
+    ) -> None:
+        # adj_close 미백필(~2014 이전)이면 factor=1 → 원본 DPS 유지.
+        candle_repo.save(_candle(ticker_id, date(2012, 12, 27), close=10000, adj_close=None))
+        repo.bulk_upsert([_row(ticker_id, date(2012, 12, 27), 500)])
+
+        _, rows = service.get_history("005930")
+
+        assert [r.dps for r in rows] == [500.0]
 
     def test_unknown_ticker_raises_not_found(self, service: DividendService) -> None:
         from src.service.exceptions import ExceptionCode, GenieError

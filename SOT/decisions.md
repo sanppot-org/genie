@@ -1,5 +1,18 @@
 의사결정 기록
 
+## 2026-06-04: 배당이력·BPS 액면분할 보정 (2e 후속)
+
+### 배경
+prod 실데이터 검증에서 2e(EPS·DPS 보정) 적용 후에도 분할 절벽이 남는 2곳 발견: ① 배당이력 차트(`stock_dividends`, 별도 소스 — 2e 미적용), ② BPS(주당순자산, `stock_fundamentals`). 삼성 FY2018 분기배당 17,700(분할 전)→354(분할 후), BPS 1,156,530(2017)→28,126(2018).
+
+### 핵심 결정
+- **배당이력**: `DividendService.get_history`가 캔들 주입받아 각 배당 `record_date` 시점 `factor=adj_close/close`로 DPS 환산(네이버 수정주가가 오늘 주식수로 back-adjust돼 있어 record_date factor가 곧 오늘 좌표계 보정). 반환 타입을 ORM `StockDividend`→`DividendHistoryPoint` 프로즌 dataclass(record_date/kind/dps/fiscal_year)로 변경(라우트는 `from_attributes`라 무변경). 캔들/adj_close 미존재·close≤0이면 factor=1.
+- **BPS**: 2e와 동일 factor를 `_adjust_per_share_for_split`에서 곱함(eps·dps·bps 동일 factor → PBR=price/bps 비율 보존). 단 **데이터 계층만 보정** — 사용자 결정으로 API/프론트 미노출(`IncomeStatementPointData.bps`만 채움). 가드도 `bps is None` 포함하도록 확장.
+- **스코어링 미변경**: `is_quarterly`(kind만 검사)·`consecutive_dividend_increase_years`(`_calc_streak`)는 `get_history`와 무관한 별도 경로라 영향 없음. 단 `_calc_streak`는 원본 DPS 연합산 비교라 **분할연도 연속인상 판정 왜곡 잠재 버그**(FY2018 raw합 < FY2017 raw합) — 스코어링 변경은 승인 필요라 이번 범위 밖, 후속 과제로 기록.
+
+### 검토
+prod 읽기전용 재현: 배당 14건 전부 record_date factor 적용 정합(2018-03 17,700×0.02=354), BPS 1,156,530×0.02=23,130. 전체 922 passed(신규 3: 배당 분할/폴백, BPS 보정), ruff·mypy 클린.
+
 ## 2026-06-03: 수정주가(adjusted) 차트 — 액면분할 절벽 제거 (Phase 1)
 
 ### 배경

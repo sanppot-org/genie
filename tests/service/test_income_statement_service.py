@@ -23,8 +23,8 @@ def _row(stac_yymm: str, sale: str, period_type: str) -> StockIncomeStatement:
     )
 
 
-def _fund(d: date, eps: float, per: float, dps: float = 0.0, div: float = 0.0) -> StockFundamental:
-    return StockFundamental(ticker_id=1, date=d, eps=eps, per=per, dps=dps, div=div)
+def _fund(d: date, eps: float, per: float, dps: float = 0.0, div: float = 0.0, bps: float | None = None) -> StockFundamental:
+    return StockFundamental(ticker_id=1, date=d, eps=eps, per=per, dps=dps, div=div, bps=bps)
 
 
 def _candle(d: date, close: float) -> StockDailyCandle:
@@ -508,3 +508,24 @@ def test_factor_anchored_to_fundamental_snapshot_date_not_period_end() -> None:
     # 스냅샷 날짜(2018-03-30) factor=0.02 적용 → 2000. period_end 기준이면 100000(틀림).
     assert p.eps == pytest.approx(2000.0)
     assert p.dps == pytest.approx(100.0)
+
+
+def test_split_adjusts_bps_to_current_share_basis() -> None:
+    """BPS(주당순자산)도 eps·dps와 동일 factor로 보정 → PBR(price/bps) 비율 보존.
+
+    현재 API/프론트 미노출(데이터 계층 보정)이라 IncomeStatementPointData에서만 검증.
+    """
+    rows = [_row("201712", "100", PERIOD_ANNUAL), _row("201812", "200", PERIOD_ANNUAL)]
+    funds = [
+        _fund(date(2017, 12, 28), eps=157967.0, per=15.0, dps=28500.0, bps=1_156_530.0),  # 분할 전
+        _fund(date(2018, 12, 28), eps=5997.0, per=6.4, dps=850.0, bps=28_126.0),           # 분할 후
+    ]
+    candles = [
+        _candle_adj(date(2017, 12, 28), close=2_650_000.0, adj_close=53_000.0),  # factor=0.02
+        _candle_adj(date(2018, 12, 28), close=53_000.0, adj_close=53_000.0),     # factor=1.0
+    ]
+    _, points = _service(rows, funds=funds, candles=candles).get_time_series("005930", PERIOD_ANNUAL)
+
+    by = {p.stac_yymm: p for p in points}
+    assert by["201712"].bps == pytest.approx(1_156_530.0 * 0.02)  # 23130.6 — 절벽 제거
+    assert by["201812"].bps == pytest.approx(28_126.0)            # factor=1, 불변

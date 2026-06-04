@@ -96,6 +96,7 @@
   [x] 스케줄러 등록 — `sync_kr_stock_daily_candles` cron 17:10 mon-fri (ticker 16:48 → fundamental 17:00 → 일봉 17:10)
 
 [x] 액면분할 후 주가 — 수정주가(adjusted) 차트. `stock_daily_candles`에 `adj_*` 컬럼(alembic 017, nullable, 원주가 보존), `PykrxDailyCandleClient.fetch_adjusted_by_ticker`(네이버 소스·인증불필요, 0값 거래정지 row 스킵), `AdjustedCandleBackfillService` + 수동 API `POST /api/candles/kr-stock/backfill-adjusted?ticker=`, 조회 API `price=raw|adjusted`(기본 raw, 프론트는 adjusted), 재무표 결산주가도 adj_close 우선(분할 전 원종가 혼입 버그 수정). 네이버 일봉은 ~2014년부터. [ ] Phase 2: 전종목 백필 배치·스케줄러 주기 재보정·prod 마이그레이션
+[x] 주당지표 액면분할 보정 — 재무요약 EPS·DPS는 `_adjust_per_share_for_split`(fundamental 스냅샷 날짜의 factor=adj_close/close, eps·dps·bps 동일 factor → 배당성향·PBR 비율 보존). 배당이력(`DividendService.get_history`)도 각 record_date factor로 DPS 환산해 분할 절벽 제거(삼성 2018-03 17,700→354). BPS는 데이터 계층만 보정(현재 API/프론트 미노출). [ ] 후속: 점수표 `_calc_streak`는 원본 DPS 연합산이라 분할연도 연속인상 판정 왜곡 가능(미수정)
 [x] 로컬에서 better stack 비활성화
 [x] 프로파일에 따라서 스케줄러 비활성화
 [x] 재무제표에 eps, per 추가 — 손익계산서 표에 EPS·PER 컬럼(결산말일 펀더멘털 스냅샷, 신규 수집 없이 stock_fundamentals 재사용)

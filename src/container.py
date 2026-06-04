@@ -268,6 +268,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
         DividendService,
         dividend_repository=stock_dividend_repository,
         ticker_repository=ticker_repository,
+        daily_candle_repository=stock_daily_candle_repository,
     )
     treasury_stock_sync_service = providers.Factory(
         TreasuryStockSyncService,

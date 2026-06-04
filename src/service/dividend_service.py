@@ -1,14 +1,60 @@
 """배당 파생 지표 서비스 — 점수표 산정용."""
 
+from bisect import bisect_right
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, timedelta
 
-from src.database.models import StockDividend, Ticker
+from src.database.models import StockDailyCandle, StockDividend, Ticker
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.stock_dividend_repository import StockDividendRepository
 from src.database.ticker_repository import TickerRepository
 from src.service.exceptions import GenieError
 
 _QUARTERLY_LABEL = "QUARTERLY"
+
+
+@dataclass(frozen=True)
+class DividendHistoryPoint:
+    """차트 표시용 배당 1건 (액면분할 보정 후 DPS)."""
+
+    record_date: date
+    kind: str
+    dps: float
+    fiscal_year: int
+
+
+def _adjust_dps_for_split(
+        rows: list[StockDividend],
+        candles: list[StockDailyCandle],
+) -> list[DividendHistoryPoint]:
+    """각 배당 레코드의 record_date 시점 분할계수(adj_close/close)로 DPS를 환산.
+
+    네이버 수정주가는 '오늘 주식수' 기준으로 back-adjust돼 있어, record_date의 factor를
+    곱하면 과거 배당도 동일 주식수 좌표계로 정렬돼 분할 절벽이 사라진다
+    (예: 삼성 2018-03 17,700 × 0.02 = 354 → 분할 후 354와 연속). 캔들은 date 오름차순,
+    record_date 이하 가장 최근 캔들을 bisect로 선택(휴장일 보정).
+    캔들/adj_close 미존재·close≤0이면 factor=1(원값 유지).
+    """
+    if not rows:
+        return []
+    candle_dates = [c.date for c in candles]
+    points: list[DividendHistoryPoint] = []
+    for r in rows:
+        factor = 1.0
+        if candle_dates:
+            idx = bisect_right(candle_dates, r.record_date) - 1
+            if idx >= 0:
+                c = candles[idx]
+                if c.adj_close is not None and c.close is not None and c.close > 0:
+                    factor = c.adj_close / c.close
+        points.append(DividendHistoryPoint(
+            record_date=r.record_date,
+            kind=r.kind,
+            dps=r.dps * factor,
+            fiscal_year=r.fiscal_year,
+        ))
+    return points
 
 
 class DividendService:
@@ -23,22 +69,25 @@ class DividendService:
             self,
             dividend_repository: StockDividendRepository,
             ticker_repository: TickerRepository,
+            daily_candle_repository: StockDailyCandleRepository,
     ) -> None:
         self._repo = dividend_repository
         self._tickers = ticker_repository
+        self._candles = daily_candle_repository
 
     def get_history(
             self,
             ticker_code: str,
             from_date: date | None = None,
             to_date: date | None = None,
-    ) -> tuple[Ticker, list[StockDividend]]:
-        """ticker 코드로 종목 + 일자 범위 배당 이력 반환. 종목 미발견 시 404."""
+    ) -> tuple[Ticker, list[DividendHistoryPoint]]:
+        """ticker 코드로 종목 + 일자 범위 배당 이력 반환 (액면분할 보정 DPS). 종목 미발견 시 404."""
         ticker = self._tickers.find_by_ticker(ticker_code)
         if ticker is None:
             raise GenieError.not_found(0)
         rows = self._repo.find_by_ticker(ticker.id, from_date, to_date)
-        return ticker, rows
+        candles = self._candles.find_by_ticker(ticker.id)
+        return ticker, _adjust_dps_for_split(rows, candles)
 
     def is_quarterly_dividend(self, ticker_id: int, today: date | None = None) -> bool:
         """최근 1년 내 `kind == 'QUARTERLY'` row가 1건 이상이면 분기배당."""

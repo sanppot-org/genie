@@ -41,6 +41,7 @@ class IncomeStatementPointData:
     per: float | None = None
     dps: float | None = None
     div: float | None = None
+    bps: float | None = None  # 주당순자산 (액면분할 보정 적용, 현재 API 미노출 — 데이터 계층 보정)
     price: float | None = None
     is_estimate: bool = False
 
@@ -206,7 +207,7 @@ def _enrich_with_fundamentals(
             enriched.append(p)
             continue
         f = funds[idx]
-        enriched.append(replace(p, eps=f.eps, per=f.per, dps=f.dps, div=f.div))
+        enriched.append(replace(p, eps=f.eps, per=f.per, dps=f.dps, div=f.div, bps=f.bps))
     return enriched
 
 
@@ -245,13 +246,13 @@ def _adjust_per_share_for_split(
         funds: list[StockFundamental],
         candles: list[StockDailyCandle],
 ) -> list[IncomeStatementPointData]:
-    """주당지표(eps·dps)를 액면분할 분할계수로 환산해 분할 절벽 제거.
+    """주당지표(eps·dps·bps)를 액면분할 분할계수로 환산해 분할 절벽 제거.
 
-    분할계수 = adj_close / close (수정주가/원주가). EPS·DPS는 **그 값이 보고된 시점의
+    분할계수 = adj_close / close (수정주가/원주가). EPS·DPS·BPS는 **그 값이 보고된 시점의
     주식수 기준**이므로, factor는 반드시 **fundamental 스냅샷 날짜**의 캔들에서 구한다
     (결산말일로 따로 bisect한 가격 캔들 날짜가 아님 — 분할 경계에서 날짜가 어긋나면
-    엉뚱한 분할구간 factor가 곱해질 수 있어서다). eps·dps에 동일 factor를 적용하므로
-    배당성향(dps/eps)·유보(eps-dps) 비율은 보존된다.
+    엉뚱한 분할구간 factor가 곱해질 수 있어서다). eps·dps·bps에 동일 factor를 적용하므로
+    배당성향(dps/eps)·유보(eps-dps)·PBR(price/bps) 비율은 보존된다.
 
     절대금액(매출·영업이익·순이익)·per(비율)·div(비율)는 보정하지 않는다.
     adj_close 미백필(~2014 이전)·close≤0이면 factor=1(원값 유지). 추정행은 보정 안 함.
@@ -263,7 +264,7 @@ def _adjust_per_share_for_split(
     candle_dates = [c.date for c in candles]
     adjusted: list[IncomeStatementPointData] = []
     for p in points:
-        if p.is_estimate or (p.eps is None and p.dps is None):
+        if p.is_estimate or (p.eps is None and p.dps is None and p.bps is None):
             adjusted.append(p)
             continue
         period_end = _fiscal_period_end(p.stac_yymm)
@@ -290,6 +291,7 @@ def _adjust_per_share_for_split(
             p,
             eps=p.eps * factor if p.eps is not None else None,
             dps=p.dps * factor if p.dps is not None else None,
+            bps=p.bps * factor if p.bps is not None else None,
         ))
     return adjusted
 
