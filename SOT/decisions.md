@@ -41,8 +41,20 @@ git 단일 소스(schedules.py)·OS crontab 관리 불필요·타 sync 잡과 �
 - `ScheduleConfig`에 옵셔널 `misfire_grace_time` 추가 → 분기 잡은 **3600초**(03:00 재시작/부하로 인한 분기 누락 방지; job_defaults 60초로는 부족).
 - 오프라인 스크립트 `scripts/backfill_adjusted_candles.py`는 수동/초기 백필용으로 유지.
 
-### Phase 2c~2d (미착수)
-프론트 수정주가/원주가·로그 스케일 토글, prod 마이그레이션 배포(017 + 전종목 백필 1회 + 분기 재백필 cron 등록). adj_volume은 네이버 소스라 KRX 원거래량과 차이(종가는 정확 일치, 표시 영향 경미).
+### Phase 2d (완료, 2026-06-04): prod 배포 + 전종목 백필
+v1.31.0 배포(017 마이그레이션 적용), 앱 서버(150.230.252.125, ecrick-app)에서 전종목 백필 — `targets=2772 failed=0 tickers_updated=2764 rows=6.34M partial=1601`(partial=2014 이전 네이버 미커버). 005930 2018 분할 경계 adj_close 연속 검증. v1.32.0 분기 안전망 배포. 인프라: DB host=140.245.67.107(arm-db), app host=150.230.252.125(키 oci-app.key). 백필은 app 서버에서 실행해야 함(local→prod WAN은 종목당 수천행 왕복으로 17h, app 내부망은 ~1.5h).
+
+### Phase 2e (완료, 2026-06-04): 펀더멘털(EPS·DPS) 수정주가 보정
+codex + architect 교차검증 반영.
+- **문제**: 재무요약 EPS·DPS가 stock_fundamentals(pykrx) 각 날짜 주식수 기준이라 2018 50:1 분할에서 2017→2018 ~1/50 절벽(주가만 보정됐고 주당지표는 미보정).
+- **해법**: `_adjust_per_share_for_split(points, funds, candles)` 신규 — 조회시점 계산(컬럼 추가 X). 분할계수=adj_close/close를 **fundamental 스냅샷 날짜의 캔들**에서 산출(period_end 별도 bisect 아님 — 분할 경계에서 fund날짜≠가격날짜면 엉뚱한 factor 곱해질 위험). eps·dps에 **동일 factor** 적용(배당성향·유보 비율 보존).
+- **범위**: eps·dps만(point에 bps 없음). 절대금액(매출·영업이익·순이익)·per(저장 비율)·div(비율) 불변. 가드 `close>0 & adj_close not None else factor=1`(2014 이전 원값). 추정행은 보정 안 함(이후 append, base_eps factor≈1).
+- **프론트 무변경**: PER=p.per 저장값, 배당성향=dps/eps, 유보=eps-dps 모두 factor에 정합. **dividend-chart는 별도 소스(StockDividend record_date)라 영향 없음**(2e 범위 밖, 배당이력 차트 절벽은 후속 과제로 남김).
+- 검증: backend 919 passed, mypy/ruff, **prod 데이터 read-only 검증**(005930 EPS 2,526→3,159→5,997→6,461 연속). 미배포(커밋/배포 대기).
+- 전제 기록: **adj_close는 액면분할·무상증자 등 주식수 변동 보정용이며 현금배당 total-return factor가 아님.**
+
+### 미착수
+프론트 수정주가/원주가·로그 스케일 토글. 배당이력 차트(dividend-chart) DPS 분할 보정. adj_volume은 네이버 소스라 KRX 원거래량과 차이(종가는 정확 일치, 표시 영향 경미).
 
 ## 2026-05-30: 자사주 소각 수집 + 스크리너 자사주 점수(3지표)
 

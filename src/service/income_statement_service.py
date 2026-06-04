@@ -96,6 +96,9 @@ class IncomeStatementService:
         points = _enrich_with_fundamentals(points, funds)
         candles = self._candles.find_by_ticker(ticker.id)
         points = _enrich_with_price(points, candles)
+        # 액면분할 보정: 주당지표(eps·dps)를 수정주가 분할계수로 환산해 분할 절벽 제거.
+        # 추정행 append 전에 수행 → base_eps가 보정값(최신은 factor≈1)으로 일관.
+        points = _adjust_per_share_for_split(points, funds, candles)
 
         # 예상실적은 연간(추정치는 연간만 존재)에만 best-effort로 덧붙인다.
         if period_type == PERIOD_ANNUAL:
@@ -235,6 +238,60 @@ def _enrich_with_price(
         c = candles[idx]
         enriched.append(replace(p, price=float(c.adj_close if c.adj_close is not None else c.close)))
     return enriched
+
+
+def _adjust_per_share_for_split(
+        points: list[IncomeStatementPointData],
+        funds: list[StockFundamental],
+        candles: list[StockDailyCandle],
+) -> list[IncomeStatementPointData]:
+    """주당지표(eps·dps)를 액면분할 분할계수로 환산해 분할 절벽 제거.
+
+    분할계수 = adj_close / close (수정주가/원주가). EPS·DPS는 **그 값이 보고된 시점의
+    주식수 기준**이므로, factor는 반드시 **fundamental 스냅샷 날짜**의 캔들에서 구한다
+    (결산말일로 따로 bisect한 가격 캔들 날짜가 아님 — 분할 경계에서 날짜가 어긋나면
+    엉뚱한 분할구간 factor가 곱해질 수 있어서다). eps·dps에 동일 factor를 적용하므로
+    배당성향(dps/eps)·유보(eps-dps) 비율은 보존된다.
+
+    절대금액(매출·영업이익·순이익)·per(비율)·div(비율)는 보정하지 않는다.
+    adj_close 미백필(~2014 이전)·close≤0이면 factor=1(원값 유지). 추정행은 보정 안 함.
+    """
+    if not points or not funds or not candles:
+        return points
+
+    fund_dates = [f.date for f in funds]
+    candle_dates = [c.date for c in candles]
+    adjusted: list[IncomeStatementPointData] = []
+    for p in points:
+        if p.is_estimate or (p.eps is None and p.dps is None):
+            adjusted.append(p)
+            continue
+        period_end = _fiscal_period_end(p.stac_yymm)
+        if period_end is None:
+            adjusted.append(p)
+            continue
+        # EPS/DPS가 나온 fundamental 스냅샷 날짜를 먼저 찾고(=_enrich_with_fundamentals와 동일 bisect),
+        # 그 날짜의 분할계수를 적용해 EPS 좌표계와 factor를 정렬한다.
+        fidx = bisect_right(fund_dates, period_end) - 1
+        if fidx < 0:
+            adjusted.append(p)
+            continue
+        snap_date = funds[fidx].date
+        cidx = bisect_right(candle_dates, snap_date) - 1
+        if cidx < 0:
+            adjusted.append(p)
+            continue
+        c = candles[cidx]
+        if c.adj_close is None or c.close is None or c.close <= 0:
+            adjusted.append(p)
+            continue
+        factor = c.adj_close / c.close
+        adjusted.append(replace(
+            p,
+            eps=p.eps * factor if p.eps is not None else None,
+            dps=p.dps * factor if p.dps is not None else None,
+        ))
+    return adjusted
 
 
 def _fiscal_period_end(stac_yymm: str) -> date | None:

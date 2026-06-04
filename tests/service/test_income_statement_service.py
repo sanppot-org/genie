@@ -431,3 +431,80 @@ def test_estimate_per_fallback_when_eps_none_or_zero() -> None:
     # price는 두 경우 모두 최근 종가
     assert est_rows[0].price == 55000.0
     assert est_rows[1].price == 55000.0
+
+
+# ----- Phase 2e: 주당지표(EPS·DPS) 액면분할 보정 -----
+
+def _candle_adj(d: date, close: float, adj_close: float | None) -> StockDailyCandle:
+    return StockDailyCandle(
+        ticker_id=1, date=d, open=close, high=close, low=close, close=close,
+        volume=1, adj_close=adj_close,
+    )
+
+
+def test_split_adjusts_eps_dps_to_current_share_basis() -> None:
+    """50:1 분할 전 결산기 EPS·DPS가 현재 주식수 기준으로 환산돼 절벽이 사라진다."""
+    rows = [_row("201712", "100", PERIOD_ANNUAL), _row("201812", "200", PERIOD_ANNUAL)]
+    funds = [
+        _fund(date(2017, 12, 28), eps=157967.0, per=15.0, dps=28500.0),  # 분할 전
+        _fund(date(2018, 12, 28), eps=5997.0, per=6.4, dps=850.0),       # 분할 후
+    ]
+    candles = [
+        _candle_adj(date(2017, 12, 28), close=2_650_000.0, adj_close=53_000.0),  # factor=0.02
+        _candle_adj(date(2018, 12, 28), close=53_000.0, adj_close=53_000.0),     # factor=1.0
+    ]
+    _, points = _service(rows, funds=funds, candles=candles).get_time_series("005930", PERIOD_ANNUAL)
+
+    by = {p.stac_yymm: p for p in points}
+    assert by["201712"].eps == pytest.approx(157967.0 * 0.02)  # 3159.34
+    assert by["201712"].dps == pytest.approx(28500.0 * 0.02)   # 570.0
+    assert by["201812"].eps == pytest.approx(5997.0)           # factor=1, 불변
+    assert by["201812"].dps == pytest.approx(850.0)
+    # per(저장 비율)·절대금액은 보정 안 함
+    assert by["201712"].per == 15.0
+    assert by["201712"].sale_account == Decimal("100")
+
+
+def test_no_adjust_when_adj_close_null() -> None:
+    """adj_close 미백필(~2014 이전) 캔들이면 factor 미적용, EPS·DPS 원값 유지."""
+    rows = [_row("201212", "100", PERIOD_ANNUAL)]
+    funds = [_fund(date(2012, 12, 28), eps=120000.0, per=10.0, dps=8000.0)]
+    candles = [_candle_adj(date(2012, 12, 28), close=1_300_000.0, adj_close=None)]
+    _, points = _service(rows, funds=funds, candles=candles).get_time_series("005930", PERIOD_ANNUAL)
+
+    p = points[0]
+    assert p.eps == 120000.0
+    assert p.dps == 8000.0
+
+
+def test_payout_ratio_preserved_after_split_adjust() -> None:
+    """eps·dps에 동일 factor 적용 → 배당성향(dps/eps) 비율 보존."""
+    rows = [_row("201712", "100", PERIOD_ANNUAL)]
+    funds = [_fund(date(2017, 12, 28), eps=157967.0, per=15.0, dps=28500.0)]
+    candles = [_candle_adj(date(2017, 12, 28), close=2_650_000.0, adj_close=53_000.0)]
+    _, points = _service(rows, funds=funds, candles=candles).get_time_series("005930", PERIOD_ANNUAL)
+
+    p = points[0]
+    assert p.dps / p.eps == pytest.approx(28500.0 / 157967.0)
+
+
+def test_factor_anchored_to_fundamental_snapshot_date_not_period_end() -> None:
+    """분할 경계: factor는 결산말일 캔들이 아니라 'EPS가 나온 fundamental 날짜' 기준.
+
+    period_end(2018-06-30)로 캔들을 bisect하면 분할 후 캔들(factor=1)이 잡혀 EPS가
+    보정 안 되지만, EPS는 분할 전(2018-03) 주식수 기준이므로 factor=0.02여야 한다.
+    """
+    rows = [_row("201806", "100", PERIOD_QUARTER)]
+    funds = [_fund(date(2018, 3, 30), eps=100000.0, per=10.0, dps=5000.0)]  # 분할 전 스냅샷
+    candles = [
+        _candle_adj(date(2018, 3, 30), close=2_500_000.0, adj_close=50_000.0),  # 분할 전 factor=0.02
+        _candle_adj(date(2018, 6, 29), close=50_000.0, adj_close=50_000.0),     # 분할 후 factor=1.0
+    ]
+    _, points = _service(rows, funds=funds, candles=candles).get_time_series(
+        "005930", PERIOD_QUARTER, single_quarter=False,
+    )
+
+    p = next(p for p in points if p.stac_yymm == "201806")
+    # 스냅샷 날짜(2018-03-30) factor=0.02 적용 → 2000. period_end 기준이면 100000(틀림).
+    assert p.eps == pytest.approx(2000.0)
+    assert p.dps == pytest.approx(100.0)
