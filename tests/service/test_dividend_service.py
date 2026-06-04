@@ -108,6 +108,51 @@ class TestConsecutiveDividendIncreaseYears:
             ticker_id, today=date(2024, 5, 20),
         ) == 2
 
+    def test_split_year_does_not_break_streak_after_adjust(
+            self, repo: StockDividendRepository, candle_repo: StockDailyCandleRepository,
+            service: DividendService, ticker_id: int,
+    ) -> None:
+        """분할연도 보정: raw 연합산이면 분할 전 거액 DPS 때문에 인상이 감소로 오판되지만,
+        record_date factor로 환산하면 실제 주당배당 증가 추세(300<350<400)가 드러난다.
+        """
+        # 2017 record는 분할 전(factor 0.02), 2018·2019는 분할 후(factor 1.0).
+        candle_repo.save(_candle(ticker_id, date(2017, 12, 29), close=50000, adj_close=1000))
+        candle_repo.save(_candle(ticker_id, date(2018, 12, 28), close=1000, adj_close=1000))
+        candle_repo.save(_candle(ticker_id, date(2019, 12, 30), close=1100, adj_close=1100))
+        repo.bulk_upsert([
+            _row(ticker_id, date(2017, 12, 29), 15000),  # 보정 후 300
+            _row(ticker_id, date(2018, 12, 28), 350),    # 350
+            _row(ticker_id, date(2019, 12, 30), 400),    # 400
+        ])
+        # raw면 2018(350)<2017(15000) → streak 1. 보정하면 300<350<400 → streak 2.
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2020, 6, 1),
+        ) == 2
+
+    def test_split_crossing_records_within_one_fiscal_year_sum_correctly(
+            self, repo: StockDividendRepository, candle_repo: StockDailyCandleRepository,
+            service: DividendService, ticker_id: int,
+    ) -> None:
+        """같은 회계연도(FY2018)에 분할 전(factor 0.02)·후(factor 1.0) record가 공존해도,
+        각 record가 오늘 주식수 기준으로 환산된 뒤 합산되므로 연배당이 올바르게 누적된다.
+        커밋이 지목한 핵심 시나리오(삼성 FY2018: 5월 분할).
+        """
+        candle_repo.save(_candle(ticker_id, date(2017, 12, 29), close=50000, adj_close=1000))  # 0.02
+        candle_repo.save(_candle(ticker_id, date(2018, 3, 30), close=50000, adj_close=1000))    # 0.02 분할 전
+        candle_repo.save(_candle(ticker_id, date(2018, 12, 28), close=1000, adj_close=1000))     # 1.0 분할 후
+        candle_repo.save(_candle(ticker_id, date(2019, 12, 30), close=1100, adj_close=1100))     # 1.0
+        repo.bulk_upsert([
+            _row(ticker_id, date(2017, 12, 29), 21500),                  # FY2017 보정 430
+            _row(ticker_id, date(2018, 3, 30), 17700, kind="QUARTERLY"),  # FY2018 분할 전 → 354
+            _row(ticker_id, date(2018, 12, 28), 354, kind="SETTLE"),      # FY2018 분할 후 → 354 (합 708)
+            _row(ticker_id, date(2019, 12, 30), 800),                     # FY2019 보정 800
+        ])
+        # 보정: FY2017=430 < FY2018=708 < FY2019=800 → streak 2.
+        # raw면 FY2018(18054) > FY2019(800) → 감소 → streak 0. 보정이 교차합산을 바로잡음.
+        assert service.consecutive_dividend_increase_years(
+            ticker_id, today=date(2020, 6, 1),
+        ) == 2
+
     def test_freeze_keeps_streak_but_not_count_as_increase(
             self, repo: StockDividendRepository, service: DividendService, ticker_id: int,
     ) -> None:
@@ -286,6 +331,28 @@ class TestBulkMethods:
         assert service.is_quarterly_dividend_bulk([]) == {}
         assert service.consecutive_dividend_increase_years_bulk([]) == {}
 
+    def test_bulk_streak_uses_raw_dps_no_split_adjust(
+            self,
+            repo: StockDividendRepository,
+            candle_repo: StockDailyCandleRepository,
+            service: DividendService,
+            ticker_id: int,
+    ) -> None:
+        """bulk는 성능상 분할 보정 미적용(원본 DPS 비교) — 알려진 한계 고정."""
+        # 캔들에 분할 factor가 있어도 bulk는 무시하고 raw로 비교한다.
+        candle_repo.save(_candle(ticker_id, date(2017, 12, 29), close=50000, adj_close=1000))
+        candle_repo.save(_candle(ticker_id, date(2018, 12, 28), close=1000, adj_close=1000))
+        repo.bulk_upsert([
+            _row(ticker_id, date(2017, 12, 29), 15000),  # raw 비교: 다음 해보다 큼
+            _row(ticker_id, date(2018, 12, 28), 350),    # raw 350 < 15000 → 감소로 처리
+        ])
+        # raw면 2018(350) < 2017(15000) → 인상 아님 → streak 0.
+        # (단건 메서드라면 보정으로 300<350 → 1; bulk는 보정 안 하므로 0)
+        result = service.consecutive_dividend_increase_years_bulk(
+            [ticker_id], today=date(2019, 6, 1),
+        )
+        assert result == {ticker_id: 0}
+
 
 class TestGetHistory:
     """배당 지급 이력 조회 — 차트 표시용."""
@@ -352,6 +419,18 @@ class TestGetHistory:
         _, rows = service.get_history("005930")
 
         assert [r.dps for r in rows] == [500.0]
+
+    def test_keeps_raw_dps_when_record_predates_all_candles(
+            self, repo: StockDividendRepository, candle_repo: StockDailyCandleRepository,
+            service: DividendService, ticker_id: int,
+    ) -> None:
+        """record_date가 가장 이른 캔들보다 앞서면(bisect idx<0) factor=1 → 원본 DPS 유지."""
+        candle_repo.save(_candle(ticker_id, date(2020, 1, 2), close=1000, adj_close=1000))
+        repo.bulk_upsert([_row(ticker_id, date(2015, 12, 28), 600)])  # 캔들 이전
+
+        _, rows = service.get_history("005930")
+
+        assert [r.dps for r in rows] == [600.0]
 
     def test_unknown_ticker_raises_not_found(self, service: DividendService) -> None:
         from src.service.exceptions import ExceptionCode, GenieError

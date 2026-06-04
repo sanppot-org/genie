@@ -8,7 +8,9 @@ prod 실데이터 검증에서 2e(EPS·DPS 보정) 적용 후에도 분할 절�
 ### 핵심 결정
 - **배당이력**: `DividendService.get_history`가 캔들 주입받아 각 배당 `record_date` 시점 `factor=adj_close/close`로 DPS 환산(네이버 수정주가가 오늘 주식수로 back-adjust돼 있어 record_date factor가 곧 오늘 좌표계 보정). 반환 타입을 ORM `StockDividend`→`DividendHistoryPoint` 프로즌 dataclass(record_date/kind/dps/fiscal_year)로 변경(라우트는 `from_attributes`라 무변경). 캔들/adj_close 미존재·close≤0이면 factor=1.
 - **BPS**: 2e와 동일 factor를 `_adjust_per_share_for_split`에서 곱함(eps·dps·bps 동일 factor → PBR=price/bps 비율 보존). 단 **데이터 계층만 보정** — 사용자 결정으로 API/프론트 미노출(`IncomeStatementPointData.bps`만 채움). 가드도 `bps is None` 포함하도록 확장.
-- **스코어링 미변경**: `is_quarterly`(kind만 검사)·`consecutive_dividend_increase_years`(`_calc_streak`)는 `get_history`와 무관한 별도 경로라 영향 없음. 단 `_calc_streak`는 원본 DPS 연합산 비교라 **분할연도 연속인상 판정 왜곡 잠재 버그**(FY2018 raw합 < FY2017 raw합) — 스코어링 변경은 승인 필요라 이번 범위 밖, 후속 과제로 기록.
+- **스코어링**: `is_quarterly`는 kind만 검사라 무관. `_calc_streak`(연속배당인상)는 원본 DPS 연합산 비교라 **분할연도 판정 왜곡 잠재 버그**(FY2018 raw합 < FY2017 raw합) 존재.
+  - 단건 `consecutive_dividend_increase_years`는 record_date factor로 DPS 환산 후 비교(보정 적용). `_calc_streak`는 StockDividend·DividendHistoryPoint 공용(fiscal_year·dps만 읽음, `_StreakRow` Union).
+  - **screening 전종목 `_bulk`는 보정 미적용(의도)**: 교차검증(architect+code-reviewer)에서 bulk 보정안(분할후보 `find_split_candidate_ticker_ids` + 종목별 캔들 로드)이 **prod에서 캔들 11M행 전구간 윈도우 스캔으로 제한시간 초과**함을 실측 확인(배당 25,790건/2,003종목). screening마다 수초 회귀 → 되돌림. 분할은 드물어 영향 종목 소수 → 알려진 한계로 문서화. 효율적 보정(배당 record 지점 factor를 LATERAL 1쿼리)은 비용 대비 효용 낮아 보류.
 
 ### 검토
 prod 읽기전용 재현: 배당 14건 전부 record_date factor 적용 정합(2018-03 17,700×0.02=354), BPS 1,156,530×0.02=23,130. 전체 922 passed(신규 3: 배당 분할/폴백, BPS 보정), ruff·mypy 클린.

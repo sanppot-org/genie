@@ -2,6 +2,7 @@
 
 from bisect import bisect_right
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -22,6 +23,10 @@ class DividendHistoryPoint:
     kind: str
     dps: float
     fiscal_year: int
+
+
+# streak 계산은 fiscal_year·dps만 읽으므로 원본 row와 보정 point를 모두 받는다.
+_StreakRow = StockDividend | DividendHistoryPoint
 
 
 def _adjust_dps_for_split(
@@ -120,9 +125,12 @@ class DividendService:
 
         점수표 정의: 동결 시 연속은 인정되나 인상으로는 인정되지 않는다.
         구현: 감소가 나오는 순간 break. 인상이면 +1, 동결이면 그대로(연속 유지).
+        액면분할연도엔 record들이 서로 다른 주식수 기준이라, record_date factor로
+        DPS를 오늘 주식수 기준 환산한 뒤 연합산·비교한다(분할 절벽 오판 방지).
         """
         rows = self._repo.find_by_ticker(ticker_id)
-        return self._calc_streak(rows, today)
+        adjusted = _adjust_dps_for_split(rows, self._candles.find_by_ticker(ticker_id))
+        return self._calc_streak(adjusted, today)
 
     def consecutive_dividend_increase_years_bulk(
             self, ticker_ids: list[int], today: date | None = None,
@@ -130,6 +138,12 @@ class DividendService:
         """다건 ticker에 대해 연속 인상 연수 일괄 산출. 쿼리 1회.
 
         결과 dict은 입력의 모든 ticker_id를 포함(데이터 없으면 0).
+
+        주의(알려진 한계): 전종목(screening) 대상이라 **액면분할 보정을 적용하지 않는다**
+        — record별 보정은 종목당 캔들 로드가 필요해 전종목 스캔 비용이 과도하다.
+        따라서 분할연도(분할 전·후 record가 다른 주식수 기준으로 섞이는 해)에는 연속인상
+        판정이 왜곡될 수 있다(분할은 드물어 영향 종목 소수). 단건 보정이 필요하면
+        `consecutive_dividend_increase_years`(record_date factor 적용)를 사용.
         """
         if not ticker_ids:
             return {}
@@ -140,7 +154,7 @@ class DividendService:
         return {tid: self._calc_streak(grouped.get(tid, []), today) for tid in ticker_ids}
 
     @staticmethod
-    def _calc_streak(rows: list[StockDividend], today: date | None = None) -> int:
+    def _calc_streak(rows: Sequence[_StreakRow], today: date | None = None) -> int:
         """진행 중인 회계연도 row는 부분합이라 비교에서 제외한다.
 
         한국 12월 결산 + 3월 정기 주총 + 4월 배당 공시 관행 기준 cutoff:
