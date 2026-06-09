@@ -14,6 +14,12 @@ export function SiteHeader() {
           차트
         </Link>
         <Link
+          href="/compare"
+          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          비교
+        </Link>
+        <Link
           href="/screening"
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
