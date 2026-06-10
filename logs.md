@@ -6,7 +6,8 @@
 
 - **원인**: `DartCompanyClient.fetch_cancellation_events`의 자회사 배제 필터(`row_stock_code != stock_code`)가 무력. DART `list.json`은 `corp_code`로 서버 필터되어 모든 row의 stock_code가 조회 대상(=공시 제출자) 코드 → 비교가 절대 성립 안 함. 모회사가 자회사(주로 비상장) 소각을 대신 공시한 "주식소각결정(자회사의 주요경영사항)"은 제출자=모회사라 stock_code도 모회사 → 키워드·stock_code 필터 둘 다 통과해 자회사 소각이 모회사 `annual_cancel_ratio`(8점)·`regular_buyback`(7점)을 부풀림. prod 실측 892건 중 **36건(21종목)** 오귀속, 35건은 소각수량까지 보유.
 - **해결**: 무력한 stock_code 비교를 제거하고 `report_nm`에 `_SUBSIDIARY_DISCLOSURE_MARKER="자회사의 주요경영사항"`(괄호 없는 부분문자열) 포함 시 배제로 교체. document() 원문 fetch 전에 배제. 회귀 테스트 추가(stock_code 동일한 자회사 row 배제 + document 미호출 검증, `__new__`로 OpenDartReader 생성자 우회).
-- **주의**: ① 이 수정은 **미래 적재만 차단** — 기존 prod 36건은 안 지워짐. 일회성 `DELETE … WHERE report_nm LIKE '%(자회사의 주요경영사항)%'`(prod+dev) 정리는 **호스트 확인 후 사용자 승인** 받아 별도 실행 필요. ② 배제 패턴은 정상 자기 공시("주식소각결정"/"[기재정정]주식소각결정")엔 없는 "주요경영사항" 공시 계열 전용이라 false-positive 없음. ③ 다른 자회사 공시명 변형이 생기면 마커 누락 가능 — prod `report_nm` 분포 재확인으로 가드.
+- **데이터 정리 완료(2026-06-11)**: 코드 수정은 미래 적재만 차단하므로 기존 적재분을 일회성 삭제. 트랜잭션+가드(>50건 시 롤백)로 `DELETE … WHERE report_nm LIKE '%(자회사의 주요경영사항)%'` 실행 — **prod(140.245.67.107) 36건 삭제(892→856), 잔존 0 독립 확인**. local docker는 전체 3건·자회사 0건이라 대상 없음. 점수는 실시간 계산이라 다음 조회부터 21종목 자동 정정.
+- **주의**: ① 배제 패턴은 정상 자기 공시("주식소각결정"/"[기재정정]주식소각결정")엔 없는 "주요경영사항" 공시 계열 전용이라 false-positive 없음. ② 다른 자회사 공시명 변형이 생기면 마커 누락 가능 — prod `report_nm` 분포 재확인으로 가드.
 
 ## 2026-06-10: 배당절차 개선으로 fiscal_year +1 오귀속 → 연속인상 streak=0 (KG케미칼) — codex 2R 교차검증
 
