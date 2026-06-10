@@ -362,13 +362,8 @@ class ScreeningService:
                 ann_ratio = None
                 s_ann = 0
 
-            # ③ 보유비율: row 없으면 0점(N/A), 0주면 5점, 그 외 구간 점수.
-            if hold_ratio is None:
-                s_hold = 0
-            elif hold_ratio == 0:
-                s_hold = 5
-            else:
-                s_hold = score_treasury_holding(hold_ratio)
+            # ③ 보유비율: row 없으면 0점(N/A), 그 외는 score 함수가 0주→5점 포함 구간 처리.
+            s_hold = 0 if hold_ratio is None else score_treasury_holding(hold_ratio)
 
             breakdown = ScoreBreakdown(
                 per=score_per(per),

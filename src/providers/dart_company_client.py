@@ -279,6 +279,14 @@ class DartCompanyClient:
                 )
                 continue
 
+            # 소각수량 추출 실패(양식 변형 등) silent-loss 방지: 결의일은 있으나 보통/종류주
+            # 모두 None이면 집계 시 0주 취급되어 소각비율이 조용히 저평가된다 → warning으로 가시화.
+            if parsed.get("common_shares") is None and parsed.get("preferred_shares") is None:
+                logger.warning(
+                    "주식소각결정 소각수량 추출 실패(0주 집계 위험) stock_code=%s rcept_no=%s report_nm=%s",
+                    stock_code, rcept_no, report_nm,
+                )
+
             results.append(CancellationEvent(
                 stock_code=stock_code,
                 rcept_no=rcept_no,
