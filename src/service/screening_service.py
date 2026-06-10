@@ -37,8 +37,8 @@ _SORT_ATTR_MAP: dict[str, str] = {
     "quarterly_dividend": "quarterly_dividend",
     "consecutive_years": "consecutive_increase_years",
     "regular_buyback": "scores.regular_buyback",
-    "annual_cancel_ratio": "scores.annual_cancel_ratio",
-    "treasury_holding": "scores.treasury_holding",
+    "annual_cancel_ratio": "annual_cancel_ratio",
+    "treasury_holding": "treasury_ratio",
 }
 
 
@@ -290,7 +290,6 @@ class ScreeningService:
 
     def score_kr_stocks(
             self,
-            target_date: date | None = None,
             limit: int = 50,
             offset: int = 0,
             today: date | None = None,
@@ -301,10 +300,10 @@ class ScreeningService:
         """전체 KR_STOCK을 점수 합산해 sort_by/order 기준으로 정렬.
 
         기본은 total_score DESC, ticker ASC. NULL 값은 정렬 방향과 무관하게 항상 맨 뒤.
-        target_date 미지정 시 `stock_fundamentals` 최신 일자 사용. 데이터 없으면 빈 결과.
+        `stock_fundamentals` 최신 일자를 사용한다. 데이터 없으면 빈 결과.
         today는 분기배당 판정 기준(테스트 결정성 확보용). 기본 None → date.today().
         """
-        resolved_date = target_date or self._fundamentals.find_latest_date()
+        resolved_date = self._fundamentals.find_latest_date()
         if resolved_date is None:
             return ScreeningResult(target_date=None, total=0, limit=limit, offset=offset, rows=[])
 

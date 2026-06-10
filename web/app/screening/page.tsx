@@ -158,7 +158,6 @@ function FormulaTooltipBody({ formula }: { formula: ScoreFormula }) {
 }
 
 export default function ScreeningPage() {
-  const [date, setDate] = useState("");
   const [offset, setOffset] = useState(0);
   const [sortBy, setSortBy] = useState<ScreeningSortBy>("total_score");
   const [order, setOrder] = useState<ScreeningSortOrder>("desc");
@@ -187,7 +186,7 @@ export default function ScreeningPage() {
   );
   const filters = useDebounce(rawFilters, 300);
 
-  const query = useScreening(date || undefined, PAGE_SIZE, offset, sortBy, order, filters);
+  const query = useScreening(PAGE_SIZE, offset, sortBy, order, filters);
   const data = query.data;
 
   function makeFilterSetter(setter: (v: string) => void): (v: string) => void {
@@ -245,21 +244,9 @@ export default function ScreeningPage() {
       </header>
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">기준 일자</span>
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setOffset(0);
-            }}
-            className="w-44"
-          />
-        </label>
         {data?.target_date && (
           <span className="text-sm text-muted-foreground">
-            적용 기준일: <span className="font-mono">{data.target_date}</span>
+            데이터 기준일: <span className="font-mono">{data.target_date}</span>
           </span>
         )}
       </div>

@@ -77,7 +77,7 @@ class TestScreeningAPI:
         assert body["rows"][0]["treasury_ratio"] == 1.0
 
         mock_screening_service.score_kr_stocks.assert_called_once_with(
-            target_date=None, limit=50, offset=0,
+            limit=50, offset=0,
             sort_by="total_score", order="desc",
             filters=ScreeningFilters(),
         )
@@ -85,19 +85,19 @@ class TestScreeningAPI:
     def test_query_params_propagate(
             self, client: TestClient, mock_screening_service: MagicMock,
     ) -> None:
-        """date/limit/offset/sort_by/order 파라미터가 그대로 service에 전달."""
+        """limit/offset/sort_by/order 파라미터가 그대로 service에 전달."""
         mock_screening_service.score_kr_stocks.return_value = ScreeningResult(
             target_date=date(2026, 4, 30), total=100, limit=10, offset=20, rows=[],
         )
 
         response = client.get(
-            "/api/screening/kr-stock?date=2026-04-30&limit=10&offset=20"
+            "/api/screening/kr-stock?limit=10&offset=20"
             "&sort_by=per&order=asc",
         )
 
         assert response.status_code == 200
         mock_screening_service.score_kr_stocks.assert_called_once_with(
-            target_date=date(2026, 4, 30), limit=10, offset=20,
+            limit=10, offset=20,
             sort_by="per", order="asc",
             filters=ScreeningFilters(),
         )
@@ -117,7 +117,7 @@ class TestScreeningAPI:
 
         assert response.status_code == 200
         mock_screening_service.score_kr_stocks.assert_called_once_with(
-            target_date=None, limit=50, offset=0,
+            limit=50, offset=0,
             sort_by="total_score", order="desc",
             filters=ScreeningFilters(
                 per_min=2.0, per_max=5.0,
@@ -143,7 +143,7 @@ class TestScreeningAPI:
 
         assert response.status_code == 200
         mock_screening_service.score_kr_stocks.assert_called_once_with(
-            target_date=None, limit=50, offset=0,
+            limit=50, offset=0,
             sort_by="total_score", order="desc",
             filters=ScreeningFilters(q="삼성"),
         )
@@ -162,7 +162,7 @@ class TestScreeningAPI:
 
         assert response.status_code == 200
         mock_screening_service.score_kr_stocks.assert_called_once_with(
-            target_date=None, limit=50, offset=0,
+            limit=50, offset=0,
             sort_by="total_score", order="desc",
             filters=ScreeningFilters(quarterly_only=True, consecutive_years_min=5),
         )
@@ -180,11 +180,6 @@ class TestScreeningAPI:
     def test_invalid_order_422(self, client: TestClient) -> None:
         """order가 asc/desc 외 값이면 422."""
         response = client.get("/api/screening/kr-stock?order=updown")
-        assert response.status_code == 422
-
-    def test_invalid_date_format_422(self, client: TestClient) -> None:
-        """date 패턴 불일치 시 422."""
-        response = client.get("/api/screening/kr-stock?date=20260430")
         assert response.status_code == 422
 
     def test_limit_out_of_range_422(self, client: TestClient) -> None:

@@ -12,7 +12,6 @@ import type {
 } from "@/lib/types";
 
 export function useScreening(
-  date: string | undefined,
   limit: number,
   offset: number,
   sortBy: ScreeningSortBy,
@@ -20,10 +19,9 @@ export function useScreening(
   filters: ScreeningFilters,
 ) {
   return useQuery({
-    queryKey: ["screening", date ?? "latest", limit, offset, sortBy, order, filters],
+    queryKey: ["screening", limit, offset, sortBy, order, filters],
     queryFn: () =>
       apiGet<GenieResponse<ScreeningResponse>>("/api/screening/kr-stock", {
-        date,
         limit,
         offset,
         sort_by: sortBy,

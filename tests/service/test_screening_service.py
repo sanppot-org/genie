@@ -196,7 +196,7 @@ class TestScoreKrStocks:
     ) -> None:
         """KR_STOCK만 포함하고 total_score DESC, ticker ASC로 정렬."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            today=date(2026, 5, 18),
         )
 
         # 비-KR_STOCK 제외 (4개)
@@ -234,7 +234,7 @@ class TestScoreKrStocks:
             self, screening_setup: ScreeningService,
     ) -> None:
         """ROE는 KIS 공식 연간 ROE(financial_ratio repo)를 주입. row 없는 종목은 None."""
-        result = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        result = screening_setup.score_kr_stocks()
         a = next(r for r in result.rows if r.ticker == "A00001")
         assert a.roe == 17.07   # KIS 공식 ROE (EPS/BPS 근사 아님)
         b = next(r for r in result.rows if r.ticker == "B00002")
@@ -244,7 +244,7 @@ class TestScoreKrStocks:
             self, screening_setup: ScreeningService,
     ) -> None:
         """적자 종목(PER=None)은 PER 점수 0 + 결과에 포함."""
-        result = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        result = screening_setup.score_kr_stocks()
         c = next(r for r in result.rows if r.ticker == "C00003")
         assert c.per is None
         assert c.scores.per == 0
@@ -260,7 +260,7 @@ class TestScoreKrStocks:
             self, screening_setup: ScreeningService,
     ) -> None:
         """해당 일자에 펀더멘털이 없는 종목은 전 점수 0."""
-        result = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        result = screening_setup.score_kr_stocks()
         d = next(r for r in result.rows if r.ticker == "D00004")
         assert d.per is None and d.pbr is None and d.dividend_yield is None
         assert d.total_score == 0
@@ -272,7 +272,7 @@ class TestScoreKrStocks:
 
         ② 발행주식수 미상이므로 소각비율도 0점 + raw None.
         """
-        result = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        result = screening_setup.score_kr_stocks()
         # B00002·D00004 모두 treasury row 없음.
         for code in ("B00002", "D00004"):
             row = next(r for r in result.rows if r.ticker == code)
@@ -297,7 +297,7 @@ class TestScoreKrStocks:
         )])
 
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            today=date(2026, 5, 18),
         )
         row = next(r for r in result.rows if r.ticker == "E00005")
         assert row.regular_buyback is True
@@ -306,10 +306,10 @@ class TestScoreKrStocks:
     def test_pagination(self, screening_setup: ScreeningService) -> None:
         """limit/offset이 정렬된 전체 결과를 슬라이스."""
         first_page = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), limit=2, offset=0,
+            limit=2, offset=0,
         )
         second_page = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), limit=2, offset=2,
+            limit=2, offset=2,
         )
 
         assert first_page.total == 4
@@ -319,11 +319,11 @@ class TestScoreKrStocks:
         # 페이지 간 중복 없음
         assert {r.ticker for r in first_page.rows} & {r.ticker for r in second_page.rows} == set()
 
-    def test_target_date_defaults_to_latest_when_none(
+    def test_uses_latest_fundamental_date(
             self, screening_setup: ScreeningService,
     ) -> None:
-        """target_date=None 시 stock_fundamentals 최신 일자(=2026-05-15) 사용."""
-        result = screening_setup.score_kr_stocks(target_date=None)
+        """stock_fundamentals 최신 일자(=2026-05-15)를 기준일로 사용."""
+        result = screening_setup.score_kr_stocks()
         assert result.target_date == date(2026, 5, 15)
         assert result.total == 4
 
@@ -336,7 +336,7 @@ class TestScoreKrStocksSorting:
     ) -> None:
         """PER ASC: A(4.0)→B(12.0)→C(null)→D(null). null은 끝, 동률은 ticker ASC."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), sort_by="per", order="asc",
+            sort_by="per", order="asc",
         )
         assert [r.ticker for r in result.rows] == ["A00001", "B00002", "C00003", "D00004"]
 
@@ -345,7 +345,7 @@ class TestScoreKrStocksSorting:
     ) -> None:
         """PER DESC: B(12.0)→A(4.0)→C(null)→D(null). DESC에서도 null은 끝."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), sort_by="per", order="desc",
+            sort_by="per", order="desc",
         )
         assert [r.ticker for r in result.rows] == ["B00002", "A00001", "C00003", "D00004"]
 
@@ -354,7 +354,7 @@ class TestScoreKrStocksSorting:
     ) -> None:
         """ticker ASC: 종목코드 사전순 — 정렬 해제 상태의 정의."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), sort_by="ticker", order="asc",
+            sort_by="ticker", order="asc",
         )
         assert [r.ticker for r in result.rows] == ["A00001", "B00002", "C00003", "D00004"]
 
@@ -363,7 +363,7 @@ class TestScoreKrStocksSorting:
     ) -> None:
         """ticker DESC: 종목코드 역순."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), sort_by="ticker", order="desc",
+            sort_by="ticker", order="desc",
         )
         assert [r.ticker for r in result.rows] == ["D00004", "C00003", "B00002", "A00001"]
 
@@ -372,13 +372,121 @@ class TestScoreKrStocksSorting:
     ) -> None:
         """파라미터 미지정 시 기존 동작(total_score DESC, ticker ASC) 그대로."""
         default_result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            today=date(2026, 5, 18),
         )
         explicit_result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            today=date(2026, 5, 18),
             sort_by="total_score", order="desc",
         )
         assert [r.ticker for r in default_result.rows] == [r.ticker for r in explicit_result.rows]
+
+    # ------------------------------------------------------------------
+    # annual_cancel_ratio 정렬 회귀 테스트
+    # 픽스처 raw 값: A=3.0%, C=0.0%, B=None, D=None
+    # ------------------------------------------------------------------
+
+    def test_sort_by_annual_cancel_ratio_desc(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """annual_cancel_ratio DESC: A(3.0)→C(0.0)→B(None)→D(None).
+        NULL은 방향과 무관하게 맨 뒤, NULL 동률은 ticker ASC.
+        """
+        result = screening_setup.score_kr_stocks(
+            sort_by="annual_cancel_ratio", order="desc",
+        )
+        assert [r.ticker for r in result.rows] == ["A00001", "C00003", "B00002", "D00004"]
+
+    def test_sort_by_annual_cancel_ratio_asc(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """annual_cancel_ratio ASC: C(0.0)→A(3.0)→B(None)→D(None).
+        NULL은 방향과 무관하게 맨 뒤, NULL 동률은 ticker ASC.
+        """
+        result = screening_setup.score_kr_stocks(
+            sort_by="annual_cancel_ratio", order="asc",
+        )
+        assert [r.ticker for r in result.rows] == ["C00003", "A00001", "B00002", "D00004"]
+
+    def test_sort_by_annual_cancel_ratio_raw_not_score_regression(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """회귀 가드: annual_cancel_ratio 정렬은 raw 비율 기준이어야 한다.
+        C(raw=0.0, score=0) 와 B(raw=None, score=0) 는 이산 점수가 동일(0점)이지만
+        raw 값이 있는 C가 None인 B보다 앞에 와야 한다.
+        이산 점수(_SORT_ATTR_MAP이 scores.annual_cancel_ratio를 가리키도록 회귀하면)
+        로 정렬할 경우 C·B 순서는 보조키(ticker ASC)에만 의존하므로 이 단언은 통과해도
+        B·C 사이 의미 있는 구분이 없어진다 — raw 기준임을 명시적으로 검증한다.
+        """
+        result = screening_setup.score_kr_stocks(
+            sort_by="annual_cancel_ratio", order="desc",
+        )
+        tickers = [r.ticker for r in result.rows]
+        c_idx = tickers.index("C00003")
+        b_idx = tickers.index("B00002")
+        # raw=0.0인 C가 raw=None인 B보다 앞(index 작음)
+        assert c_idx < b_idx
+
+        # raw 값 자체도 검증
+        rows_by_ticker = {r.ticker: r for r in result.rows}
+        assert rows_by_ticker["A00001"].annual_cancel_ratio == 3.0
+        assert rows_by_ticker["C00003"].annual_cancel_ratio == 0.0
+        assert rows_by_ticker["B00002"].annual_cancel_ratio is None
+        assert rows_by_ticker["D00004"].annual_cancel_ratio is None
+
+    # ------------------------------------------------------------------
+    # treasury_holding 정렬 회귀 테스트
+    # 픽스처 raw 값: A=1.0%, C=0.0%, B=None, D=None
+    # ------------------------------------------------------------------
+
+    def test_sort_by_treasury_holding_desc(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """treasury_holding DESC: A(1.0)→C(0.0)→B(None)→D(None).
+        NULL은 방향과 무관하게 맨 뒤, NULL 동률은 ticker ASC.
+        """
+        result = screening_setup.score_kr_stocks(
+            sort_by="treasury_holding", order="desc",
+        )
+        assert [r.ticker for r in result.rows] == ["A00001", "C00003", "B00002", "D00004"]
+
+    def test_sort_by_treasury_holding_asc(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """treasury_holding ASC: C(0.0)→A(1.0)→B(None)→D(None).
+        NULL은 방향과 무관하게 맨 뒤, NULL 동률은 ticker ASC.
+        """
+        result = screening_setup.score_kr_stocks(
+            sort_by="treasury_holding", order="asc",
+        )
+        assert [r.ticker for r in result.rows] == ["C00003", "A00001", "B00002", "D00004"]
+
+    def test_sort_by_treasury_holding_raw_not_score_regression(
+            self, screening_setup: ScreeningService,
+    ) -> None:
+        """회귀 가드: treasury_holding 정렬은 raw treasury_ratio 기준이어야 한다.
+        A(raw=1.0, score=4) 와 C(raw=0.0, score=5) 는 이산 점수 순서(C>A)와
+        raw 순서(A>C, DESC 기준)가 반대다.
+        DESC 정렬 시 A가 C보다 앞에 오면 raw 기준 정렬임을 확인.
+        이산 점수(scores.treasury_holding)로 회귀하면 C(5점)가 A(4점)보다 앞에 와서
+        이 단언이 실패한다.
+        """
+        result = screening_setup.score_kr_stocks(
+            sort_by="treasury_holding", order="desc",
+        )
+        tickers = [r.ticker for r in result.rows]
+        a_idx = tickers.index("A00001")
+        c_idx = tickers.index("C00003")
+        # raw=1.0인 A가 raw=0.0인 C보다 앞(DESC이므로 index 작음)
+        assert a_idx < c_idx
+
+        # raw 값 및 점수도 검증 — 점수와 raw 순서가 반대임을 명시
+        rows_by_ticker = {r.ticker: r for r in result.rows}
+        assert rows_by_ticker["A00001"].treasury_ratio == 1.0
+        assert rows_by_ticker["A00001"].scores.treasury_holding == 4   # raw=1.0 → 점수 4
+        assert rows_by_ticker["C00003"].treasury_ratio == 0.0
+        assert rows_by_ticker["C00003"].scores.treasury_holding == 5   # raw=0.0 → 점수 5
+        # 점수만 보면 C>A이지만, raw DESC 정렬에서 A가 앞 → raw 기준 정렬 확인
+        assert rows_by_ticker["A00001"].scores.treasury_holding < rows_by_ticker["C00003"].scores.treasury_holding
 
 
 class TestScoreKrStocksFiltering:
@@ -389,7 +497,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """per_max=5 → A(4.0)만 통과. B(12.0)·C(null)·D(null) 모두 제외."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(per_max=5.0),
         )
         assert result.total == 1
@@ -400,7 +507,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """per_min=10 → B(12.0)만 통과. A(4.0)·C(null)·D(null) 제외."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(per_min=10.0),
         )
         assert [r.ticker for r in result.rows] == ["B00002"]
@@ -410,7 +516,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """pbr 0.4~0.6 → C(0.5)만. A(0.25)·B(1.5)·D(null) 제외."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(pbr_min=0.4, pbr_max=0.6),
         )
         assert [r.ticker for r in result.rows] == ["C00003"]
@@ -420,7 +525,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """dividend_yield_min=3.0 → A(8.0)만. B(2.0)·C(null)·D(null) 제외."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(dividend_yield_min=3.0),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -430,7 +534,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """여러 필터는 AND. per_max=10 + pbr_max=0.3 → A만."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(per_max=10.0, pbr_max=0.3),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -440,7 +543,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """모든 종목이 컷되면 total=0, rows=[]."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(per_max=0.5),
         )
         assert result.total == 0
@@ -450,9 +552,9 @@ class TestScoreKrStocksFiltering:
             self, screening_setup: ScreeningService,
     ) -> None:
         """filters=None 시 기본 동작과 동일 (4개 전체)."""
-        no_filter = screening_setup.score_kr_stocks(target_date=date(2026, 5, 15))
+        no_filter = screening_setup.score_kr_stocks()
         empty_filter = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), filters=ScreeningFilters(),
+            filters=ScreeningFilters(),
         )
         assert no_filter.total == empty_filter.total == 4
 
@@ -461,7 +563,6 @@ class TestScoreKrStocksFiltering:
     ) -> None:
         """페이지네이션 total은 필터 후 결과 길이를 반영."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(per_max=10.0),
             limit=10, offset=0,
         )
@@ -477,7 +578,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """ticker 부분일치: 'A00001' → A 한 종목."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(q="A00001"),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -487,7 +587,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """name 부분일치: '기업' → C00003(적자기업) 한 종목."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(q="기업"),
         )
         assert [r.ticker for r in result.rows] == ["C00003"]
@@ -497,7 +596,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """소문자 입력도 대문자 ticker 매칭."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(q="a00001"),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -507,7 +605,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """매칭 없으면 total=0."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(q="존재하지않음"),
         )
         assert result.total == 0
@@ -518,7 +615,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """공백만 입력은 noop (전체 4개)."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(q="   "),
         )
         assert result.total == 4
@@ -528,7 +624,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """빈 문자열도 noop."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(q=""),
         )
         assert result.total == 4
@@ -538,7 +633,6 @@ class TestScoreKrStocksSearch:
     ) -> None:
         """다른 필터와 AND. per_max=10 + q='A' → A만(B는 per=12 컷)."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(per_max=10.0, q="A"),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -552,7 +646,7 @@ class TestScoreKrStocksQuarterlyAndStreak:
     ) -> None:
         """quarterly_only=True → A만 통과(나머지는 분기배당 아님)."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            today=date(2026, 5, 18),
             filters=ScreeningFilters(quarterly_only=True),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -562,7 +656,6 @@ class TestScoreKrStocksQuarterlyAndStreak:
     ) -> None:
         """quarterly_only=False(기본) → 전체 4개 그대로."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(quarterly_only=False),
         )
         assert result.total == 4
@@ -572,7 +665,6 @@ class TestScoreKrStocksQuarterlyAndStreak:
     ) -> None:
         """consecutive_years_min=5 → A만(B/C/D는 streak=0)."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(consecutive_years_min=5),
         )
         assert [r.ticker for r in result.rows] == ["A00001"]
@@ -582,7 +674,6 @@ class TestScoreKrStocksQuarterlyAndStreak:
     ) -> None:
         """consecutive_years_min=0 → 모두 0 이상이라 전체 4개."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15),
             filters=ScreeningFilters(consecutive_years_min=0),
         )
         assert result.total == 4
@@ -592,7 +683,7 @@ class TestScoreKrStocksQuarterlyAndStreak:
     ) -> None:
         """quarterly_only + consecutive_years_min=3 + per_max=10 → A만."""
         result = screening_setup.score_kr_stocks(
-            target_date=date(2026, 5, 15), today=date(2026, 5, 18),
+            today=date(2026, 5, 18),
             filters=ScreeningFilters(
                 quarterly_only=True, consecutive_years_min=3, per_max=10.0,
             ),
