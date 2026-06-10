@@ -2,6 +2,12 @@
 
 최신순 상단. 원인·해결·주의사항 3줄 요약.
 
+## 2026-06-11: 자회사 주식소각결정 공시가 모회사로 오귀속 (스크리너 소각비율 부풀림) — codex·OMC 교차검증
+
+- **원인**: `DartCompanyClient.fetch_cancellation_events`의 자회사 배제 필터(`row_stock_code != stock_code`)가 무력. DART `list.json`은 `corp_code`로 서버 필터되어 모든 row의 stock_code가 조회 대상(=공시 제출자) 코드 → 비교가 절대 성립 안 함. 모회사가 자회사(주로 비상장) 소각을 대신 공시한 "주식소각결정(자회사의 주요경영사항)"은 제출자=모회사라 stock_code도 모회사 → 키워드·stock_code 필터 둘 다 통과해 자회사 소각이 모회사 `annual_cancel_ratio`(8점)·`regular_buyback`(7점)을 부풀림. prod 실측 892건 중 **36건(21종목)** 오귀속, 35건은 소각수량까지 보유.
+- **해결**: 무력한 stock_code 비교를 제거하고 `report_nm`에 `_SUBSIDIARY_DISCLOSURE_MARKER="자회사의 주요경영사항"`(괄호 없는 부분문자열) 포함 시 배제로 교체. document() 원문 fetch 전에 배제. 회귀 테스트 추가(stock_code 동일한 자회사 row 배제 + document 미호출 검증, `__new__`로 OpenDartReader 생성자 우회).
+- **주의**: ① 이 수정은 **미래 적재만 차단** — 기존 prod 36건은 안 지워짐. 일회성 `DELETE … WHERE report_nm LIKE '%(자회사의 주요경영사항)%'`(prod+dev) 정리는 **호스트 확인 후 사용자 승인** 받아 별도 실행 필요. ② 배제 패턴은 정상 자기 공시("주식소각결정"/"[기재정정]주식소각결정")엔 없는 "주요경영사항" 공시 계열 전용이라 false-positive 없음. ③ 다른 자회사 공시명 변형이 생기면 마커 누락 가능 — prod `report_nm` 분포 재확인으로 가드.
+
 ## 2026-06-10: 배당절차 개선으로 fiscal_year +1 오귀속 → 연속인상 streak=0 (KG케미칼) — codex 2R 교차검증
 
 - **원인**: 배당절차 개선(2023~)으로 12월 결산 종목이 배당기준일을 결산일(12/31)→익년 봄(3~4월)으로 이전. KIS `ksdinfo_dividend`는 봄 실배당 record + `(N-1)-12-31 dps=0 결산` 폐지 placeholder를 함께 내려주는데, ① placeholder는 `dps<=0`이라 적재 제외되어 fiscal 2025 공백, ② 봄 record는 `fiscal_year=record_date.year`(=2026)로 오적재 → `_calc_streak` recency 앵커(`years_desc[0]!=cutoff_year`) 실패로 streak=0. KG케미칼 FY2023 120→FY2024 130→FY2025 150(record 20260415) 연속인상인데 0. prod 동일 패턴(fys⊇{2024,2026}∧2025∉) **117종목**(상승69/동결35/하락12).

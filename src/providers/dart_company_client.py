@@ -77,8 +77,16 @@ _BUYBACK_KEYWORD_MAP: tuple[tuple[str, str], ...] = (
     ("자기주식처분", "DISPOSAL"),
 )
 
-# 주식소각결정 공시명 판별 키워드 ("[기재정정] 주식소각결정", "(자회사의 주요경영사항) 주식소각결정" 변형 포함).
+# 주식소각결정 공시명 판별 키워드 ("[기재정정]주식소각결정" 등 변형 포함).
 _CANCELLATION_REPORT_KEYWORD = "주식소각결정"
+
+# 자회사 공시 배제 마커: 모회사가 (주로 비상장) 자회사의 소각을 대신 공시하면 report_nm에
+# 이 문구가 붙는다(실측: "주식소각결정(자회사의 주요경영사항)" 등). 제출자가 모회사라 list()의
+# stock_code도 모회사 코드 → stock_code 비교로는 못 거른다. 모회사 소각량 오귀속
+# (annual_cancel_ratio/regular_buyback 부풀림) 방지를 위해 배제.
+# 매칭은 괄호 없는 부분문자열(표기 변형·뒤 (증권사명) 흡수). 상수에 괄호를 다시 넣지 말 것.
+# 한계: 이 배제는 미래 적재만 차단 — 기존 적재분(prod 오귀속) 정리는 별도 작업(logs.md 2026-06-11).
+_SUBSIDIARY_DISCLOSURE_MARKER = "자회사의 주요경영사항"
 
 
 class DartCompanyClient:
@@ -261,9 +269,9 @@ class DartCompanyClient:
             if _CANCELLATION_REPORT_KEYWORD not in report_nm:
                 continue
 
-            # 자회사 공시 배제: list() 결과의 stock_code가 대상과 다르면 제외.
-            row_stock_code = str(row.get("stock_code") or "").strip()
-            if row_stock_code and row_stock_code != stock_code:
+            # 자회사 공시 배제: 모회사가 자회사 소각을 대신 공시한 건은 report_nm에
+            # "(자회사의 주요경영사항)"이 붙는다(제출자=모회사라 stock_code 비교로는 안 걸림).
+            if _SUBSIDIARY_DISCLOSURE_MARKER in report_nm:
                 continue
 
             rcept_no = str(row.get("rcept_no") or "").strip()

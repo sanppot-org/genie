@@ -1,8 +1,11 @@
 """DART 주식소각결정 공시 원문 파싱(_parse_cancellation_document) 테스트."""
 
 from datetime import date
+from unittest.mock import MagicMock
 
-from src.providers.dart_company_client import _parse_cancellation_document
+import pandas as pd
+
+from src.providers.dart_company_client import DartCompanyClient, _parse_cancellation_document
 
 # 삼성전자 rcept_no=20250218800029 주식소각결정 소각표 구간 실측 raw HTML.
 _SAMSUNG_DOC = (
@@ -70,3 +73,31 @@ def test_parse_returns_none_when_resolution_date_missing() -> None:
         '<td><span>4. 소각예정금액(원)</span></td> <td><span class="xforms_input">1,000,000</span></td>'
     )
     assert _parse_cancellation_document(doc) is None
+
+
+def _client_with_reader(reader: MagicMock) -> DartCompanyClient:
+    """OpenDartReader(네트워크/corpCode.xml 다운로드)를 우회하고 _reader만 주입한 클라이언트."""
+    client = DartCompanyClient.__new__(DartCompanyClient)
+    client._reader = reader  # type: ignore[attr-defined]
+    return client
+
+
+def test_fetch_cancellation_excludes_subsidiary_disclosure() -> None:
+    """'(자회사의 주요경영사항)' 공시는 모회사 소각으로 오귀속되지 않게 배제.
+
+    회귀 가드: 자회사 row의 stock_code도 모회사 코드(008560)와 동일하므로 옛 stock_code
+    비교(`row_stock_code != stock_code`)로는 걸러지지 않았다 → report_nm 패턴 배제가 핵심.
+    배제는 비싼 document() 호출 전에 이뤄져야 한다.
+    """
+    reader = MagicMock()
+    reader.list.return_value = pd.DataFrame([
+        {"report_nm": "주식소각결정(자회사의 주요경영사항)", "stock_code": "008560", "rcept_no": "1001"},
+        {"report_nm": "주식소각결정", "stock_code": "008560", "rcept_no": "1002"},
+    ])
+    reader.document.return_value = _SAMSUNG_DOC  # 결의일 등 파싱 가능한 실측 doc
+    client = _client_with_reader(reader)
+
+    events = client.fetch_cancellation_events("008560", date(2025, 1, 1), date(2025, 12, 31))
+
+    assert [e.rcept_no for e in events] == ["1002"]
+    reader.document.assert_called_once_with("1002")
