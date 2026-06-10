@@ -2,6 +2,12 @@
 
 최신순 상단. 원인·해결·주의사항 3줄 요약.
 
+## 2026-06-10: 배당절차 개선으로 fiscal_year +1 오귀속 → 연속인상 streak=0 (KG케미칼) — codex 2R 교차검증
+
+- **원인**: 배당절차 개선(2023~)으로 12월 결산 종목이 배당기준일을 결산일(12/31)→익년 봄(3~4월)으로 이전. KIS `ksdinfo_dividend`는 봄 실배당 record + `(N-1)-12-31 dps=0 결산` 폐지 placeholder를 함께 내려주는데, ① placeholder는 `dps<=0`이라 적재 제외되어 fiscal 2025 공백, ② 봄 record는 `fiscal_year=record_date.year`(=2026)로 오적재 → `_calc_streak` recency 앵커(`years_desc[0]!=cutoff_year`) 실패로 streak=0. KG케미칼 FY2023 120→FY2024 130→FY2025 150(record 20260415) 연속인상인데 0. prod 동일 패턴(fys⊇{2024,2026}∧2025∉) **117종목**(상승69/동결35/하락12).
+- **해결**: sync에서 ticker별 `(N-1)-12-31 dps=0 결산` placeholder 연도를 앵커로 수집 → 봄(1~6월) 결산배당이고 짝 placeholder가 있으면 `fiscal_year=record_year-1` 보정(없으면 미보정 → 상시 봄결산형 오탐 차단). placeholder는 여전히 미적재(앵커 전용). 일일 sync 윈도우 `from_date=min(today-30d,(today.year-1)-12-01)`로 확장해 봄 record와 placeholder 동시 수집. UPSERT 키 `(ticker_id,record_date,kind)`·`set_`에 fiscal_year 포함 → 광역 재동기화로 in-place 보정. 죽은 `divi_aplc_yymm`/`_parse_fiscal_year`·모델 필드 제거(KIS live 미제공 확정: 25,791건 전부 fiscal_year==record_date.year).
+- **주의**: ① KIS·DART 모두 특별배당 구분 필드 없음(특별배당은 결산 현금배당에 흡수). ② placeholder만 있고 봄 실배당 없으면 그 해 **무배당**(포스코퓨처엠 FY2024) — (A)는 봄 dps>0일 때만 보정해 무관. ③ **prod 광역 재동기화는 사용자 직접**(로컬 prod 백필 금지), older 봄 record까지 보정하려면 `from`을 2023-12 이상으로. ④ 교차검증은 read-only `codex exec`(또는 `/codex:review`)로, codex-rescue write 경로 금지.
+
 ## 2026-05-30: 스크리너 배당연속증가(`_calc_streak`) 정확성 결함 — codex·OMC critic 교차검증
 
 - **누락 연도(gap)가 연속을 끊지 않음(HIGH)**: `dividend_service._calc_streak`이 정렬된 연도 **배열 인덱스**를 인접 비교해, 배당 중단 연도(dps<=0은 sync 미적재 → row 결측)가 있어도 그 양옆 연도를 "연속"으로 잘못 인정. 예: 2020·2021·2023만 있고 2022 중단 → streak=2(정답 0). → 비교 전 `years_desc[i] - years_desc[i+1] != 1`이면 break.

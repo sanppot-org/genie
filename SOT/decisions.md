@@ -1,5 +1,26 @@
 의사결정 기록
 
+## 2026-06-10: 배당절차 개선 fiscal_year 보정 (placeholder 앵커)
+
+### 배경
+스크리닝 연속배당인상 streak이 KG케미칼(001390)에서 0 — 실제 FY2023 120→FY2024 130→FY2025 150 연속인상. 배당절차 개선(2023~)으로 12월 결산 종목이 배당기준일을 결산일(12/31)→익년 봄으로 이전하면서, 봄 실배당이 `fiscal_year=record_date.year`로 +1 오귀속(2025→2026)되어 cutoff_year 공백 → `_calc_streak` recency 앵커 실패. prod 동일 패턴 117종목.
+
+### 검증 (KIS live 응답 + prod 감사)
+- KIS `ksdinfo_dividend` 응답에 회계연도/배당귀속연월 필드 **부재** 확인(필드 12개 전수). 모델의 `divi_aplc_yymm`은 유령(25,791건 전부 fiscal_year==record_date.year, 예외 0). DART `alotMatter`도 특별배당·회계연도 구조화 필드 없음.
+- KIS는 배당절차 개선 종목에 `(N-1)-12-31 dps=0 결산` 폐지 placeholder + 봄 실배당 record를 함께 응답. placeholder 유무로 제도변경형 vs 상시봄형 변별됨(라이브 실증: 003670/417200/264660 placeholder有, 289080 SV인베스트먼트 placeholder無→미보정).
+
+### 핵심 결정
+- **fiscal_year 보정(sync 단계)**: 봄(1~6월) 결산배당이고 같은 배치에 `(record_year-1)-12-31 dps=0 결산` placeholder가 있으면 `fiscal_year=record_year-1`. placeholder 없으면 미보정(상시봄형·신규상장 오탐 차단). placeholder는 적재 제외 유지(앵커 전용 — `_calc_streak` 집계 오염 방지). 단순 -1 휴리스틱(가드 없음)은 기각.
+- **sync 윈도우 확장**: 일일 job `from_date=min(today-30d,(today.year-1)-12-01)` — 봄 record와 짝 placeholder 동시 수집 보장. 배당 저빈도·멱등 UPSERT라 비용 무시.
+- **죽은 코드 제거**: `divi_aplc_yymm`(모델 필드+resolution 우선순위)·`_parse_fiscal_year`. KIS 미제공 확정이고, 향후 봄 기준연월(202604)이 채워지면 보정 무력화하는 재발 지뢰라 제거(codex 지적).
+- **`_calc_streak`·`is_quarterly`·`_dedup_by_event` 무변경**: fiscal_year만 바뀌고, 후자는 record_date/kind 기반이라 무영향(확인 완료).
+
+### 교차검증
+codex(gpt-5.3) 2라운드: 1R 4건 지적(기존 row 미복구·placeholder 광범·divi_aplc_yymm 지뢰·백필 테스트 부재) → 전부 반영, 2R에서 잔여 `dps<=0`→`dps!=0` 1건 정정. OMC architect/code-reviewer 코드 검증(harness 출력 미반환, 정합성은 직접 확인). ruff·mypy 클린, pytest 932 통과(신규 6: 제도변경/상시봄/혼합/분기/Dec30/재동기화).
+
+### 후속 (사용자 수행)
+prod 광역 재동기화(`from` 2023-12 이상)로 117종목 fiscal_year in-place 보정 후 KG케미칼 streak>0 재확인. **로컬 prod 백필 금지 규칙** 준수.
+
 ## 2026-06-04: 배당이력·BPS 액면분할 보정 (2e 후속)
 
 ### 배경

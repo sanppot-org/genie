@@ -3,7 +3,7 @@
 스케줄러에서 실행되는 모든 작업 함수들을 관리합니다.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import logging
 from time import sleep
 
@@ -201,9 +201,13 @@ def sync_kr_stock_dividends(
 
     최근 30일 ~ 향후 60일 범위로 호출 → 배당락일이 사전 공지된 분도 미리 수집.
     매일 멱등 UPSERT라 중복 호출에도 데이터 무결성 유지.
+
+    단, from_date는 직전 12월까지 확장한다: 배당절차 개선 종목의 봄(1~6월) 결산배당을
+    직전 회계연도로 귀속하려면 `(N-1)-12-31` 폐지 placeholder가 같은 응답 배치에 있어야 한다.
+    배당은 저빈도·멱등 UPSERT라 광역 재조회 비용은 무시 가능.
     """
     today = datetime.now(KST).date()
-    from_date = today - timedelta(days=30)
+    from_date = min(today - timedelta(days=30), date(today.year - 1, 12, 1))
     to_date = today + timedelta(days=60)
     try:
         result = service.sync(from_date, to_date)

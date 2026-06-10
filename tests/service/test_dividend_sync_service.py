@@ -239,3 +239,119 @@ class TestDividendSyncService:
         rows: list[StockDividend] = StockDividendRepository(session).find_by_ticker(kr_stock_ticker.id)
         assert len(rows) == 1
         assert rows[0].dps == 400.0
+
+
+class TestFiscalYearReformCorrection:
+    """배당절차 개선: 봄 결산배당의 fiscal_year를 placeholder 앵커로 직전 회계연도에 귀속."""
+
+    def _fy_by_date(self, session: Session, ticker_id: int) -> dict[date, int]:
+        rows = StockDividendRepository(session).find_by_ticker(ticker_id)
+        return {r.record_date: r.fiscal_year for r in rows}
+
+    def test_reform_spring_settle_anchored_to_prev_year(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """`(N-1)-12-31 dps=0` placeholder가 있으면 봄(1~6월) 결산배당은 fiscal_year=N-1.
+
+        placeholder 자체는 적재되지 않는다(앵커 전용).
+        """
+        rows = [
+            DividendOutput(sht_cd="005930", record_date="20241231", per_sto_divi_amt="130", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20251231", per_sto_divi_amt="0", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20260415", per_sto_divi_amt="150", divi_kind="결산"),
+        ]
+        service, _ = _make_service(session, rows)
+
+        result = service.sync(date(2024, 12, 1), date(2026, 6, 30))
+
+        assert result.upserted == 2  # placeholder(dps=0) 제외
+        fy = self._fy_by_date(session, kr_stock_ticker.id)
+        assert fy == {date(2024, 12, 31): 2024, date(2026, 4, 15): 2025}
+
+    def test_always_spring_without_placeholder_not_adjusted(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """폐지 placeholder가 없는 상시 봄 결산형은 보정하지 않는다(record_date.year 유지)."""
+        rows = [
+            DividendOutput(sht_cd="005930", record_date="20240331", per_sto_divi_amt="20", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20260331", per_sto_divi_amt="20", divi_kind="결산"),
+        ]
+        service, _ = _make_service(session, rows)
+
+        service.sync(date(2024, 1, 1), date(2026, 6, 30))
+
+        fy = self._fy_by_date(session, kr_stock_ticker.id)
+        assert fy == {date(2024, 3, 31): 2024, date(2026, 3, 31): 2026}
+
+    def test_mixed_old_dec_and_reform_spring(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """봄 배당만 보정하고 같은 해 12월 실배당은 record_date.year 유지 → 연속 회계연도."""
+        rows = [
+            DividendOutput(sht_cd="005930", record_date="20231231", per_sto_divi_amt="0", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20240331", per_sto_divi_amt="400", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20241231", per_sto_divi_amt="100", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20251231", per_sto_divi_amt="0", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20260303", per_sto_divi_amt="550", divi_kind="결산"),
+        ]
+        service, _ = _make_service(session, rows)
+
+        service.sync(date(2023, 12, 1), date(2026, 6, 30))
+
+        fy = self._fy_by_date(session, kr_stock_ticker.id)
+        assert fy == {
+            date(2024, 3, 31): 2023,   # placeholder 2023 → 직전 귀속
+            date(2024, 12, 31): 2024,  # 12월 실배당, 미보정
+            date(2026, 3, 3): 2025,    # placeholder 2025 → 직전 귀속
+        }
+
+    def test_interim_spring_not_adjusted(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """중간/분기 배당은 placeholder가 있어도 보정 대상이 아니다(결산만 보정)."""
+        rows = [
+            DividendOutput(sht_cd="005930", record_date="20251231", per_sto_divi_amt="0", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20260331", per_sto_divi_amt="50", divi_kind="분기"),
+        ]
+        service, _ = _make_service(session, rows)
+
+        service.sync(date(2025, 12, 1), date(2026, 6, 30))
+
+        fy = self._fy_by_date(session, kr_stock_ticker.id)
+        assert fy == {date(2026, 3, 31): 2026}
+
+    def test_dec31_only_placeholder_anchors(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """12월이라도 31일이 아닌 dps=0 결산은 폐지 placeholder가 아니다(앵커 미작동)."""
+        rows = [
+            DividendOutput(sht_cd="005930", record_date="20251220", per_sto_divi_amt="0", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20260415", per_sto_divi_amt="150", divi_kind="결산"),
+        ]
+        service, _ = _make_service(session, rows)
+
+        service.sync(date(2025, 12, 1), date(2026, 6, 30))
+
+        fy = self._fy_by_date(session, kr_stock_ticker.id)
+        assert fy == {date(2026, 4, 15): 2026}  # placeholder 아님 → 미보정
+
+    def test_resync_corrects_previously_mislabeled_row_in_place(
+            self, session: Session, kr_stock_ticker: Ticker,
+    ) -> None:
+        """placeholder 누락 배치로 fiscal_year=2026 오적재된 봄 배당이, placeholder 포함 광역
+        재동기화 시 UPSERT로 fiscal_year=2025로 in-place 보정된다(백필 경로 검증)."""
+        narrow = [
+            DividendOutput(sht_cd="005930", record_date="20260415", per_sto_divi_amt="150", divi_kind="결산"),
+        ]
+        _make_service(session, narrow)[0].sync(date(2026, 3, 1), date(2026, 6, 30))
+        assert self._fy_by_date(session, kr_stock_ticker.id) == {date(2026, 4, 15): 2026}
+
+        wide = [
+            DividendOutput(sht_cd="005930", record_date="20251231", per_sto_divi_amt="0", divi_kind="결산"),
+            DividendOutput(sht_cd="005930", record_date="20260415", per_sto_divi_amt="150", divi_kind="결산"),
+        ]
+        _make_service(session, wide)[0].sync(date(2025, 12, 1), date(2026, 6, 30))
+
+        stored = StockDividendRepository(session).find_by_ticker(kr_stock_ticker.id)
+        assert len(stored) == 1  # 중복 생성 없이 갱신
+        assert self._fy_by_date(session, kr_stock_ticker.id) == {date(2026, 4, 15): 2025}

@@ -1,5 +1,6 @@
 """배당 이력 동기화 서비스 — KIS `ksdinfo_dividend` → `stock_dividends`."""
 
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime
 import logging
@@ -72,6 +73,18 @@ class DividendSyncService:
             t.ticker: t.id for t in tickers if t.asset_type == AssetType.KR_STOCK
         }
 
+        # 배당절차 개선(2023~): 12월 결산 종목이 배당기준일을 결산일(12/31)에서 익년 봄으로
+        # 이전. KIS는 구 기준일 폐지를 `(N)-12-31 dps=0 결산` placeholder로 표시하고, 실배당은
+        # 익년 봄(1~6월) record로 내려준다. placeholder 연도를 회계연도 앵커로 모아 두면, 봄
+        # record를 직전 회계연도(record_year-1)로 귀속시켜 fiscal_year +1 밀림을 바로잡는다.
+        placeholder_years: dict[int, set[int]] = defaultdict(set)
+        for row in rows:
+            ticker_id = code_to_id.get(row.sht_cd)
+            if ticker_id is None:
+                continue
+            if _is_dec_settle_placeholder(row):
+                placeholder_years[ticker_id].add(_parse_kis_date(row.record_date).year)  # type: ignore[union-attr]
+
         entities: list[StockDividend] = []
         skipped_unmapped = 0
         skipped_invalid = 0
@@ -80,7 +93,7 @@ class DividendSyncService:
             if ticker_id is None:
                 skipped_unmapped += 1
                 continue
-            entity = _build_entity(row, ticker_id)
+            entity = _build_entity(row, ticker_id, placeholder_years[ticker_id])
             if entity is None:
                 skipped_invalid += 1
                 continue
@@ -118,10 +131,13 @@ def _dedup_by_event(entities: list[StockDividend]) -> tuple[list[StockDividend],
     return list(best.values()), len(entities) - len(best)
 
 
-def _build_entity(row: DividendOutput, ticker_id: int) -> StockDividend | None:
+def _build_entity(
+        row: DividendOutput, ticker_id: int, placeholder_years: set[int],
+) -> StockDividend | None:
     record_date = _parse_kis_date(row.record_date)
     dps = _parse_float(row.per_sto_divi_amt)
-    # dps=0은 "무배당 결의" 이력 — 현금배당 이벤트가 아니므로 적재하지 않는다.
+    # dps=0은 "무배당 결의"(또는 구 기준일 폐지 placeholder) — 현금배당 이벤트가 아니므로
+    # 적재하지 않는다. placeholder는 위 sync 단계에서 회계연도 앵커로만 활용된다.
     if record_date is None or dps is None or dps <= 0:
         return None
     label = _HANGUL_KIND_TO_LABEL.get((row.divi_kind or "").strip())
@@ -133,8 +149,35 @@ def _build_entity(row: DividendOutput, ticker_id: int) -> StockDividend | None:
         pay_date=_parse_kis_date(row.divi_pay_dt),
         dps=dps,
         kind=label,
-        fiscal_year=_parse_fiscal_year(row.divi_aplc_yymm) or record_date.year,
+        fiscal_year=_resolve_fiscal_year(record_date, label, placeholder_years),
     )
+
+
+def _is_dec_settle_placeholder(row: DividendOutput) -> bool:
+    """구 기준일 폐지 placeholder 판정 — 결산 ∧ dps=0 ∧ 기준일이 12/31(결산일).
+
+    배당절차 개선 종목에서 KIS가 회계연도별로 내려주는 표식. 그 해 봄 실배당의 회계연도
+    앵커로 쓴다(상시 봄 결산형은 이 표식이 없어 자연히 보정 대상에서 제외된다).
+    """
+    if _HANGUL_KIND_TO_LABEL.get((row.divi_kind or "").strip()) != "SETTLE":
+        return False
+    dps = _parse_float(row.per_sto_divi_amt)
+    if dps is None or dps != 0:
+        return False
+    record_date = _parse_kis_date(row.record_date)
+    return record_date is not None and record_date.month == 12 and record_date.day == 31
+
+
+def _resolve_fiscal_year(record_date: date, label: str, placeholder_years: set[int]) -> int:
+    """배당의 귀속 회계연도 산출.
+
+    KIS 응답엔 회계연도/배당귀속연월 필드가 없어 record_date 기반으로 산출한다. 단, 봄
+    (1~6월) 결산배당이면서 `(record_year-1)-12-31` 폐지 placeholder가 같은 배치에 있으면
+    배당절차 개선 케이스로 보고 직전 회계연도로 귀속(짝 placeholder 없으면 미적용).
+    """
+    if label == "SETTLE" and 1 <= record_date.month <= 6 and (record_date.year - 1) in placeholder_years:
+        return record_date.year - 1
+    return record_date.year
 
 
 _KIS_DATE_FORMATS = ("%Y%m%d", "%Y/%m/%d", "%Y-%m-%d")
@@ -164,14 +207,5 @@ def _parse_float(value: str | None) -> float | None:
         return None
     try:
         return float(text)
-    except ValueError:
-        return None
-
-
-def _parse_fiscal_year(value: str | None) -> int | None:
-    if not value or len(value.strip()) < 4:
-        return None
-    try:
-        return int(value.strip()[:4])
     except ValueError:
         return None

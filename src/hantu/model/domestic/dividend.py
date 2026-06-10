@@ -49,7 +49,6 @@ class DividendOutput(BaseModel):
     divi_rate: str | None = Field(default=None, description="시가배당률(%)")
     stk_divi_rate: str | None = Field(default=None, description="주식배당률")
     divi_kind: str | None = Field(default=None, description="배당 종류")
-    divi_aplc_yymm: str | None = Field(default=None, description="배당기준연월 YYYYMM")
 
 
 class ResponseBody(BaseModel):
