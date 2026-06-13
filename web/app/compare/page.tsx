@@ -8,6 +8,7 @@ import { colorFor } from "@/lib/compare-colors";
 import { Input } from "@/components/ui/input";
 import { apiGet } from "@/lib/api";
 import type { CandleSeries, GenieResponse, Ticker } from "@/lib/types";
+import { useRecentTickers } from "@/lib/use-recent-tickers";
 
 const CompareChart = dynamic(
   () => import("@/components/compare-chart").then((m) => m.CompareChart),
@@ -20,31 +21,12 @@ const CompareChart = dynamic(
 // 비교 가능한 최대 종목 수(색 팔레트·가독성 한도).
 const MAX_COMPARE = 8;
 
-// 조회 구간 lookback(년). ALL은 from/to 생략 → 백엔드 전체.
-const RANGES = [
-  { label: "1Y", years: 1 },
-  { label: "3Y", years: 3 },
-  { label: "5Y", years: 5 },
-  { label: "10Y", years: 10 },
-  { label: "ALL", years: null },
-] as const;
-
-function rangeFor(years: number | null): { from?: string; to?: string } {
-  if (years === null) return {};
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-  const to = new Date();
-  const from = new Date();
-  from.setFullYear(from.getFullYear() - years);
-  return { from: fmt(from), to: fmt(to) };
-}
-
 export default function ComparePage() {
   const [q, setQ] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const deferredQ = useDeferredValue(q);
   const [selected, setSelected] = useState<Ticker[]>([]);
-  const [rangeIdx, setRangeIdx] = useState(1); // 기본 3Y
+  const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
 
   const tickers = useQuery({
     queryKey: ["tickers", deferredQ],
@@ -55,17 +37,14 @@ export default function ComparePage() {
     enabled: deferredQ.trim().length > 0,
   });
 
-  const { from, to } = rangeFor(RANGES[rangeIdx].years);
-
   // 종목별 캔들을 병렬 fetch. 멀티심볼 엔드포인트가 없어 클라에서 fan-out.
+  // from/to 생략 → 전체 기간 1회 조회. 기간 조절은 차트 휠 줌/드래그로(서버 재조회 없음).
   const candleQueries = useQueries({
     queries: selected.map((t) => ({
-      queryKey: ["compare-candles", t.ticker, rangeIdx],
+      queryKey: ["compare-candles", t.ticker],
       queryFn: () =>
         apiGet<GenieResponse<CandleSeries>>("/api/candles/kr-stock", {
           ticker: t.ticker,
-          from,
-          to,
           price: "adjusted", // 액면분할 보정 — 정규화 왜곡 방지.
         }).then((r) => r.data),
       placeholderData: keepPreviousData,
@@ -84,7 +63,7 @@ export default function ComparePage() {
     .join("|");
 
   // selected와 1:1 정렬 유지(결측은 빈 points 자리표시) → 차트 색 인덱스가 칩 색과 일치.
-  // 빈 시리즈는 compare-chart normalize가 건너뛰되 색 인덱스는 보존.
+  // 빈 시리즈는 clipToCommon이 건너뛰되, colorFor(i)가 원본 인덱스 i를 쓰므로 칩 색과 정합.
   // 시그니처로 메모이즈 → 검색 입력 등 무관 렌더에서 차트 재생성·줌 리셋 방지.
   const seriesList = useMemo<CandleSeries[]>(
     () =>
@@ -103,6 +82,7 @@ export default function ComparePage() {
         ? prev
         : [...prev, t],
     );
+    addRecent(t); // "차트" 탭과 동일 최근 기록(genie:recentTickers) 공유.
     setQ("");
     setSearchFocused(false);
     (document.activeElement as HTMLElement | null)?.blur();
@@ -115,7 +95,7 @@ export default function ComparePage() {
     <main className="w-full p-6 space-y-6">
       <h1 className="text-2xl font-semibold">종목 비교 — 상대 수익률</h1>
       <p className="text-sm text-muted-foreground">
-        여러 종목을 같은 기간 동안 누가 더/덜 올랐는지 비교 (공통 시작일 0% 기준 정규화).
+        여러 종목을 같은 기간 동안 누가 더/덜 올랐는지 비교 (보이는 구간 시작점 0% 기준 정규화).
       </p>
 
       <div className="relative max-w-3xl">
@@ -149,7 +129,7 @@ export default function ComparePage() {
               {tickers.data?.map((t) => {
                 const picked = selected.some((p) => p.ticker === t.ticker);
                 return (
-                  <li key={t.id}>
+                  <li key={t.ticker}>
                     <button
                       type="button"
                       disabled={picked}
@@ -197,20 +177,37 @@ export default function ComparePage() {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-1">
-        {RANGES.map((r, i) => (
-          <button
-            key={r.label}
-            type="button"
-            onClick={() => setRangeIdx(i)}
-            className={`rounded border px-2 py-0.5 text-xs ${
-              rangeIdx === i ? "bg-foreground text-background" : "bg-background hover:bg-muted"
-            }`}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
+      {recent.some((t) => !selected.some((s) => s.ticker === t.ticker)) && (
+        <div className="flex max-w-3xl flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">최근</span>
+          {recent
+            .filter((t) => !selected.some((s) => s.ticker === t.ticker))
+            .map((t) => (
+              <span
+                key={t.ticker}
+                className="inline-flex items-center rounded-full border bg-background pl-3 text-sm"
+              >
+                <button
+                  type="button"
+                  disabled={selected.length >= MAX_COMPARE}
+                  onClick={() => addTicker(t)}
+                  className="py-1 hover:text-foreground disabled:opacity-40"
+                >
+                  <span className="font-mono">{t.ticker}</span>
+                  <span className="ml-1.5">{t.name}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`${t.name} 최근 기록 삭제`}
+                  onClick={() => removeRecent(t.ticker)}
+                  className="px-2 py-1 text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+        </div>
+      )}
 
       {errored.length > 0 && (
         <p className="text-sm text-red-600">
