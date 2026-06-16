@@ -25,6 +25,12 @@ export function SiteHeader() {
         >
           스크리닝
         </Link>
+        <Link
+          href="/screening/filter"
+          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          필터
+        </Link>
       </nav>
     </header>
   );
