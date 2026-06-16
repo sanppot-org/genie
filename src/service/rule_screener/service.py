@@ -109,7 +109,7 @@ class RuleScreeningService:
                 total_score=int(score) if score is not None else None,
                 metrics=res.metrics,
             )
-            sort_val = self._sort_value(sort_by, sort_metric, tm, t.ticker, t.name)
+            sort_val = self._sort_value(sort_metric, tm)
             passed.append((sort_val, t.ticker, row))
 
         passed = self._sort(passed, sort_by, order)
@@ -124,8 +124,7 @@ class RuleScreeningService:
             return sort_by
         raise ValueError(f"정렬 불가한 sort_by: {sort_by} (스칼라 지표/ticker/name만 허용)")
 
-    def _sort_value(self, sort_by: str, sort_metric: str | None, tm: TickerMetrics,
-                    ticker: str, name: str) -> float | None:
+    def _sort_value(self, sort_metric: str | None, tm: TickerMetrics) -> float | None:
         if sort_metric is None:
             return None  # ticker/name 정렬은 _sort에서 문자열로 처리
         v = extract_metric(sort_metric, tm)

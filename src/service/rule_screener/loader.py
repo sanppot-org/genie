@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from src.database.models import StockFundamental
 from src.database.stock_financial_ratio_repository import StockFinancialRatioRepository
 from src.database.stock_fundamental_repository import StockFundamentalRepository
 from src.database.stock_income_statement_repository import StockIncomeStatementRepository
@@ -42,7 +43,7 @@ class MetricDataLoader:
             today: date | None,
     ) -> dict[int, TickerMetrics]:
         """ticker_id → TickerMetrics. 참조 안 된 소스는 빈 값으로 둔다."""
-        fundamentals: dict[int, object] = {}
+        fundamentals: dict[int, StockFundamental] = {}
         if MetricSource.FUNDAMENTAL in sources:
             latest = self._fundamentals.find_latest_date()
             if latest is not None:
@@ -70,7 +71,7 @@ class MetricDataLoader:
         for tid in ticker_ids:
             score = score_by_code.get(ticker_code_by_id.get(tid, ""))
             out[tid] = TickerMetrics(
-                fundamental=fundamentals.get(tid),  # type: ignore[arg-type]
+                fundamental=fundamentals.get(tid),
                 income_annual=income.get(tid, []),
                 ratio_annual=ratios.get(tid, []),
                 total_score=score,
