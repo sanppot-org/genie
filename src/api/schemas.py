@@ -1,7 +1,8 @@
 """API 스키마 정의"""
 from datetime import date, datetime
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.candle_client import CandleInterval
 from src.common.data_adapter import DataSource
@@ -313,3 +314,50 @@ class ScreeningResponse(BaseModel):
     offset: int
     max_score: int
     rows: list[ScreeningRowResponse]
+
+
+class FilterPredicate(BaseModel):
+    """시계열 연산(count/streak)의 연도별 판정 술어."""
+
+    cmp: Literal["lt", "lte", "gt", "gte", "eq"]
+    value: float
+
+
+class FilterCondition(BaseModel):
+    """단일 조건. op별 필수 필드는 서버(validate_condition)가 최종 검증."""
+
+    metric: str
+    op: Literal["cmp", "count", "cagr", "streak", "avg"]
+    cmp: Literal["lt", "lte", "gt", "gte", "eq"] | None = None
+    value: float | None = None
+    window: int | None = Field(default=None, ge=1, le=20)
+    min_count: int | None = Field(default=None, ge=1)
+    predicate: FilterPredicate | None = None
+
+
+class FilterScreeningRequest(BaseModel):
+    """조건 필터 스크리닝 요청 (조건은 AND)."""
+
+    conditions: list[FilterCondition] = Field(min_length=1, max_length=20)
+    sort_by: str = "total_score"
+    order: Literal["asc", "desc"] = "desc"
+    limit: int = Field(default=50, ge=1, le=500)
+    offset: int = Field(default=0, ge=0)
+
+
+class FilterScreeningRowResponse(BaseModel):
+    """조건 필터 결과 1종목. metrics는 참조된 지표만 동적으로 포함."""
+
+    ticker: str
+    name: str
+    total_score: int | None = None
+    metrics: dict[str, Any]
+
+
+class FilterScreeningResponse(BaseModel):
+    """조건 필터 스크리닝 응답."""
+
+    total: int
+    limit: int
+    offset: int
+    rows: list[FilterScreeningRowResponse]

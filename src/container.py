@@ -56,6 +56,7 @@ from src.service.fundamental_service import FundamentalService
 from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.income_statement_service import IncomeStatementService
 from src.service.income_statement_sync_service import IncomeStatementSyncService
+from src.service.rule_screener import RuleScreeningService
 from src.service.screening_service import ScreeningService
 from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
@@ -315,4 +316,12 @@ class ApplicationContainer(containers.DeclarativeContainer):
         cancellation_event_repository=stock_cancellation_event_repository,
         treasury_stock_repository=stock_treasury_stock_repository,
         financial_ratio_repository=stock_financial_ratio_repository,
+    )
+    rule_screening_service = providers.Factory(
+        RuleScreeningService,
+        ticker_repository=ticker_repository,
+        fundamental_repository=stock_fundamental_repository,
+        income_statement_repository=stock_income_statement_repository,
+        financial_ratio_repository=stock_financial_ratio_repository,
+        screening_service=screening_service,
     )

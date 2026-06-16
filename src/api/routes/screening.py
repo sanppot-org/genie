@@ -5,15 +5,20 @@ from dataclasses import asdict
 from typing import Literal
 
 from dependency_injector.wiring import Provide, inject
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.schemas import (
+    FilterCondition,
+    FilterScreeningRequest,
+    FilterScreeningResponse,
+    FilterScreeningRowResponse,
     GenieResponse,
     ScreeningResponse,
     ScreeningRowResponse,
     ScreeningScoreBreakdown,
 )
 from src.container import ApplicationContainer
+from src.service.rule_screener import Comparator, Condition, Predicate, RuleScreeningResult, RuleScreeningService
 from src.service.screening_service import ScreeningFilters, ScreeningResult, ScreeningService
 
 router = APIRouter(tags=["screening"])
@@ -65,6 +70,56 @@ def get_kr_stock_screening(
         sort_by=sort_by, order=order, filters=filters,
     )
     return GenieResponse(data=_to_response(result))
+
+
+def _to_condition(c: FilterCondition) -> Condition:
+    pred = Predicate(cmp=Comparator(c.predicate.cmp), value=c.predicate.value) if c.predicate else None
+    return Condition(
+        metric=c.metric,
+        op=c.op,
+        cmp=Comparator(c.cmp) if c.cmp is not None else None,
+        value=c.value,
+        window=c.window,
+        min_count=c.min_count,
+        predicate=pred,
+    )
+
+
+@router.post("/screening/filter", response_model=GenieResponse[FilterScreeningResponse])
+@inject
+def post_filter_screening(
+        request: FilterScreeningRequest,
+        service: RuleScreeningService = Depends(Provide[ApplicationContainer.rule_screening_service]),
+) -> GenieResponse[FilterScreeningResponse]:
+    """동적 조건(AND) 리스트로 KR_STOCK 필터링.
+
+    조건/지표/연산 오류는 400, 스키마(타입/범위) 오류는 422.
+    """
+    try:
+        result = service.screen(
+            conditions=[_to_condition(c) for c in request.conditions],
+            sort_by=request.sort_by,
+            order=request.order,
+            limit=request.limit,
+            offset=request.offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return GenieResponse(data=_to_filter_response(result))
+
+
+def _to_filter_response(result: RuleScreeningResult) -> FilterScreeningResponse:
+    return FilterScreeningResponse(
+        total=result.total,
+        limit=result.limit,
+        offset=result.offset,
+        rows=[
+            FilterScreeningRowResponse(
+                ticker=r.ticker, name=r.name, total_score=r.total_score, metrics=r.metrics,
+            )
+            for r in result.rows
+        ],
+    )
 
 
 def _to_response(result: ScreeningResult) -> ScreeningResponse:
