@@ -145,3 +145,46 @@ export interface ScreeningFilters {
   consecutive_years_min?: number;
   q?: string;
 }
+
+export type FilterComparator = "lt" | "lte" | "gt" | "gte" | "eq";
+export type FilterOp = "cmp" | "count" | "cagr" | "streak" | "avg";
+
+export interface FilterPredicate {
+  cmp: FilterComparator;
+  value: number;
+}
+
+export interface FilterCondition {
+  metric: string;
+  op: FilterOp;
+  cmp?: FilterComparator;
+  value?: number;
+  window?: number;
+  min_count?: number;
+  predicate?: FilterPredicate;
+}
+
+export interface FilterScreeningRequest {
+  conditions: FilterCondition[];
+  sort_by: string;
+  order: ScreeningSortOrder; // "asc" | "desc" 재사용
+  limit: number;
+  offset: number;
+}
+
+// 응답 metrics는 참조 지표만 동적으로: cmp→number, count→{count,window}, cagr/streak/avg→{[op]:number|null}
+export type FilterMetricDisplay = number | Record<string, number | null> | null;
+
+export interface FilterScreeningRow {
+  ticker: string;
+  name: string;
+  total_score: number | null;
+  metrics: Record<string, FilterMetricDisplay>;
+}
+
+export interface FilterScreeningResponse {
+  total: number;
+  limit: number;
+  offset: number;
+  rows: FilterScreeningRow[];
+}
