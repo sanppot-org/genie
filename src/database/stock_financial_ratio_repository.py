@@ -76,6 +76,27 @@ class StockFinancialRatioRepository(BaseRepository[StockFinancialRatio, int]):
         )
         return {row[0]: row[1] for row in rows}
 
+    def find_annual_series_by_tickers(self, ticker_ids: list[int]) -> dict[int, list[StockFinancialRatio]]:
+        """다건 ticker의 연간(12월 결산) 재무비율 시계열. ticker_id → stac_yymm DESC 리스트. 쿼리 1회.
+
+        스크리너 시계열 조건용. TTM/분기 잠정(...03 등) 행은 제외.
+        """
+        if not ticker_ids:
+            return {}
+        rows = (
+            self.session.query(StockFinancialRatio)
+            .filter(
+                StockFinancialRatio.ticker_id.in_(ticker_ids),
+                StockFinancialRatio.stac_yymm.like("%12"),
+            )
+            .order_by(StockFinancialRatio.ticker_id, StockFinancialRatio.stac_yymm.desc())
+            .all()
+        )
+        result: dict[int, list[StockFinancialRatio]] = {}
+        for r in rows:
+            result.setdefault(r.ticker_id, []).append(r)
+        return result
+
     def bulk_upsert(self, entities: list[StockFinancialRatio]) -> None:
         """Postgres ON CONFLICT로 (ticker_id, stac_yymm) 키 일괄 UPSERT.
 

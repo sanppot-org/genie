@@ -51,6 +51,28 @@ class StockIncomeStatementRepository(BaseRepository[StockIncomeStatement, int]):
         )
         return {row[0]: row[1] for row in rows}
 
+    def find_annual_series_by_tickers(self, ticker_ids: list[int]) -> dict[int, list[StockIncomeStatement]]:
+        """다건 ticker의 ANNUAL(12월 결산) 손익계산서 시계열. ticker_id → stac_yymm DESC 리스트. 쿼리 1회.
+
+        스크리너 시계열 조건용. 분기/잠정(...03 등) 행은 제외해 연간 비교의 일관성 확보.
+        """
+        if not ticker_ids:
+            return {}
+        rows = (
+            self.session.query(StockIncomeStatement)
+            .filter(
+                StockIncomeStatement.ticker_id.in_(ticker_ids),
+                StockIncomeStatement.period_type == "ANNUAL",
+                StockIncomeStatement.stac_yymm.like("%12"),
+            )
+            .order_by(StockIncomeStatement.ticker_id, StockIncomeStatement.stac_yymm.desc())
+            .all()
+        )
+        result: dict[int, list[StockIncomeStatement]] = {}
+        for r in rows:
+            result.setdefault(r.ticker_id, []).append(r)
+        return result
+
     def bulk_upsert(self, entities: list[StockIncomeStatement]) -> None:
         """Postgres ON CONFLICT로 (ticker_id, period_type, stac_yymm) 키 일괄 UPSERT.
 
