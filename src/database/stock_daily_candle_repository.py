@@ -1,5 +1,6 @@
 """StockDailyCandle Repository."""
 
+from collections.abc import Mapping
 from datetime import date, timedelta
 import logging
 
@@ -91,7 +92,7 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
     def update_adjusted_from_rows(
         self,
         rows: list[StockDailyCandle],
-        adjusted_by_date: dict[date, tuple[float, float, float, float, int]],
+        adjusted_by_date: Mapping[date, tuple[float, float, float, float, int | None]],
     ) -> int:
         """이미 로드된 row 리스트에 수정주가 매핑을 메모리에서 적용.
 
@@ -116,7 +117,7 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
         return updated
 
     def update_adjusted(
-        self, ticker_id: int, adjusted_by_date: dict[date, tuple[float, float, float, float, int]]
+        self, ticker_id: int, adjusted_by_date: Mapping[date, tuple[float, float, float, float, int | None]]
     ) -> int:
         """종목의 기존 row를 로드해 adj_* 컬럼만 UPDATE (편의 메서드).
 

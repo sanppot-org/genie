@@ -56,3 +56,33 @@ def test_register_is_idempotent(db: Database, session: Session) -> None:
         result = service.register(["AAPL"])  # 두 번째 호출
     assert result.updated == 1
     assert len(TickerRepository(session).find_by_data_source(DataSource.FDR)) == 1
+
+
+def test_register_rehomes_ticker_with_different_source_and_type(db: Database, session: Session) -> None:
+    """다른 data_source/asset_type으로 등록된 ticker를 US_STOCK/FDR로 재분류한다."""
+    from src.database.models import Ticker
+
+    # 같은 심볼 AAPL을 KR_STOCK/PYKRX로 미리 저장
+    repo = TickerRepository(session)
+    repo.save(Ticker(
+        ticker="AAPL",
+        name="Old Name",
+        asset_type=AssetType.KR_STOCK,
+        data_source=DataSource.PYKRX.value,
+        exchange="KRX",
+    ))
+    session.commit()
+
+    service = UsStockTickerService(database=db)
+    with _patched_listing():
+        result = service.register(["AAPL"])
+
+    assert result.updated == 1
+    assert result.registered == 0
+
+    session.expire_all()
+    aapl = TickerRepository(session).find_by_ticker("AAPL")
+    assert aapl is not None
+    assert aapl.asset_type == AssetType.US_STOCK
+    assert aapl.data_source == DataSource.FDR.value
+    assert aapl.exchange == "NAS"

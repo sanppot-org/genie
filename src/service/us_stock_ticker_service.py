@@ -61,6 +61,8 @@ class UsStockTickerService:
                     existing.name = name
                     existing.exchange = excd
                     existing.active = True
+                    existing.asset_type = AssetType.US_STOCK
+                    existing.data_source = DataSource.FDR.value
                     result.updated += 1
                 else:
                     repo.save(Ticker(

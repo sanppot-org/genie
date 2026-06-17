@@ -67,6 +67,9 @@ class UsStockDailyClient:
         """OHLCV + Adj Close DataFrame을 UsDailyBar 리스트로 변환 (Adj Close 없으면 Close 사용)."""
         bars: list[UsDailyBar] = []
         for idx, row in df.iterrows():
+            if any(pd.isna(row[c]) for c in ("Open", "High", "Low", "Close", "Volume")):
+                logger.warning("US 일봉 NaN 행 skip date=%s", idx)
+                continue
             close = float(row["Close"])
             adj = float(row["Adj Close"]) if "Adj Close" in df.columns and pd.notna(row["Adj Close"]) else close
             bars.append(UsDailyBar(

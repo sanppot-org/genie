@@ -101,28 +101,32 @@ class UsStockDailyCandleService:
         bars = self._client.fetch(symbol, start, to_date)
         if not bars:
             return 0
+        # 중복 날짜 dedup (last-wins, bulk_upsert 동작과 일치)
+        bars_by_date = {b.date: b for b in bars}
         entities = [
             StockDailyCandle(
                 ticker_id=ticker_id, date=b.date,
                 open=b.open, high=b.high, low=b.low, close=b.close,
                 volume=b.volume, trade_value=None,
             )
-            for b in bars
+            for b in bars_by_date.values()
         ]
-        adjusted_by_date = {b.date: self._adjusted(b) for b in bars}
+        adjusted_by_date = {d: self._adjusted(b) for d, b in bars_by_date.items()}
         with self._database.session_scope() as session:
             repo = StockDailyCandleRepository(session)
             repo.bulk_upsert(entities)
             rows = repo.find_by_ticker(ticker_id)
             repo.update_adjusted_from_rows(rows, adjusted_by_date)
-        return len(entities)
+        return len(bars_by_date)
 
     @staticmethod
-    def _adjusted(bar: UsDailyBar) -> tuple[float, float, float, float, int]:
-        """factor = adj_close/close 비례 역조정으로 (adj_open, adj_high, adj_low, adj_close, adj_volume)."""
+    def _adjusted(bar: UsDailyBar) -> tuple[float, float, float, float, int | None]:
+        """factor = adj_close/close 비례 역조정으로 (adj_open, adj_high, adj_low, adj_close, adj_volume).
+
+        adj_volume은 배당/분할 팩터로 거래량을 보정하는 것이 부정확하므로 NULL(None) 반환.
+        """
         factor = bar.adj_close / bar.close if bar.close else 1.0
-        adj_volume = int(round(bar.volume / factor)) if factor else bar.volume
-        return (bar.open * factor, bar.high * factor, bar.low * factor, bar.adj_close, adj_volume)
+        return (bar.open * factor, bar.high * factor, bar.low * factor, bar.adj_close, None)
 
     def _load_targets(self, symbols: list[str] | None) -> list[tuple[int, str]]:
         """대상 (ticker_id, symbol) 목록 (US_STOCK, FDR, active=True)."""

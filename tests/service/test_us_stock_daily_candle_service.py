@@ -59,8 +59,10 @@ def test_backfill_upserts_raw_and_adjusted(db: Database, us_ticker: int) -> None
     assert r1.close == 200 and r1.open == 210      # 원주가 보존
     assert r1.adj_close == 100                      # 수정 종가
     assert r1.adj_open == 105 and r1.adj_high == 110 and r1.adj_low == 95  # OHLC * 0.5
+    assert r1.adj_volume is None                    # adj_volume은 NULL (Spec §6)
     r2 = rows[date(2024, 1, 3)]
     assert r2.adj_close == 210 and r2.adj_open == 205  # factor=1.0
+    assert r2.adj_volume is None
 
 
 def test_backfill_skips_empty_response(db: Database, us_ticker: int) -> None:

@@ -54,3 +54,25 @@ def test_fetch_returns_empty_when_fdr_empty() -> None:
          patch("src.providers.us_stock_daily_client.yf.Ticker", return_value=MagicMock(history=MagicMock(return_value=pd.DataFrame()))):
         bars = client.fetch("ZZZZ", date(2024, 1, 1), date(2024, 1, 10))
     assert bars == []
+
+
+def test_normalize_skips_nan_rows() -> None:
+    """NaN이 포함된 행은 skip하고 유효한 행만 반환한다."""
+    idx = pd.to_datetime(["2024-01-02", "2024-01-03"])
+    df = pd.DataFrame(
+        {
+            "Open": [187.15, 184.22],
+            "High": [188.44, 185.88],
+            "Low": [183.89, 183.43],
+            "Close": [185.64, 184.25],
+            "Volume": [float("nan"), 58414500],  # 첫 번째 행 Volume NaN
+            "Adj Close": [183.56, 182.19],
+        },
+        index=idx,
+    )
+    client = UsStockDailyClient()
+    with patch("src.providers.us_stock_daily_client.fdr.DataReader", return_value=df):
+        bars = client.fetch("AAPL", date(2024, 1, 1), date(2024, 1, 10))
+    assert len(bars) == 1
+    assert bars[0].date == date(2024, 1, 3)
+    assert bars[0].volume == 58414500
