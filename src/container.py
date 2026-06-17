@@ -41,6 +41,7 @@ from src.providers.pykrx_daily_candle_client import PykrxDailyCandleClient
 from src.providers.pykrx_fundamental_client import PykrxFundamentalClient
 from src.providers.pykrx_ticker_client import PykrxTickerClient
 from src.providers.upbit_candle_client import UpbitCandleClient
+from src.providers.us_stock_daily_client import UsStockDailyClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.adjusted_candle_sync_service import AdjustedCandleSyncService
@@ -62,6 +63,8 @@ from src.service.stock_daily_candle_service import StockDailyCandleService
 from src.service.ticker_service import TickerService
 from src.service.ticker_sync_service import TickerSyncService
 from src.service.treasury_stock_sync_service import TreasuryStockSyncService
+from src.service.us_stock_daily_candle_service import UsStockDailyCandleService
+from src.service.us_stock_ticker_service import UsStockTickerService
 from src.strategy.cache.cache_manager import CacheManager
 from src.strategy.data.collector import DataCollector
 from src.strategy.order.order_executor import OrderExecutor
@@ -258,6 +261,16 @@ class ApplicationContainer(containers.DeclarativeContainer):
         AdjustedCandleSyncService,
         database=database,
         client=pykrx_daily_candle_client,
+    )
+    us_stock_daily_client = providers.Singleton(UsStockDailyClient)
+    us_stock_ticker_service = providers.Factory(
+        UsStockTickerService,
+        database=database,
+    )
+    us_stock_daily_candle_service = providers.Factory(
+        UsStockDailyCandleService,
+        database=database,
+        client=us_stock_daily_client,
     )
     dividend_sync_service = providers.Factory(
         DividendSyncService,
