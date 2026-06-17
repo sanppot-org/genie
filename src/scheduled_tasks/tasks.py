@@ -31,6 +31,7 @@ from src.service.fundamental_sync_service import FundamentalSyncService
 from src.service.income_statement_sync_service import IncomeStatementSyncService
 from src.service.ticker_sync_service import TickerSyncService
 from src.service.treasury_stock_sync_service import TreasuryStockSyncService
+from src.service.us_stock_daily_candle_service import UsStockDailyCandleService
 from src.strategy.config import BaseStrategyConfig
 from src.upbit.upbit_api import UpbitAPI
 
@@ -433,3 +434,31 @@ def resync_all_adjusted_candles(
         mark_rollback_only()
         logger.exception("전종목 수정주가 안전망 실패")
         slack_client.send_status(f"수정주가 안전망 실패: {e}")
+
+
+@db_scoped
+@inject
+def sync_us_stock_daily_candles(
+        service: UsStockDailyCandleService = Provide[ApplicationContainer.us_stock_daily_candle_service],
+        slack_client: SlackClient = Provide[ApplicationContainer.slack_client],
+) -> None:
+    """미국 주식 일봉 EOD 증분 동기화 (미국장 마감 후, 화~토 07:30 KST).
+
+    최근 5거래일을 멱등 UPSERT(휴장·실행 누락 방어). 종목별 독립 커밋이라
+    일부 종목 실패는 배치를 막지 않고 failed로 집계 → Slack 알림.
+    """
+    try:
+        result = service.sync_recent()
+        logger.info(
+            "미국 일봉 동기화 완료 targets=%d attempted=%d failed=%d tickers_upserted=%d rows_upserted=%d",
+            result.ticker_count, result.attempted, result.failed,
+            result.tickers_upserted, result.rows_upserted,
+        )
+        if result.failed_tickers:
+            slack_client.send_status(
+                f"미국 일봉 동기화 일부 실패({result.failed}종목): {','.join(result.failed_tickers[:20])}"
+            )
+    except Exception as e:
+        mark_rollback_only()
+        logger.exception("미국 일봉 동기화 실패")
+        slack_client.send_status(f"미국 일봉 동기화 실패: {e}")
