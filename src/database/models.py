@@ -164,6 +164,7 @@ class Ticker(Base, TimestampMixin):
     asset_type: Mapped[AssetType] = mapped_column(String(20), nullable=False, index=True)
     data_source: Mapped[DataSource] = mapped_column(Enum(DataSource, native_enum=False), nullable=False, index=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true(), default=True)
+    exchange: Mapped[str | None] = mapped_column(String(4), nullable=True, comment="해외 거래소코드(KIS EXCD: NAS/NYS/AMS), US_STOCK만 채워짐")
     industry_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     industry_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     sector_large_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
