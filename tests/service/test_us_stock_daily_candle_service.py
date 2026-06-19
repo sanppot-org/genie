@@ -80,3 +80,23 @@ def test_backfill_continues_on_one_ticker_failure(db: Database, us_ticker: int) 
     result = service.backfill(["AAPL"], start=date(2024, 1, 1), now=date(2024, 1, 10))
     assert result.failed == 1
     assert "AAPL" in result.failed_tickers
+
+
+def test_backfill_targets_both_us_stock_and_us_etf(db: Database, us_ticker: int) -> None:
+    """대상 선정이 US_STOCK과 US_ETF active FDR ticker를 모두 포함한다."""
+    session = db.get_session()
+    try:
+        TickerRepository(session).save(Ticker(
+            ticker="TQQQ", name="ProShares UltraPro QQQ",
+            asset_type=AssetType.US_ETF, data_source=DataSource.FDR.value, exchange=None,
+        ))
+        session.commit()
+    finally:
+        session.close()
+
+    bar = [UsDailyBar(date=date(2024, 1, 2), open=10, high=11, low=9, close=10, volume=100, adj_close=10)]
+    service = UsStockDailyCandleService(database=db, client=_client(bar), throttle_sec=0)
+    result = service.backfill(start=date(2024, 1, 1), now=date(2024, 1, 10))
+
+    assert result.ticker_count == 2  # AAPL(US_STOCK) + TQQQ(US_ETF)
+    assert result.tickers_upserted == 2

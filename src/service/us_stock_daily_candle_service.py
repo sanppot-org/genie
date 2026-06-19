@@ -9,7 +9,7 @@
 - 종목 단위라 중단 후 재개 안전, 멱등 UPSERT.
 - 한 종목 실패가 배치 전체를 막지 않음(failed 집계).
 
-대상: tickers 중 `data_source=FDR & asset_type=US_STOCK & active=True`.
+대상: tickers 중 `data_source=FDR & asset_type in (US_STOCK, US_ETF) & active=True`.
 """
 
 from dataclasses import dataclass, field
@@ -129,13 +129,13 @@ class UsStockDailyCandleService:
         return (bar.open * factor, bar.high * factor, bar.low * factor, bar.adj_close, None)
 
     def _load_targets(self, symbols: list[str] | None) -> list[tuple[int, str]]:
-        """대상 (ticker_id, symbol) 목록 (US_STOCK, FDR, active=True)."""
+        """대상 (ticker_id, symbol) 목록 (US_STOCK/US_ETF, FDR, active=True)."""
         wanted = {s.upper() for s in symbols} if symbols is not None else None
         with self._database.session_scope() as session:
             tickers = TickerRepository(session).find_by_data_source(DataSource.FDR)
             return [
                 (t.id, t.ticker)
                 for t in tickers
-                if t.asset_type == AssetType.US_STOCK and t.active and t.id is not None
+                if t.asset_type in (AssetType.US_STOCK, AssetType.US_ETF) and t.active and t.id is not None
                 and (wanted is None or t.ticker.upper() in wanted)
             ]
