@@ -7,6 +7,10 @@ from src.database.models import (
     InfiniteBuyingOrder,
     InfiniteBuyingPosition,
 )
+from src.infinite_buying.repository import (
+    InfiniteBuyingConfigRepository,
+    InfiniteBuyingPositionRepository,
+)
 
 
 def test_models_persist_via_create_all(session: Session) -> None:
@@ -32,12 +36,6 @@ def test_models_persist_via_create_all(session: Session) -> None:
     assert cfg.id is not None
     assert pos.id is not None
     assert order.id is not None and order.position_id == pos.id
-
-
-from src.infinite_buying.repository import (
-    InfiniteBuyingConfigRepository,
-    InfiniteBuyingPositionRepository,
-)
 
 
 def test_config_repo_save_and_find(session: Session) -> None:

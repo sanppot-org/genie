@@ -1,7 +1,8 @@
 # 무한매수법(라오어 매매법) 자동매매 — 설계 (큰틀)
 
 - 작성일: 2026-06-20
-- 상태: 큰틀 확정 / 디테일은 구현 계획 단계에서 보강
+- 상태: **Phase 1(도메인 코어 + 원장 영속화) 구현 완료. Phase 2(KIS 어댑터·서비스·스케줄·order_plan) 대기.**
+  - 계획서: `docs/superpowers/plans/2026-06-20-infinite-buying-phase1.md`
 - 원전: `docs/무한매수법.md` (별지점·T·전반전/후반전·매수/매도 규칙의 단일 출처)
 
 ## 1. 목표와 범위
@@ -70,7 +71,7 @@ src/infinite_buying/
 ```
 infinite_buying_position    # 종목별 현재 상태 (사이클당 1행, 진실의 근원)
   ticker_id, cycle_no
-  avg_price                 # 평단
+  avg_price                 # 평단 — **저장 안 함 — `cumulative_buy / holding_qty`로 파생** (T와 동일한 단일근원 원칙)
   holding_qty               # 보유수량
   cumulative_buy            # 매수누적액
   per_round_amount          # 현재 회당금액 (반복리/복리로 갱신)
@@ -99,6 +100,7 @@ infinite_buying_config      # 종목별 파라미터 (DB 테이블)
 
 - **T는 저장하지 않는다.** `cumulative_buy / per_round_amount`로 매번 파생 → 원장 단일근원 유지.
 - `phase`는 조회 편의용 캐시(T에서 파생).
+- `realized_pnl` 누적과 `per_round_amount` 재도출(매도 차익 반영)은 Phase 2 대조잡(reconcile_fills) 책임. Phase 1 컬럼은 write-target.
 
 ## 6. 스케줄 & 설정
 
