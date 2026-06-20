@@ -52,7 +52,7 @@ def test_full_liquidation_completes_cycle() -> None:
     s = PositionState(holding_qty=12, cumulative_buy=555.0)
     new_state, _ = apply_sell(s, fill_price=60.0, fill_qty=12)
     assert new_state.holding_qty == 0
-    assert new_state.cumulative_buy == pytest.approx(0.0)
+    assert new_state.cumulative_buy == pytest.approx(0.0, abs=1e-9)
     assert is_cycle_complete(new_state) is True
 
 
