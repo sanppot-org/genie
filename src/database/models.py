@@ -439,11 +439,11 @@ class InfiniteBuyingConfig(Base, TimestampMixin):
     __tablename__ = "infinite_buying_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ticker_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True, index=True)
-    division: Mapped[int] = mapped_column(Integer, nullable=False, default=40, comment="분할수")
+    ticker_id: Mapped[int] = mapped_column(Integer, ForeignKey("tickers.id", name="fk_infinite_buying_config_ticker_id"), nullable=False, unique=True, index=True)
+    division: Mapped[int] = mapped_column(Integer, nullable=False, default=40, server_default="40", comment="분할수")
     base_gap: Mapped[float] = mapped_column(Float, nullable=False, comment="종목별 최대 괴리율(%포인트): TQQQ=15, SOXL=20")
     allocation: Mapped[float] = mapped_column(Float, nullable=False, comment="할당금액")
-    compounding: Mapped[str] = mapped_column(String(8), nullable=False, default="half", comment="회당금액 갱신: simple/half/full")
+    compounding: Mapped[str] = mapped_column(String(8), nullable=False, default="half", server_default="half", comment="회당금액 갱신: simple/half/full")
     sell_limit_pct: Mapped[float] = mapped_column(Float, nullable=False, comment="지정가매도 %: TQQQ=15, SOXL=20")
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=true(), default=True)
 
@@ -457,14 +457,14 @@ class InfiniteBuyingPosition(Base, TimestampMixin):
     __tablename__ = "infinite_buying_position"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ticker_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    ticker_id: Mapped[int] = mapped_column(Integer, ForeignKey("tickers.id", name="fk_infinite_buying_position_ticker_id"), nullable=False, index=True)
     cycle_no: Mapped[int] = mapped_column(Integer, nullable=False, comment="사이클 번호 (1부터)")
-    holding_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="보유수량")
-    cumulative_buy: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, comment="매수누적액")
+    holding_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0", comment="보유수량")
+    cumulative_buy: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0", comment="매수누적액")
     per_round_amount: Mapped[float] = mapped_column(Float, nullable=False, comment="현재 회당금액")
-    phase: Mapped[str] = mapped_column(String(16), nullable=False, default="first_half", comment="first_half/second_half (T 파생 캐시)")
-    status: Mapped[str] = mapped_column(String(8), nullable=False, default="active", comment="active/closed")
-    realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, comment="사이클 누적 실현손익")
+    phase: Mapped[str] = mapped_column(String(16), nullable=False, default="first_half", server_default="first_half", comment="first_half/second_half (T 파생 캐시)")
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="active", server_default="active", comment="active/closed")
+    realized_pnl: Mapped[float] = mapped_column(Float, nullable=False, default=0.0, server_default="0", comment="사이클 누적 실현손익")
 
     __table_args__ = (
         Index("ix_ib_position_ticker_cycle", "ticker_id", "cycle_no", unique=True),
@@ -480,15 +480,15 @@ class InfiniteBuyingOrder(Base, TimestampMixin):
     __tablename__ = "infinite_buying_order"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    position_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    position_id: Mapped[int] = mapped_column(Integer, ForeignKey("infinite_buying_position.id", name="fk_infinite_buying_order_position_id"), nullable=False, index=True)
     kis_order_no: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="KIS 주문번호")
     side: Mapped[str] = mapped_column(String(4), nullable=False, comment="buy/sell")
     order_kind: Mapped[str] = mapped_column(String(24), nullable=False, comment="first_buy/separation_buy/avg_buy/extra_buy/quarter_sell/limit_sell")
     order_division: Mapped[str] = mapped_column(String(8), nullable=False, comment="LOC/MOC/LIMIT")
     target_price: Mapped[float] = mapped_column(Float, nullable=False)
     qty: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[str] = mapped_column(String(8), nullable=False, default="pending", comment="pending/filled/unfilled/canceled")
-    filled_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(8), nullable=False, default="pending", server_default="pending", comment="pending/filled/unfilled/canceled")
+    filled_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     filled_price: Mapped[float | None] = mapped_column(Float, nullable=True)
     trade_date: Mapped[date | None] = mapped_column(Date, nullable=True, comment="체결일")
 

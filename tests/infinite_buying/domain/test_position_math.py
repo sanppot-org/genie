@@ -72,3 +72,37 @@ def test_next_cycle_seed_resets_state_and_increments_cycle() -> None:
     seed_state, next_no = next_cycle_seed(prev_cycle_no=1)
     assert seed_state == PositionState(holding_qty=0, cumulative_buy=0.0)
     assert next_no == 2
+
+
+def test_quarter_sell_non_multiple_of_four_is_not_exactly_075() -> None:
+    """잔량이 4의 배수가 아닐 때 쿼터매도 비율은 0.75가 아님을 문서화.
+
+    holding_qty=10: floor(10/4)=2 매도 → 잔량 8, 잔여누적액 비율 = 8/10 = 0.8 (≠ 0.75).
+    """
+    s = PositionState(holding_qty=10, cumulative_buy=500.0)
+    sell_qty = s.holding_qty // 4  # 2
+    new_state, _ = apply_sell(s, fill_price=60.0, fill_qty=sell_qty)
+    ratio = new_state.cumulative_buy / s.cumulative_buy
+    assert ratio == pytest.approx(0.8)  # NOT 0.75 — approximation only when qty % 4 == 0
+
+
+def test_buy_sell_rebuy_invariant_avg_price() -> None:
+    """매수 → 쿼터매도 → 재매수 순서로 평단 불변식(avg = cumulative/qty)이 유지됨을 검증."""
+    # 초기 매수: 10주 @ 50
+    s = PositionState(holding_qty=0, cumulative_buy=0.0)
+    s = apply_buy(s, fill_price=50.0, fill_qty=10)
+    assert s.avg_price == pytest.approx(s.cumulative_buy / s.holding_qty)
+
+    # 물타기: 6주 @ 40 → 평단 46.25
+    s = apply_buy(s, fill_price=40.0, fill_qty=6)
+    assert s.avg_price == pytest.approx(s.cumulative_buy / s.holding_qty)
+
+    # 쿼터매도: floor(16/4)=4주 @ 55
+    s, _ = apply_sell(s, fill_price=55.0, fill_qty=4)
+    assert s.holding_qty == 12
+    assert s.avg_price == pytest.approx(s.cumulative_buy / s.holding_qty)  # 여전히 46.25
+
+    # 재매수: 4주 @ 42 → 평단 재계산
+    s = apply_buy(s, fill_price=42.0, fill_qty=4)
+    assert s.holding_qty == 16
+    assert s.avg_price == pytest.approx(s.cumulative_buy / s.holding_qty)
