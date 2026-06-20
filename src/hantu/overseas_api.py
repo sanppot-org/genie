@@ -506,6 +506,56 @@ class HantuOverseasAPI(HantuBaseAPI):
             price=price,
         )
 
+    def buy_loc_order(
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+    ) -> overseas_order.ResponseBody:
+        """LOC(장마감지정가) 매수 주문. 종가가 지정가 이하로 마감되면 종가로 체결."""
+        return self._order(
+            order_direction=OrderDirection.BUY,
+            order_division=overseas_order.OverseasOrderDivision.LOC,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price=price,
+        )
+
+    def sell_loc_order(
+            self,
+            ticker: str,
+            quantity: int,
+            price: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+    ) -> overseas_order.ResponseBody:
+        """LOC(장마감지정가) 매도 주문. 종가가 지정가 이상으로 마감되면 종가로 체결."""
+        return self._order(
+            order_direction=OrderDirection.SELL,
+            order_division=overseas_order.OverseasOrderDivision.LOC,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price=price,
+        )
+
+    def sell_moc_order(
+            self,
+            ticker: str,
+            quantity: int,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+    ) -> overseas_order.ResponseBody:
+        """MOC(장마감시장가) 매도 주문. 종가로 시장가 체결되므로 단가는 0으로 전송."""
+        return self._order(
+            order_direction=OrderDirection.SELL,
+            order_division=overseas_order.OverseasOrderDivision.MOC,
+            exchange_code=exchange_code,
+            ticker=ticker,
+            quantity=quantity,
+            price="0",
+        )
+
     def _order(
             self,
             order_direction: OrderDirection,
