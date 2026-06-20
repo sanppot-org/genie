@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 무한매수법의 *돈이 걸린 순수 계산*(별지점·T·회당금액 갱신·체결 반영 평단 재계산)을 KIS·DB 의존 0으로 단위테스트와 함께 구현하고, 자체 원장 3개 테이블(설정/포지션/주문)과 영속화 리포지토리를 만든다.
+**Goal:** 무한매수법의 *돈이 걸린 순수 계산*(별지점·T·회당금액 갱신·체결 반영 평단 재계산·사이클 종료/재시작)을 KIS·DB 의존 0으로 단위테스트와 함께 구현하고, 자체 원장 3개 테이블(설정/포지션/주문) 스키마 + 설정·포지션 리포지토리를 만든다. (주문 리포지토리는 소비자가 생기는 Phase 2에서 추가 — YAGNI.)
 
 **Architecture:** 헥사고날 — `src/infinite_buying/domain/`은 입력값(평단·T·회당금액·체결 등)을 받아 숫자만 반환하는 순수 함수 모음(외부 의존 0). 원장 모델은 코드베이스 관례대로 중앙 `src/database/models.py`에 정의(alembic autogenerate·`Base.metadata`가 스캔). 리포지토리는 bounded context를 묶기 위해 `src/infinite_buying/repository.py`에 모듈-로컬로 둔다. Phase 1은 KIS 어댑터·서비스 오케스트레이션·스케줄·order_plan 합성을 포함하지 않는다(Phase 2).
 
@@ -28,7 +28,9 @@
 - `src/infinite_buying/domain/separation_point.py` (생성) — 별지점 계산.
 - `src/infinite_buying/domain/progress.py` (생성) — T 계산 + `Phase` 판정.
 - `src/infinite_buying/domain/per_round_amount.py` (생성) — 회당금액 갱신 + `Compounding`.
-- `src/infinite_buying/domain/position_math.py` (생성) — `PositionState` + 체결 반영(매수/매도) + 사이클 종료 판정.
+- `src/infinite_buying/domain/position_math.py` (생성) — `PositionState` + 체결 반영(매수/매도) + 사이클 종료 판정 + 다음 사이클 시드(재시작).
+- `tests/infinite_buying/__init__.py` (생성) — 테스트 패키지 마커 (기존 모든 test 디렉토리 관례; pytest importmode=prepend).
+- `tests/infinite_buying/domain/__init__.py` (생성) — 테스트 패키지 마커.
 - `src/database/models.py` (수정, 파일 끝에 추가) — `InfiniteBuyingConfig` / `InfiniteBuyingPosition` / `InfiniteBuyingOrder` 모델.
 - `alembic/versions/019_add_infinite_buying_tables.py` (생성) — 3개 테이블 마이그레이션.
 - `src/infinite_buying/repository.py` (생성) — `InfiniteBuyingConfigRepository` / `InfiniteBuyingPositionRepository`.
@@ -41,11 +43,15 @@
 **Files:**
 - Create: `src/infinite_buying/__init__.py`
 - Create: `src/infinite_buying/domain/__init__.py`
+- Create: `tests/infinite_buying/__init__.py`
+- Create: `tests/infinite_buying/domain/__init__.py`
 - Create: `src/infinite_buying/domain/separation_point.py`
 - Test: `tests/infinite_buying/domain/test_separation_point.py`
 
 **Interfaces:**
 - Produces: `separation_point(avg_price: float, t: float, division: int, base_gap: float) -> float`
+
+> ⚠️ 테스트 패키지 마커 필수: 이 프로젝트는 pytest importmode=prepend(기본)이고 모든 기존 `tests/<domain>/`에 `__init__.py`가 있다. 신규 `tests/infinite_buying/`와 그 하위에 빈 `__init__.py`를 만들지 않으면 동일 basename(`test_repository.py` 등) 충돌·수집 에러가 날 수 있다.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -98,6 +104,13 @@ Create `src/infinite_buying/domain/__init__.py`:
 """무한매수법 순수 도메인 코어 (KIS·DB 의존 0)."""
 ```
 
+Create empty test package markers `tests/infinite_buying/__init__.py` and `tests/infinite_buying/domain/__init__.py` (둘 다 빈 파일):
+
+```bash
+mkdir -p tests/infinite_buying/domain
+touch tests/infinite_buying/__init__.py tests/infinite_buying/domain/__init__.py
+```
+
 Create `src/infinite_buying/domain/separation_point.py`:
 
 ```python
@@ -134,7 +147,7 @@ Expected: PASS (4 tests)
 
 ```bash
 uv run ruff check src/infinite_buying/ && uv run mypy src/infinite_buying/
-git add src/infinite_buying/__init__.py src/infinite_buying/domain/__init__.py src/infinite_buying/domain/separation_point.py tests/infinite_buying/domain/test_separation_point.py
+git add src/infinite_buying/__init__.py src/infinite_buying/domain/__init__.py tests/infinite_buying/__init__.py tests/infinite_buying/domain/__init__.py src/infinite_buying/domain/separation_point.py tests/infinite_buying/domain/test_separation_point.py
 git commit -m "feat(infinite-buying): add separation_point pure formula"
 ```
 
@@ -270,6 +283,12 @@ def test_half_adds_profit_over_two_division() -> None:
 def test_full_adds_profit_over_division() -> None:
     # 복리: 회당금액 + 수익/분할수 → 250 + 80/40 = 252
     assert update_per_round_amount(250.0, realized_profit=80.0, division=40, mode=Compounding.FULL) == pytest.approx(252.0)
+
+
+def test_loss_does_not_reduce_amount() -> None:
+    # 원전 §4: "수익이 생길 때마다 증가" — 손실(음수 차익) 매도는 회당금액을 줄이지 않는다.
+    assert update_per_round_amount(250.0, realized_profit=-80.0, division=40, mode=Compounding.HALF) == 250.0
+    assert update_per_round_amount(250.0, realized_profit=-80.0, division=40, mode=Compounding.FULL) == 250.0
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -288,7 +307,8 @@ Create `src/infinite_buying/domain/per_round_amount.py`:
 - 반복리(HALF, 기본): 회당금액 + 수익/2/분할수.
 - 복리(FULL): 회당금액 + 수익/분할수.
 예) 250불, 수익 80불, 40분할 → 반복리 251불, 복리 252불.
-원전: docs/무한매수법.md §4.
+원전 §4는 "수익이 생길 때마다 회당금액이 증가한다"이므로, 손실(음수 차익) 매도는
+회당금액을 줄이지 않는다(증가 전용). 원전: docs/무한매수법.md §4.
 """
 
 from enum import StrEnum
@@ -308,18 +328,18 @@ def update_per_round_amount(
     division: int,
     mode: Compounding,
 ) -> float:
-    """실현 수익을 반영해 회당금액을 갱신한다.
+    """실현 수익을 반영해 회당금액을 갱신한다(증가 전용).
 
     Args:
         current: 현재 회당금액.
-        realized_profit: 이번에 실현된 수익(매도 차익).
+        realized_profit: 이번에 실현된 수익(매도 차익). 0 이하면 갱신 없음.
         division: 분할수.
         mode: 단리/반복리/복리.
 
     Returns:
         갱신된 회당금액.
     """
-    if mode is Compounding.SIMPLE:
+    if mode is Compounding.SIMPLE or realized_profit <= 0:
         return current
     if mode is Compounding.HALF:
         return current + realized_profit / 2 / division
@@ -329,7 +349,7 @@ def update_per_round_amount(
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/infinite_buying/domain/test_per_round_amount.py -v`
-Expected: PASS (3 tests)
+Expected: PASS (4 tests)
 
 - [ ] **Step 5: Lint + commit**
 
@@ -354,8 +374,11 @@ git commit -m "feat(infinite-buying): add per-round-amount update (simple/half/f
   - `apply_buy(state: PositionState, fill_price: float, fill_qty: int) -> PositionState`
   - `apply_sell(state: PositionState, fill_price: float, fill_qty: int) -> tuple[PositionState, float]` — (새 상태, 실현수익)
   - `is_cycle_complete(state: PositionState) -> bool`
+  - `next_cycle_seed(prev_cycle_no: int) -> tuple[PositionState, int]` — 전량 청산 후 새 사이클 시드 `(빈 PositionState, prev_cycle_no + 1)`
 
-불변식: `avg_price == cumulative_buy / holding_qty` (보유 0이면 0.0). 매도는 평단을 바꾸지 않고 매수누적액을 비례 감소시킨다 → T가 비례 하락(쿼터매도 시 ≈0.75배). 이 값들이 Task 3 `update_per_round_amount(realized_profit=...)`의 입력이 된다.
+불변식: `avg_price == cumulative_buy / holding_qty` (보유 0이면 0.0). 매도는 평단을 바꾸지 않고 매수누적액을 비례 감소시킨다 → T가 비례 하락(쿼터매도 시 ≈0.75배). 매도수량이 보유수량을 넘으면 보유는 0으로 클램프(음수 방지).
+
+> 범위 노트: `apply_sell`이 반환하는 per-fill `realized`와 `next_cycle_seed`의 결과를 실제 `per_round_amount` 갱신·`realized_pnl` 누적·DB 반영으로 **연결(wiring)하는 것은 Phase 2 대조잡(reconcile_fills)의 책임**이다. Phase 1은 이 순수 계산들이 정확함을 단위테스트로 보장하는 데 한정한다. (스펙 §4 대조잡 참조)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -371,6 +394,7 @@ from src.infinite_buying.domain.position_math import (
     apply_buy,
     apply_sell,
     is_cycle_complete,
+    next_cycle_seed,
 )
 
 
@@ -421,6 +445,20 @@ def test_full_liquidation_completes_cycle() -> None:
 
 def test_cycle_not_complete_while_holding() -> None:
     assert is_cycle_complete(PositionState(holding_qty=5, cumulative_buy=200.0)) is False
+
+
+def test_oversell_clamps_holding_to_zero() -> None:
+    # 비정상 입력(매도수량 > 보유수량)이라도 보유수량이 음수가 되지 않는다.
+    s = PositionState(holding_qty=3, cumulative_buy=150.0)
+    new_state, _ = apply_sell(s, fill_price=60.0, fill_qty=5)
+    assert new_state.holding_qty == 0
+    assert new_state.cumulative_buy == pytest.approx(0.0)
+
+
+def test_next_cycle_seed_resets_state_and_increments_cycle() -> None:
+    seed_state, next_no = next_cycle_seed(prev_cycle_no=1)
+    assert seed_state == PositionState(holding_qty=0, cumulative_buy=0.0)
+    assert next_no == 2
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -471,24 +509,34 @@ def apply_sell(state: PositionState, fill_price: float, fill_qty: int) -> tuple[
     """매도 체결 반영: 보유수량·매수누적액 비례 감소. 반환 (새 상태, 실현수익).
 
     매수누적액은 평단×매도수량(원가)만큼 줄어 평단이 유지된다.
-    실현수익 = (체결가 - 평단) × 매도수량.
+    실현수익 = (체결가 - 평단) × 매도수량. 매도수량이 보유수량을 넘으면 보유분까지만 매도(음수 방지).
     """
+    sold = min(fill_qty, state.holding_qty)
     avg = state.avg_price
-    new_qty = state.holding_qty - fill_qty
-    new_cumulative = state.cumulative_buy - avg * fill_qty
-    realized = (fill_price - avg) * fill_qty
+    new_qty = state.holding_qty - sold
+    new_cumulative = state.cumulative_buy - avg * sold
+    realized = (fill_price - avg) * sold
     return PositionState(holding_qty=new_qty, cumulative_buy=max(new_cumulative, 0.0)), realized
 
 
 def is_cycle_complete(state: PositionState) -> bool:
     """보유수량이 0이면 사이클 종료(전량 청산)."""
     return state.holding_qty == 0
+
+
+def next_cycle_seed(prev_cycle_no: int) -> tuple[PositionState, int]:
+    """전량 청산 후 새 사이클의 시드를 반환한다: (빈 상태, 다음 사이클 번호).
+
+    원전 §5: 지정가매도로 전량 청산되면 사이클이 끝나고 첫 매수부터 새 사이클 시작.
+    회당금액(per_round_amount)은 사이클 간 이어지므로 이 함수가 다루지 않는다(서비스 책임).
+    """
+    return PositionState(holding_qty=0, cumulative_buy=0.0), prev_cycle_no + 1
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `uv run pytest tests/infinite_buying/domain/test_position_math.py -v`
-Expected: PASS (6 tests)
+Expected: PASS (8 tests)
 
 - [ ] **Step 5: Lint + commit**
 
@@ -569,7 +617,7 @@ class InfiniteBuyingConfig(Base, TimestampMixin):
 
     __tablename__ = "infinite_buying_config"
 
-    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=True, index=True)
     division: Mapped[int] = mapped_column(Integer, nullable=False, default=40, comment="분할수")
     base_gap: Mapped[float] = mapped_column(Float, nullable=False, comment="종목별 최대 괴리율(%포인트): TQQQ=15, SOXL=20")
@@ -587,7 +635,7 @@ class InfiniteBuyingPosition(Base, TimestampMixin):
 
     __tablename__ = "infinite_buying_position"
 
-    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     ticker_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     cycle_no: Mapped[int] = mapped_column(Integer, nullable=False, comment="사이클 번호 (1부터)")
     holding_qty: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="보유수량")
@@ -610,7 +658,7 @@ class InfiniteBuyingOrder(Base, TimestampMixin):
 
     __tablename__ = "infinite_buying_order"
 
-    id: Mapped[int | None] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     position_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     kis_order_no: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="KIS 주문번호")
     side: Mapped[str] = mapped_column(String(4), nullable=False, comment="buy/sell")
@@ -628,6 +676,8 @@ class InfiniteBuyingOrder(Base, TimestampMixin):
 ```
 
 > 참고: `BigInteger, Boolean, Date, Float, Identity, Index, Integer, String, true`와 `Mapped, mapped_column`은 이미 `models.py` 상단에서 import되어 있다(파일 1-26행 확인). 추가 import 불필요.
+>
+> ⚠️ **PK 패턴 주의 (검증됨):** 대리키 PK는 `Ticker`(models.py:161)와 동일한 `Integer, primary_key=True, autoincrement=True`를 쓴다. 코드베이스의 다른 `BigInteger + Identity(always=True)` 모델들은 **자연키 복합 PK**(`PrimaryKeyConstraint`)를 가진 경우라 `id`가 `nullable=True`·non-PK다. `BigInteger + Identity(always=True) + primary_key=True` 조합을 그대로 쓰면 **SQLite 테스트 하니스(conftest.py의 `create_all`)에서 `FlushError: NULL identity key`로 실패**한다(직접 재현 확인). `ticker_id`/`position_id`는 PK가 아니므로 기존처럼 `BigInteger` 유지.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -665,12 +715,12 @@ def upgrade() -> None:
     """Create infinite_buying_config / _position / _order tables."""
     op.create_table(
         "infinite_buying_config",
-        sa.Column("id", sa.BigInteger(), sa.Identity(always=True), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("ticker_id", sa.BigInteger(), nullable=False),
-        sa.Column("division", sa.Integer(), nullable=False),
+        sa.Column("division", sa.Integer(), server_default="40", nullable=False),
         sa.Column("base_gap", sa.Float(), nullable=False),
         sa.Column("allocation", sa.Float(), nullable=False),
-        sa.Column("compounding", sa.String(length=8), nullable=False),
+        sa.Column("compounding", sa.String(length=8), server_default="half", nullable=False),
         sa.Column("sell_limit_pct", sa.Float(), nullable=False),
         sa.Column("active", sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -682,15 +732,15 @@ def upgrade() -> None:
 
     op.create_table(
         "infinite_buying_position",
-        sa.Column("id", sa.BigInteger(), sa.Identity(always=True), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("ticker_id", sa.BigInteger(), nullable=False),
         sa.Column("cycle_no", sa.Integer(), nullable=False),
-        sa.Column("holding_qty", sa.Integer(), nullable=False),
-        sa.Column("cumulative_buy", sa.Float(), nullable=False),
+        sa.Column("holding_qty", sa.Integer(), server_default="0", nullable=False),
+        sa.Column("cumulative_buy", sa.Float(), server_default="0", nullable=False),
         sa.Column("per_round_amount", sa.Float(), nullable=False),
-        sa.Column("phase", sa.String(length=16), nullable=False),
-        sa.Column("status", sa.String(length=8), nullable=False),
-        sa.Column("realized_pnl", sa.Float(), nullable=False),
+        sa.Column("phase", sa.String(length=16), server_default="first_half", nullable=False),
+        sa.Column("status", sa.String(length=8), server_default="active", nullable=False),
+        sa.Column("realized_pnl", sa.Float(), server_default="0", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -700,7 +750,7 @@ def upgrade() -> None:
 
     op.create_table(
         "infinite_buying_order",
-        sa.Column("id", sa.BigInteger(), sa.Identity(always=True), nullable=False),
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("position_id", sa.BigInteger(), nullable=False),
         sa.Column("kis_order_no", sa.String(length=32), nullable=True),
         sa.Column("side", sa.String(length=4), nullable=False),
@@ -708,8 +758,8 @@ def upgrade() -> None:
         sa.Column("order_division", sa.String(length=8), nullable=False),
         sa.Column("target_price", sa.Float(), nullable=False),
         sa.Column("qty", sa.Integer(), nullable=False),
-        sa.Column("status", sa.String(length=8), nullable=False),
-        sa.Column("filled_qty", sa.Integer(), nullable=False),
+        sa.Column("status", sa.String(length=8), server_default="pending", nullable=False),
+        sa.Column("filled_qty", sa.Integer(), server_default="0", nullable=False),
         sa.Column("filled_price", sa.Float(), nullable=True),
         sa.Column("trade_date", sa.Date(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -900,7 +950,7 @@ git commit -m "feat(infinite-buying): add config/position ledger repositories"
 - [ ] **Step 1: Full lint/type/test sweep**
 
 Run: `uv run ruff check src/ tests/ && uv run mypy src/ && uv run pytest tests/infinite_buying/ -q`
-Expected: all pass (도메인 17 + 리포지토리 4 = 21 tests).
+Expected: all pass (도메인 20 [separation 4 + progress 4 + per_round 4 + position_math 8] + 리포지토리 4 = 24 tests).
 
 - [ ] **Step 2: Confirm domain purity (no KIS/DB imports)**
 
@@ -909,7 +959,10 @@ Expected: `pure ok`
 
 - [ ] **Step 3: Mark Phase 1 done in the spec**
 
-In `docs/superpowers/specs/2026-06-20-infinite-buying-design.md`, update the `상태:` line to note Phase 1(도메인 코어 + 원장 영속화) 구현 완료, Phase 2(KIS 어댑터·서비스·스케줄·order_plan) 대기. Add a one-line pointer to `docs/superpowers/plans/2026-06-20-infinite-buying-phase1.md`.
+In `docs/superpowers/specs/2026-06-20-infinite-buying-design.md`:
+1. `상태:` 라인에 Phase 1(도메인 코어 + 원장 영속화) 구현 완료, Phase 2(KIS 어댑터·서비스·스케줄·order_plan) 대기 표기 + 계획서(`docs/superpowers/plans/2026-06-20-infinite-buying-phase1.md`) 포인터 1줄 추가.
+2. §5 `infinite_buying_position`의 `avg_price` 줄에 "**저장 안 함 — `cumulative_buy / holding_qty`로 파생** (T와 동일한 단일근원 원칙)" 명시(스펙↔구현 일치).
+3. §5에 한 줄 추가: "`realized_pnl` 누적과 `per_round_amount` 재도출(매도 차익 반영)은 Phase 2 대조잡(reconcile_fills) 책임. Phase 1 컬럼은 write-target."
 
 - [ ] **Step 4: Commit**
 
@@ -924,10 +977,25 @@ git commit -m "docs(infinite-buying): mark phase 1 (domain core + ledger) comple
 
 - **Spec coverage (Phase 1 범위):**
   - §3 별지점 → Task 1. §3 T·전반전/후반전 → Task 2. §4 회당금액(단리/반복리/복리) → Task 3.
-  - §4~§5 체결 반영 평단·보유·누적액 재계산 + 쿼터매도 T≈0.75 + 사이클 종료 → Task 4.
+  - §4~§5 체결 반영 평단·보유·누적액 재계산 + 쿼터매도 T≈0.75 + 사이클 종료/재시작(next_cycle_seed) → Task 4.
   - §5 DB 모델(position/order/config) → Task 5 + 마이그레이션. 리포지토리 → Task 6.
   - **Phase 2로 이월(스펙 §9 리서치 의존):** order_plan 합성(첫매수/별지점/평단/여유매수 단 구성), KIS 어댑터(LOC/MOC/AFTER 지정가·체결조회), 서비스 오케스트레이션(place_daily_orders/reconcile_fills), 스케줄(발주/대조), 설정 API/UI, 전략 전용 계좌.
 - **Type consistency:** `PositionState`(Task 4) ↔ 모델 `holding_qty/cumulative_buy`(Task 5) 명칭 일치. `Phase`(progress.py) 값 `first_half/second_half` ↔ position.phase 컬럼 코멘트 일치. `Compounding` 값 `simple/half/full` ↔ config.compounding 컬럼 코멘트·테스트 값 일치. `apply_sell` 반환 realized_profit ↔ Task 3 `update_per_round_amount(realized_profit=...)` 입력 연결.
 - **No placeholders:** 모든 코드 스텝에 완전한 구현/테스트 포함. order_plan·서비스 등 미확정 부분은 stub로 넣지 않고 Phase 2로 명시 분리.
 - **마이그레이션 주의:** Task 5 Step 7-8 — `alembic upgrade`는 호스트 확인·사용자 승인 후에만(prod 오적용 방지).
 - **모델 위치 결정:** 스펙은 `src/infinite_buying/model.py`를 제안했으나, alembic autogenerate와 `Base.metadata`가 중앙 `models.py`를 스캔하는 코드베이스 관례를 따라 모델은 `src/database/models.py`에 둔다. 리포지토리는 bounded context 응집을 위해 모듈-로컬 유지.
+
+## 교차검증 반영 (Codex + critic, 2026-06-20)
+
+- **[CRITICAL 적용] PK 패턴:** `BigInteger + Identity(always=True) + primary_key=True`는 SQLite 테스트(`conftest.py` `create_all`)에서 `FlushError`로 실패함을 직접 재현 → 3모델 모두 `Ticker` 관례인 `Integer, primary_key=True, autoincrement=True`로 교체, 마이그레이션도 `sa.Integer()+autoincrement`로 정렬.
+- **[CRITICAL 적용] 손실 매도 회당금액 보호(C1):** `update_per_round_amount`에 `realized_profit<=0`이면 불변 가드(원전 "수익 시에만 증가") + 테스트.
+- **[Major 적용] over-sell 가드(C2):** `apply_sell`이 보유수량까지만 매도(`min`) → 음수 보유 방지 + 테스트.
+- **[Major 적용] 사이클 재시작:** 스펙 §3 `cycle.py`의 "신규 진입" 책임을 `position_math.next_cycle_seed(prev_cycle_no)` 순수 함수로 구현 + 테스트(빈 상태·cycle_no+1).
+- **[Major 적용] 테스트 패키지 마커:** `tests/infinite_buying/__init__.py`·`.../domain/__init__.py` 추가(pytest importmode=prepend, 기존 모든 test 디렉토리 관례).
+- **[Major 문서화] avg_price 스펙 편차:** 스펙 §5는 저장 컬럼으로 명시했으나 `cumulative_buy/holding_qty`로 **파생**(T 단일근원 원칙과 동일). Task 7에서 스펙 §5 갱신.
+- **[Major 문서화] realized_pnl·per_round_amount 연결:** 누적/재도출은 Phase 2 대조잡 책임으로 명확화(Phase 1 순수 함수는 입력값만 정확히 산출). prose 과장 제거.
+- **[Minor 적용] server_default:** 마이그레이션의 default 보유 NOT NULL 컬럼에 server_default 정렬(비-ORM 삽입 안전, 컨벤션 일치).
+- **[Minor 결정] 금액 타입 Float 유지:** 사용자 결정 — 도메인 계산이 float이고 경계 변환 불필요. 누적 부동소수점 오차는 주식 수량·달러 단위라 실용상 무시 가능.
+- **[Phase 2 이월] 종목당 다중 active 사이클 방지:** 다중 사이클을 쓰는 writer(재시작 반영)가 Phase 2이므로, `(ticker_id) WHERE status='active'` 부분 유니크 인덱스는 Phase 2에서 추가.
+- **[유지] FK 미설정:** `ticker_id`/`position_id`에 FK를 두지 않음 — candle/stock 등 대용량 테이블의 plain `ticker_id` 관례와 일치. (참조 무결성은 애플리케이션 레벨)
+- **[기각] 테스트 카운트:** critic이 progress를 5개로 오산. 실제 progress 4개. 최종 도메인 20 + 리포지토리 4 = 24.
