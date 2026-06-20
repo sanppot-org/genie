@@ -9,6 +9,7 @@ from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic.account_type import AccountType
 from src.hantu.model.domestic.trading_currency_code import TradingCurrencyCode
 from src.hantu.model.overseas import balance as overseas_balance
+from src.hantu.model.overseas import execution as overseas_execution
 from src.hantu.model.overseas import order as overseas_order
 from src.hantu.model.overseas.asset_type import OverseasAssetType
 from src.hantu.model.overseas.candle_period import OverseasCandlePeriod
@@ -129,6 +130,91 @@ class HantuOverseasAPI(HantuBaseAPI):
         else:
             # 모든 페이지 수집 완료
             return accumulated_output1, response_body.output2
+
+    def inquire_ccnl(
+            self,
+            start_date: str,
+            end_date: str,
+            exchange_code: OverseasExchangeCode = OverseasExchangeCode.NASD,
+            sell_buy_dvsn: str = "00",
+            ccld_dvsn: str = "00",
+            symbol: str = "%",
+    ) -> list[overseas_execution.ExecutionRecord]:
+        """해외주식 주문체결내역 조회 (기간 내 전 페이지 누적).
+
+        Args:
+            start_date: 조회 시작일 YYYYMMDD (현지시각 기준)
+            end_date: 조회 종료일 YYYYMMDD
+            exchange_code: 거래소코드 (기본 NASD)
+            sell_buy_dvsn: 00:전체 01:매도 02:매수 (모의투자는 00)
+            ccld_dvsn: 00:전체 01:체결 02:미체결 (모의투자는 00)
+            symbol: 종목코드, "%"는 전종목
+
+        Returns:
+            ExecutionRecord 리스트 (주문번호 odno로 우리가 낸 주문과 대조).
+        """
+        return self._inquire_ccnl_recursive(
+            start_date=start_date, end_date=end_date, exchange_code=exchange_code,
+            sell_buy_dvsn=sell_buy_dvsn, ccld_dvsn=ccld_dvsn, symbol=symbol,
+        )
+
+    def _inquire_ccnl_recursive(
+            self,
+            start_date: str,
+            end_date: str,
+            exchange_code: OverseasExchangeCode,
+            sell_buy_dvsn: str,
+            ccld_dvsn: str,
+            symbol: str,
+            ctx_area_fk200: str = "",
+            ctx_area_nk200: str = "",
+            continuation_flag: str = "",
+            accumulated: list[overseas_execution.ExecutionRecord] | None = None,
+    ) -> list[overseas_execution.ExecutionRecord]:
+        """체결조회 연속조회(내부). tr_cont M/F면 다음 페이지를 이어 받는다(잔고조회와 동형)."""
+        if accumulated is None:
+            accumulated = []
+
+        url = f"{self.url_base}/uapi/overseas-stock/v1/trading/inquire-ccnl"
+        tr_id = "TTTS3035R" if self.account_type == AccountType.REAL else "VTTS3035R"
+        # 모의투자는 SORT_SQN 미지원
+        sort_sqn = "DS" if self.account_type == AccountType.REAL else ""
+
+        header = overseas_execution.RequestHeader(
+            authorization=f"Bearer {self._get_token()}",
+            appkey=self.app_key,
+            appsecret=self.app_secret,
+            tr_id=tr_id,
+            tr_cont=continuation_flag,
+        )
+        param = overseas_execution.RequestQueryParam(
+            CANO=self.cano,
+            ACNT_PRDT_CD=self.acnt_prdt_cd,
+            PDNO=symbol,
+            ORD_STRT_DT=start_date,
+            ORD_END_DT=end_date,
+            SLL_BUY_DVSN=sell_buy_dvsn,
+            CCLD_NCCS_DVSN=ccld_dvsn,
+            OVRS_EXCG_CD=exchange_code.value,
+            SORT_SQN=sort_sqn,
+            CTX_AREA_FK200=ctx_area_fk200,
+            CTX_AREA_NK200=ctx_area_nk200,
+        )
+
+        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        self._validate_response(res)
+        body = overseas_execution.ResponseBody.model_validate(res.json())
+        accumulated.extend(body.output)
+
+        if res.headers.get("tr_cont", "") in ["M", "F"]:
+            time.sleep(0.1)
+            return self._inquire_ccnl_recursive(
+                start_date=start_date, end_date=end_date, exchange_code=exchange_code,
+                sell_buy_dvsn=sell_buy_dvsn, ccld_dvsn=ccld_dvsn, symbol=symbol,
+                ctx_area_fk200=body.ctx_area_fk200, ctx_area_nk200=body.ctx_area_nk200,
+                continuation_flag="N", accumulated=accumulated,
+            )
+        return accumulated
 
     def get_current_price(self, exchange_code: OverseasMarketCode = OverseasMarketCode.NYS, symbol: str = "") -> OverseasCurrentPriceResponse:
         """해외 주식 현재체결가 조회
