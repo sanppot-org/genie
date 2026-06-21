@@ -29,6 +29,7 @@ from src.database.stock_income_statement_repository import StockIncomeStatementR
 from src.database.stock_treasury_stock_repository import StockTreasuryStockRepository
 from src.database.ticker_repository import TickerRepository
 from src.hantu import HantuDomesticAPI, HantuOverseasAPI
+from src.infinite_buying.service import InfiniteBuyingService
 from src.providers import HantuOverseasCandleClient
 from src.providers.binance_candle_client import BinanceCandleClient
 from src.providers.dart_company_client import DartCompanyClient
@@ -337,4 +338,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
         income_statement_repository=stock_income_statement_repository,
         financial_ratio_repository=stock_financial_ratio_repository,
         screening_service=screening_service,
+    )
+    infinite_buying_service = providers.Factory(
+        InfiniteBuyingService,
+        database=database,
+        overseas_api=hantu_overseas_api,
     )
