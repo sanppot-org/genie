@@ -73,5 +73,46 @@ def test_place_skips_ticker_without_exchange(db: Database) -> None:
     api.buy_loc_order.assert_not_called()
 
 
+def test_place_sell_routing_calls_correct_api_and_records_orders(db: Database) -> None:
+    """전반전 매도 경로: quarter_sell→LOC, limit_sell→LIMIT. 포지션 상태 미변경 확인."""
+    api = MagicMock()
+    api.buy_loc_order.return_value = _order_resp("ODNO_BUY")
+    api.sell_loc_order.return_value = _order_resp("ODNO_QLOC")
+    api.sell_limit_order.return_value = _order_resp("ODNO_LMT")
+
+    with db.session_scope() as s:
+        from src.database.models import InfiniteBuyingPosition
+        ticker_id = _seed(s, exchange="NAS")
+        # 기존 활성 포지션: holding_qty=16, cumulative_buy=740.0 → 전반전, 매수 가능
+        s.add(InfiniteBuyingPosition(
+            ticker_id=ticker_id, cycle_no=1,
+            holding_qty=16, cumulative_buy=740.0,
+            per_round_amount=250.0, phase="first_half",
+            status="active", realized_pnl=0.0,
+        ))
+
+    service = InfiniteBuyingService(database=db, overseas_api=api)
+    result = service.place_daily_orders(now=date(2026, 6, 19))
+
+    # 전반전: buy × 2 (separation_buy + avg_buy) + sell × 2 (quarter_sell LOC + limit_sell LIMIT)
+    assert result.placed == 4
+
+    api.sell_loc_order.assert_called()   # quarter_sell → LOC
+    api.sell_limit_order.assert_called()  # limit_sell  → LIMIT
+
+    with db.session_scope() as s:
+        pos = InfiniteBuyingPositionRepository(s).find_active_by_ticker(_only_ticker_id(s))
+        assert pos is not None
+        # 발주잡은 포지션 상태를 변경하지 않는다
+        assert pos.holding_qty == 16
+        assert pos.cumulative_buy == 740.0
+
+        orders = InfiniteBuyingOrderRepository(s).find_pending_by_position(pos.id)
+        kinds = {o.order_kind: o for o in orders}
+
+        assert kinds["quarter_sell"].order_division == "LOC"
+        assert kinds["limit_sell"].order_division == "LIMIT"
+
+
 def _only_ticker_id(session: Session) -> int:
     return session.query(Ticker).filter(Ticker.ticker == "TQQQ").one().id

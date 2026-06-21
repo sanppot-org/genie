@@ -94,7 +94,7 @@ class InfiniteBuyingService:
         """intent를 KIS 주문으로 발주하고 주문번호(ODNO)를 반환."""
         if intent.side == "buy":  # v1: 매수는 LOC만
             resp = self._api.buy_loc_order(symbol, intent.qty, _fmt_price(intent.target_price), exchange)
-        elif intent.order_kind == "limit_sell":
+        elif intent.order_kind == "limit_sell" and intent.order_division == "LIMIT":
             resp = self._api.sell_limit_order(symbol, intent.qty, _fmt_price(intent.target_price), exchange)
         elif intent.order_division == "MOC":
             resp = self._api.sell_moc_order(symbol, intent.qty, exchange)
@@ -117,6 +117,7 @@ class InfiniteBuyingService:
     @staticmethod
     def _latest_close(session: object, ticker_id: int, before: date) -> float | None:
         """before 이전 가장 최근 raw 종가 (전일종가)."""
+        # find_by_ticker returns rows ordered by date ascending, so prior[-1] is the most recent close.
         rows = StockDailyCandleRepository(session).find_by_ticker(ticker_id, to_date=before)  # type: ignore[arg-type]
         prior = [r for r in rows if r.date < before]
         return prior[-1].close if prior else None
