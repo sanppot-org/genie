@@ -62,6 +62,9 @@ def test_reconcile_applies_buy_fill_to_position(db: Database) -> None:
         assert pos.cumulative_buy == 200.0  # 4*50
         order = InfiniteBuyingOrderRepository(s).find_by_kis_order_no("ODNO_FB")
         assert order.status == "filled" and order.filled_qty == 4 and order.filled_price == 50.0
+        assert order.trade_date == date(2026, 6, 19)
+        # T = cumulative_buy / per_round = 200 / 250 = 0.8; half = division/2 = 20; 0.8 < 20 → first_half
+        assert pos.phase == "first_half"
 
 
 def test_reconcile_full_liquidation_closes_cycle_and_seeds_next(db: Database) -> None:

@@ -11,6 +11,8 @@ reconcile_fills(대조잡): inquire_ccnl 체결 대조 → position_math로 평�
 from dataclasses import dataclass, field
 from datetime import date
 
+from sqlalchemy.orm import Session
+
 from src.database.database import Database
 from src.database.models import InfiniteBuyingConfig, InfiniteBuyingOrder, InfiniteBuyingPosition, Ticker
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
@@ -68,7 +70,7 @@ def _fmt_price(price: float) -> str:
 def _sorted_for_apply(orders: list[InfiniteBuyingOrder]) -> list[InfiniteBuyingOrder]:
     """체결 적용 순서: 매수 → 쿼터매도 → 지정가매도 (평단 일관성)."""
     rank = {"buy": 0, "quarter_sell": 1, "limit_sell": 2}
-    return sorted(orders, key=lambda o: rank.get(o.order_kind if o.side == "sell" else "buy", 0))
+    return sorted(orders, key=lambda o: rank.get(o.order_kind if o.side == "sell" else "buy", 99))
 
 
 class InfiniteBuyingService:
@@ -126,9 +128,9 @@ class InfiniteBuyingService:
             resp = self._api.sell_loc_order(symbol, intent.qty, _fmt_price(intent.target_price), exchange)
         return resp.output.ODNO
 
-    def _ensure_active_position(self, session: object, ticker_id: int, allocation: float, division: int) -> InfiniteBuyingPosition:
+    def _ensure_active_position(self, session: Session, ticker_id: int, allocation: float, division: int) -> InfiniteBuyingPosition:
         """활성 사이클이 없으면 cycle 1을 생성해 반환."""
-        repo = InfiniteBuyingPositionRepository(session)  # type: ignore[arg-type]
+        repo = InfiniteBuyingPositionRepository(session)
         existing = repo.find_active_by_ticker(ticker_id)
         if existing is not None:
             return existing
@@ -164,7 +166,7 @@ class InfiniteBuyingService:
 
     def _apply_fills(
         self,
-        session: object,
+        session: Session,
         cfg: InfiniteBuyingConfig,
         position: InfiniteBuyingPosition,
         pending: list[InfiniteBuyingOrder],
@@ -206,7 +208,7 @@ class InfiniteBuyingService:
         if is_cycle_complete(state):
             position.status = "closed"
             _seed_state, next_no = next_cycle_seed(position.cycle_no)
-            InfiniteBuyingPositionRepository(session).save(InfiniteBuyingPosition(  # type: ignore[arg-type]
+            InfiniteBuyingPositionRepository(session).save(InfiniteBuyingPosition(
                 ticker_id=position.ticker_id, cycle_no=next_no, holding_qty=0, cumulative_buy=0.0,
                 per_round_amount=per_round, phase="first_half", status="active", realized_pnl=0.0,
             ))
@@ -214,9 +216,9 @@ class InfiniteBuyingService:
         return False
 
     @staticmethod
-    def _latest_close(session: object, ticker_id: int, before: date) -> float | None:
+    def _latest_close(session: Session, ticker_id: int, before: date) -> float | None:
         """before 이전 가장 최근 raw 종가 (전일종가)."""
         # find_by_ticker returns rows ordered by date ascending, so prior[-1] is the most recent close.
-        rows = StockDailyCandleRepository(session).find_by_ticker(ticker_id, to_date=before)  # type: ignore[arg-type]
+        rows = StockDailyCandleRepository(session).find_by_ticker(ticker_id, to_date=before)
         prior = [r for r in rows if r.date < before]
         return prior[-1].close if prior else None
