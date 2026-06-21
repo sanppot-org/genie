@@ -42,15 +42,16 @@ def main() -> None:
         if ticker is None or ticker.id is None:
             raise SystemExit(f"티커 미등록: {args.ticker} (register_us_tickers.py로 먼저 등록)")
         rows = StockDailyCandleRepository(session).find_by_ticker(ticker.id, from_date, to_date)
+        # 세션 유효 동안 DailyBar로 변환 (세션 종료 후 ORM 객체는 detached → 속성 접근 불가)
+        bars = [
+            DailyBar(
+                date=r.date,
+                high=r.adj_high if r.adj_high is not None else r.high,
+                close=r.adj_close if r.adj_close is not None else r.close,
+            )
+            for r in rows
+        ]
 
-    bars = [
-        DailyBar(
-            date=r.date,
-            high=r.adj_high if r.adj_high is not None else r.high,
-            close=r.adj_close if r.adj_close is not None else r.close,
-        )
-        for r in rows
-    ]
     if not bars:
         raise SystemExit(f"일봉 데이터 없음: {args.ticker} (backfill_us_daily_candles.py로 백필)")
 
