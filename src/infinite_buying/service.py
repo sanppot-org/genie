@@ -12,12 +12,21 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from src.database.database import Database
-from src.database.models import InfiniteBuyingOrder, InfiniteBuyingPosition, Ticker
+from src.database.models import InfiniteBuyingConfig, InfiniteBuyingOrder, InfiniteBuyingPosition, Ticker
 from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.hantu.model.overseas.exchange_code import OverseasExchangeCode
+from src.hantu.model.overseas.execution import ExecutionRecord
 from src.hantu.overseas_api import HantuOverseasAPI
 from src.infinite_buying.domain.order_plan import OrderIntent, build_daily_plan
-from src.infinite_buying.domain.position_math import PositionState
+from src.infinite_buying.domain.per_round_amount import Compounding, update_per_round_amount
+from src.infinite_buying.domain.position_math import (
+    PositionState,
+    apply_buy,
+    apply_sell,
+    is_cycle_complete,
+    next_cycle_seed,
+)
+from src.infinite_buying.domain.progress import calc_t, phase_of
 from src.infinite_buying.repository import (
     InfiniteBuyingConfigRepository,
     InfiniteBuyingOrderRepository,
@@ -42,9 +51,24 @@ class PlaceResult:
     skipped_no_close: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ReconcileResult:
+    """대조잡 결과."""
+
+    positions: int = 0
+    filled: int = 0
+    cycles_closed: int = 0
+
+
 def _fmt_price(price: float) -> str:
     """KIS 주문 단가 문자열 (미국주식 2 decimal)."""
     return f"{round(price, 2):.2f}"
+
+
+def _sorted_for_apply(orders: list[InfiniteBuyingOrder]) -> list[InfiniteBuyingOrder]:
+    """체결 적용 순서: 매수 → 쿼터매도 → 지정가매도 (평단 일관성)."""
+    rank = {"buy": 0, "quarter_sell": 1, "limit_sell": 2}
+    return sorted(orders, key=lambda o: rank.get(o.order_kind if o.side == "sell" else "buy", 0))
 
 
 class InfiniteBuyingService:
@@ -113,6 +137,81 @@ class InfiniteBuyingService:
             ticker_id=ticker_id, cycle_no=1, holding_qty=0, cumulative_buy=0.0,
             per_round_amount=per_round, phase="first_half", status="active", realized_pnl=0.0,
         ))
+
+    def reconcile_fills(self, start_date: date, end_date: date) -> ReconcileResult:
+        """KIS 체결조회로 PENDING 주문을 대조해 평단·T·사이클·회당금액을 갱신한다."""
+        result = ReconcileResult()
+        with self._database.session_scope() as session:
+            configs = InfiniteBuyingConfigRepository(session).find_active()
+            pos_repo = InfiniteBuyingPositionRepository(session)
+            for cfg in configs:
+                position = pos_repo.find_active_by_ticker(cfg.ticker_id)
+                if position is None:
+                    continue
+                pending = InfiniteBuyingOrderRepository(session).find_pending_by_position(position.id)
+                if not pending:
+                    continue
+                ticker = session.query(Ticker).filter(Ticker.id == cfg.ticker_id).one()
+                exchange = _EXCHANGE_MAP.get(ticker.exchange or "")
+                if exchange is None:
+                    continue
+                records = self._api.inquire_ccnl(start_date.strftime("%Y%m%d"), end_date.strftime("%Y%m%d"), exchange)
+                by_odno = {r.odno: r for r in records}
+                result.positions += 1
+                if self._apply_fills(session, cfg, position, pending, by_odno, result, end_date):
+                    result.cycles_closed += 1
+        return result
+
+    def _apply_fills(
+        self,
+        session: object,
+        cfg: InfiniteBuyingConfig,
+        position: InfiniteBuyingPosition,
+        pending: list[InfiniteBuyingOrder],
+        by_odno: dict[str, ExecutionRecord],
+        result: ReconcileResult,
+        trade_date: date,
+    ) -> bool:
+        """PENDING 주문에 체결을 반영(매수→쿼터매도→지정가매도). 사이클 종료 시 True."""
+        state = PositionState(holding_qty=position.holding_qty, cumulative_buy=position.cumulative_buy)
+        per_round = position.per_round_amount
+        realized_total = position.realized_pnl
+        for order in _sorted_for_apply(pending):
+            rec = by_odno.get(order.kis_order_no or "")
+            if rec is None:
+                continue  # 이번 조회창에 없음 → PENDING 유지
+            ccld = int(rec.ft_ccld_qty)
+            if ccld <= 0:
+                order.status = "unfilled"
+                continue
+            price = float(rec.ft_ccld_unpr3)
+            if order.side == "buy":
+                state = apply_buy(state, price, ccld)
+            else:
+                state, realized = apply_sell(state, price, ccld)
+                per_round = update_per_round_amount(per_round, realized, cfg.division, Compounding.HALF)  # type: ignore[attr-defined]
+                realized_total += realized
+            order.status = "filled"
+            order.filled_qty = ccld
+            order.filled_price = price
+            order.trade_date = trade_date
+            result.filled += 1
+
+        position.holding_qty = state.holding_qty
+        position.cumulative_buy = state.cumulative_buy
+        position.per_round_amount = per_round
+        position.realized_pnl = realized_total
+        position.phase = phase_of(calc_t(state.cumulative_buy, per_round), cfg.division).value  # type: ignore[attr-defined]
+
+        if is_cycle_complete(state):
+            position.status = "closed"
+            _seed_state, next_no = next_cycle_seed(position.cycle_no)
+            InfiniteBuyingPositionRepository(session).save(InfiniteBuyingPosition(  # type: ignore[arg-type]
+                ticker_id=position.ticker_id, cycle_no=next_no, holding_qty=0, cumulative_buy=0.0,
+                per_round_amount=per_round, phase="first_half", status="active", realized_pnl=0.0,
+            ))
+            return True
+        return False
 
     @staticmethod
     def _latest_close(session: object, ticker_id: int, before: date) -> float | None:
