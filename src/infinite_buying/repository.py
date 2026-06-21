@@ -5,7 +5,7 @@
 """
 
 from src.database.base_repository import BaseRepository
-from src.database.models import InfiniteBuyingConfig, InfiniteBuyingPosition
+from src.database.models import InfiniteBuyingConfig, InfiniteBuyingOrder, InfiniteBuyingPosition
 
 
 class InfiniteBuyingConfigRepository(BaseRepository[InfiniteBuyingConfig, int]):
@@ -53,5 +53,35 @@ class InfiniteBuyingPositionRepository(BaseRepository[InfiniteBuyingPosition, in
                 InfiniteBuyingPosition.status == "active",
             )
             .order_by(InfiniteBuyingPosition.cycle_no.desc())
+            .first()
+        )
+
+
+class InfiniteBuyingOrderRepository(BaseRepository[InfiniteBuyingOrder, int]):
+    """무한매수법 발주 원장 리포지토리. 발주잡이 PENDING 기록, 대조잡이 체결 갱신."""
+
+    def _get_model_class(self) -> type[InfiniteBuyingOrder]:
+        return InfiniteBuyingOrder
+
+    def _get_unique_constraint_fields(self) -> tuple[str, ...]:
+        return ("id",)
+
+    def find_pending_by_position(self, position_id: int) -> list[InfiniteBuyingOrder]:
+        """해당 포지션의 PENDING 주문 목록 (대조 대상)."""
+        return (
+            self.session.query(InfiniteBuyingOrder)
+            .filter(
+                InfiniteBuyingOrder.position_id == position_id,
+                InfiniteBuyingOrder.status == "pending",
+            )
+            .order_by(InfiniteBuyingOrder.id)
+            .all()
+        )
+
+    def find_by_kis_order_no(self, kis_order_no: str) -> InfiniteBuyingOrder | None:
+        """KIS 주문번호로 조회."""
+        return (
+            self.session.query(InfiniteBuyingOrder)
+            .filter(InfiniteBuyingOrder.kis_order_no == kis_order_no)
             .first()
         )
