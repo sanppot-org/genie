@@ -114,5 +114,30 @@ def test_place_sell_routing_calls_correct_api_and_records_orders(db: Database) -
         assert kinds["limit_sell"].order_division == "LIMIT"
 
 
+def test_place_is_idempotent_on_same_date(db: Database) -> None:
+    """같은 날 두 번 호출해도 실주문은 1회만 — 재호출은 skipped_already_placed로 기록되고 API 미호출."""
+    api = MagicMock()
+    api.buy_loc_order.return_value = _order_resp("ODNO_FB")
+    with db.session_scope() as s:
+        _seed(s, exchange="NAS")
+
+    service = InfiniteBuyingService(database=db, overseas_api=api)
+
+    first = service.place_daily_orders(now=date(2026, 6, 19))
+    assert first.placed == 1
+    assert api.buy_loc_order.call_count == 1
+
+    second = service.place_daily_orders(now=date(2026, 6, 19))
+    assert second.placed == 0
+    assert "TQQQ" in second.skipped_already_placed
+    # 재호출 시 추가 발주 없음
+    assert api.buy_loc_order.call_count == 1
+
+    with db.session_scope() as s:
+        pos = InfiniteBuyingPositionRepository(s).find_active_by_ticker(_only_ticker_id(s))
+        orders = InfiniteBuyingOrderRepository(s).find_pending_by_position(pos.id)
+        assert len(orders) == 1  # 원장에도 1건만
+
+
 def _only_ticker_id(session: Session) -> int:
     return session.query(Ticker).filter(Ticker.ticker == "TQQQ").one().id

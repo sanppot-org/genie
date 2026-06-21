@@ -10,6 +10,7 @@ reconcile_fills(대조잡): inquire_ccnl 체결 대조 → position_math로 평�
 
 from dataclasses import dataclass, field
 from datetime import date
+import logging
 
 from sqlalchemy.orm import Session
 
@@ -42,6 +43,8 @@ _EXCHANGE_MAP: dict[str, OverseasExchangeCode] = {
     "AMS": OverseasExchangeCode.AMEX,
 }
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class PlaceResult:
@@ -51,6 +54,8 @@ class PlaceResult:
     placed: int = 0
     skipped_no_exchange: list[str] = field(default_factory=list)
     skipped_no_close: list[str] = field(default_factory=list)
+    skipped_already_placed: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -98,25 +103,38 @@ class InfiniteBuyingService:
                     result.skipped_no_close.append(ticker.ticker)
                     continue
                 position = self._ensure_active_position(session, cfg.ticker_id, cfg.allocation, cfg.division)
+                order_repo = InfiniteBuyingOrderRepository(session)
+                # 멱등성: 같은 날 이미 발주했으면 재발주 금지 (실주문 중복 방지)
+                if order_repo.exists_for_position_on_date(position.id, today):
+                    result.skipped_already_placed.append(ticker.ticker)
+                    continue
                 state = PositionState(holding_qty=position.holding_qty, cumulative_buy=position.cumulative_buy)
                 plan = build_daily_plan(
                     state=state, per_round_amount=position.per_round_amount, prev_close=prev_close,
                     division=cfg.division, base_gap=cfg.base_gap, sell_limit_pct=cfg.sell_limit_pct,
                     allocation=cfg.allocation,
                 )
-                order_repo = InfiniteBuyingOrderRepository(session)
                 for intent in plan:
-                    odno = self._place_order(ticker.ticker, exchange, intent)
-                    order_repo.save(InfiniteBuyingOrder(
-                        position_id=position.id, kis_order_no=odno,
-                        side=intent.side, order_kind=intent.order_kind, order_division=intent.order_division,
-                        target_price=intent.target_price, qty=intent.qty, status="pending",
-                        filled_qty=0, trade_date=today,
-                    ))
-                    result.placed += 1
+                    # intent별 예외 격리: N+1 주문이 실패해도 이미 체결된 N..1 원장 행은 커밋되어야
+                    # 대조잡이 매칭할 수 있다. 예외가 session_scope 밖으로 새면 전체 롤백 → 상태 드리프트.
+                    # 잔여 리스크: KIS가 주문을 수락했으나 응답이 에러(ODNO 없음)면 기록 불가 —
+                    # fire-and-forget의 본질적 한계로 본 범위 밖.
+                    try:
+                        odno = self._place_order(ticker.ticker, exchange, intent)
+                        order_repo.save(InfiniteBuyingOrder(
+                            position_id=position.id, kis_order_no=odno,
+                            side=intent.side, order_kind=intent.order_kind, order_division=intent.order_division,
+                            target_price=intent.target_price, qty=intent.qty, status="pending",
+                            filled_qty=0, trade_date=today,
+                        ))
+                        result.placed += 1
+                    except Exception:
+                        logger.exception("발주 실패 ticker=%s kind=%s", ticker.ticker, intent.order_kind)
+                        result.failed.append(f"{ticker.ticker}:{intent.order_kind}")
+                        continue
         return result
 
-    def _place_order(self, symbol: str, exchange: OverseasExchangeCode, intent: OrderIntent) -> str | None:
+    def _place_order(self, symbol: str, exchange: OverseasExchangeCode, intent: OrderIntent) -> str:
         """intent를 KIS 주문으로 발주하고 주문번호(ODNO)를 반환."""
         if intent.side == "buy":  # v1: 매수는 LOC만
             resp = self._api.buy_loc_order(symbol, intent.qty, _fmt_price(intent.target_price), exchange)
@@ -126,6 +144,8 @@ class InfiniteBuyingService:
             resp = self._api.sell_moc_order(symbol, intent.qty, exchange)
         else:  # quarter_sell LOC
             resp = self._api.sell_loc_order(symbol, intent.qty, _fmt_price(intent.target_price), exchange)
+        # validate_response가 rt_cd!=0에서 예외를 던지므로 성공 응답은 항상 ODNO를 가진다.
+        assert resp.output.ODNO, "KIS 주문 응답에 ODNO 없음"
         return resp.output.ODNO
 
     def _ensure_active_position(self, session: Session, ticker_id: int, allocation: float, division: int) -> InfiniteBuyingPosition:
@@ -175,9 +195,13 @@ class InfiniteBuyingService:
         trade_date: date,
     ) -> bool:
         """PENDING 주문에 체결을 반영(매수→쿼터매도→지정가매도). 사이클 종료 시 True."""
+        # 사이클 종료 판단에 사용: 적용 전 보유 수량이 있었는지. 신규 시드 사이클(보유 0)에서
+        # 첫매수가 미체결이면 holding 0이 유지되는데, 이를 청산으로 오인해 사이클을 닫으면 안 된다.
+        had_holding = position.holding_qty > 0
         state = PositionState(holding_qty=position.holding_qty, cumulative_buy=position.cumulative_buy)
         per_round = position.per_round_amount
         realized_total = position.realized_pnl
+        compounding = Compounding(cfg.compounding)
         for order in _sorted_for_apply(pending):
             rec = by_odno.get(order.kis_order_no or "")
             if rec is None:
@@ -191,7 +215,7 @@ class InfiniteBuyingService:
                 state = apply_buy(state, price, ccld)
             else:
                 state, realized = apply_sell(state, price, ccld)
-                per_round = update_per_round_amount(per_round, realized, cfg.division, Compounding.HALF)  # type: ignore[attr-defined]
+                per_round = update_per_round_amount(per_round, realized, cfg.division, compounding)
                 realized_total += realized
             order.status = "filled"
             order.filled_qty = ccld
@@ -205,7 +229,7 @@ class InfiniteBuyingService:
         position.realized_pnl = realized_total
         position.phase = phase_of(calc_t(state.cumulative_buy, per_round), cfg.division).value  # type: ignore[attr-defined]
 
-        if is_cycle_complete(state):
+        if had_holding and is_cycle_complete(state):
             position.status = "closed"
             _seed_state, next_no = next_cycle_seed(position.cycle_no)
             InfiniteBuyingPositionRepository(session).save(InfiniteBuyingPosition(

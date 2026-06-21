@@ -4,6 +4,8 @@
 주문(InfiniteBuyingOrder) 영속화는 발주/대조 서비스가 도입되는 Phase 2에서 추가한다.
 """
 
+from datetime import date
+
 from src.database.base_repository import BaseRepository
 from src.database.models import InfiniteBuyingConfig, InfiniteBuyingOrder, InfiniteBuyingPosition
 
@@ -76,6 +78,18 @@ class InfiniteBuyingOrderRepository(BaseRepository[InfiniteBuyingOrder, int]):
             )
             .order_by(InfiniteBuyingOrder.id)
             .all()
+        )
+
+    def exists_for_position_on_date(self, position_id: int, trade_date: date) -> bool:
+        """해당 포지션에 해당 일자(trade_date)로 기록된 주문이 이미 있는지 (멱등성 체크)."""
+        return (
+            self.session.query(InfiniteBuyingOrder)
+            .filter(
+                InfiniteBuyingOrder.position_id == position_id,
+                InfiniteBuyingOrder.trade_date == trade_date,
+            )
+            .first()
+            is not None
         )
 
     def find_by_kis_order_no(self, kis_order_no: str) -> InfiniteBuyingOrder | None:
