@@ -57,6 +57,6 @@ class SimpleStrategy(bt.Strategy):
             self.order = self.buy()
 
         # If in position
-        elif self.dataclose[0] < self.sma[0]:
+        elif self.position and self.dataclose[0] < self.sma[0]:
             self.log(f"SELL CREATE, {self.dataclose[0]:.2f}")
             self.order = self.sell()

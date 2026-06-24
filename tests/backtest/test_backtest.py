@@ -88,13 +88,13 @@ class TestBacktestBuilder:
         """분석기 추가가 작동하는지 테스트"""
         builder = (
             BacktestBuilder()
-            .with_analyzer(bt.analyzers.SharpeRatio, "sharpe")
-            .with_analyzer(bt.analyzers.DrawDown, "drawdown")
+            .with_analyzer(bt.analyzers.SharpeRatio, "custom_sharpe")
+            .with_analyzer(bt.analyzers.DrawDown, "custom_drawdown")
         )
 
         assert len(builder._analyzers) == 2
-        assert builder._analyzers[0] == (bt.analyzers.SharpeRatio, "sharpe")
-        assert builder._analyzers[1] == (bt.analyzers.DrawDown, "drawdown")
+        assert builder._analyzers[0] == (bt.analyzers.SharpeRatio, "custom_sharpe")
+        assert builder._analyzers[1] == (bt.analyzers.DrawDown, "custom_drawdown")
 
     def test_builder_method_chaining(self):
         """메서드 체이닝이 작동하는지 테스트"""
@@ -125,7 +125,7 @@ class TestBacktestBuilder:
         assert builder.with_sizer(SizerConfig.percent(5)) is builder
         assert builder.with_strategy(TestStrategy, ma_period=20) is builder
         assert builder.with_slippage(0.0005) is builder
-        assert builder.with_analyzer(bt.analyzers.SharpeRatio, "sharpe") is builder
+        assert builder.with_analyzer(bt.analyzers.SharpeRatio, "custom_sharpe") is builder
 
     def test_builder_add_data(self):
         """add_data 메서드가 작동하는지 테스트"""
