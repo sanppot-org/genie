@@ -31,6 +31,12 @@ export function SiteHeader() {
         >
           필터
         </Link>
+        <Link
+          href="/lab"
+          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Lab
+        </Link>
       </nav>
     </header>
   );

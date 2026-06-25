@@ -188,3 +188,73 @@ export interface FilterScreeningResponse {
   offset: number;
   rows: FilterScreeningRow[];
 }
+
+// ── Backtest ─────────────────────────────────────────────────────────────────
+
+export interface StrategyInfo {
+  name: string;
+  timeframe: string;
+  description: string;
+}
+
+export interface BacktestRunItem {
+  strategy_name: string;
+  timeframe: string;
+  initial_cash: number;
+  final_value: number;
+  total_return_pct: number;
+  cagr_pct: number | null;
+  max_drawdown_pct: number | null;
+  sharpe_ratio: number | null;
+  total_trades: number;
+  win_rate_pct: number | null;
+  period_days: number | null;
+  bust: boolean;
+}
+
+export interface BacktestRunResult {
+  results: BacktestRunItem[];
+  skipped: string[];
+  failed: string[];
+  mixed_timeframes: boolean;
+}
+
+export interface BacktestRunRequest {
+  ticker: string;
+  strategies: string[];
+  start?: string | null;
+  end?: string | null;
+  initial_cash: number;
+  commission: number;
+  slippage: number;
+  asset: "stock" | "crypto";
+  param_overrides?: Record<string, unknown> | null;
+}
+
+// ── US Ticker / Candle management ────────────────────────────────────────────
+
+export interface UsTickerInfo {
+  ticker: string;
+  name: string | null;
+  asset_type: string;
+  exchange: string | null;
+  candle_count: number;
+  first_date: string | null;
+  last_date: string | null;
+}
+
+export interface UsRegisterResult {
+  registered: number;
+  updated: number;
+  skipped_unknown: number;
+  skipped: string[];
+}
+
+export interface UsBackfillResult {
+  ticker_count: number;
+  attempted: number;
+  failed: number;
+  tickers_upserted: number;
+  rows_upserted: number;
+  failed_tickers: string[];
+}
