@@ -1,0 +1,193 @@
+"""Lab API — 백테스트 실행 + US 데이터 관리 (종목 등록·캔들 백필) 엔드포인트."""
+# ruff: noqa: B008
+
+from dataclasses import asdict
+from datetime import date, datetime
+
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from src.api.schemas import (
+    BacktestRunItem,
+    BacktestRunRequest,
+    BacktestRunResponse,
+    GenieResponse,
+    StrategyInfo,
+    UsBackfillRequest,
+    UsBackfillResult,
+    UsRegisterRequest,
+    UsRegisterResult,
+    UsTickerInfo,
+)
+from src.container import ApplicationContainer
+from src.service.backtest_service import BacktestService
+from src.service.us_stock_daily_candle_service import UsStockDailyCandleService
+from src.service.us_stock_ticker_service import UsStockTickerService
+
+router = APIRouter(tags=["lab"])
+
+
+@router.get("/backtest/strategies", response_model=GenieResponse[list[StrategyInfo]])
+@inject
+def get_strategies(
+        service: BacktestService = Depends(Provide[ApplicationContainer.backtest_service]),
+) -> GenieResponse[list[StrategyInfo]]:
+    """레지스트리에 등록된 전략 목록 반환. [{name, timeframe, description}]"""
+    infos = [
+        StrategyInfo(name=spec.name, timeframe=spec.timeframe, description=spec.description)
+        for spec in service.list_strategies()
+    ]
+    return GenieResponse(data=infos)
+
+
+@router.post("/backtest/run", response_model=GenieResponse[BacktestRunResponse])
+@inject
+def run_backtest(
+        request: BacktestRunRequest,
+        service: BacktestService = Depends(Provide[ApplicationContainer.backtest_service]),
+) -> GenieResponse[BacktestRunResponse]:
+    """백테스트 실행. ticker + 전략 목록 + 기간/자본/수수료 파라미터를 받아 결과 반환.
+
+    - 잘못된 전략명: 400
+    - 미등록 티커: 400
+    - 데이터 없는 전략: skipped 목록에 포함 (results에서 제외)
+    - 실행 예외 전략: failed 목록에 포함
+    """
+    # param_overrides 다중전략 가드 (CLI 규칙과 동일)
+    if request.param_overrides and len(request.strategies) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="param_overrides는 단일 전략 요청에서만 사용할 수 있습니다.",
+        )
+
+    # 날짜 파싱
+    start: date | None = None
+    end: date | None = None
+    try:
+        if request.start:
+            start = datetime.strptime(request.start, "%Y%m%d").date()
+        if request.end:
+            end = datetime.strptime(request.end, "%Y%m%d").date()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="날짜는 YYYYMMDD 형식이어야 합니다.") from None
+
+    if start and end and end < start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="종료일이 시작일보다 앞설 수 없습니다.")
+
+    # 전략명 검증
+    try:
+        from src.backtest.registry import get_strategy as _gs
+        for name in request.strategies:
+            _gs(name)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    # 실행
+    try:
+        output = service.run(
+            ticker=request.ticker,
+            strategy_names=request.strategies,
+            start=start,
+            end=end,
+            initial_cash=request.initial_cash,
+            commission=request.commission,
+            slippage=request.slippage,
+            asset=request.asset,
+            param_overrides=request.param_overrides,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    items = [
+        BacktestRunItem(
+            strategy_name=rr.result.strategy_name,
+            timeframe=rr.timeframe,
+            initial_cash=rr.result.initial_cash,
+            final_value=rr.result.final_value,
+            total_return_pct=rr.result.total_return_pct,
+            cagr_pct=rr.result.cagr_pct,
+            max_drawdown_pct=rr.result.max_drawdown_pct,
+            sharpe_ratio=rr.result.sharpe_ratio,
+            total_trades=rr.result.total_trades,
+            win_rate_pct=rr.result.win_rate_pct,
+            period_days=rr.result.period_days,
+            bust=rr.bust,
+        )
+        for rr in output.results
+    ]
+    return GenieResponse(data=BacktestRunResponse(
+        results=items,
+        skipped=output.skipped,
+        failed=output.failed,
+        mixed_timeframes=output.mixed_timeframes,
+    ))
+
+
+@router.post("/us-tickers/register", response_model=GenieResponse[UsRegisterResult])
+@inject
+def register_us_tickers(
+        request: UsRegisterRequest,
+        service: UsStockTickerService = Depends(Provide[ApplicationContainer.us_stock_ticker_service]),
+) -> GenieResponse[UsRegisterResult]:
+    """미국 주식/ETF 종목을 FDR StockListing 기반으로 등록(또는 갱신).
+
+    FDR 목록에 없는 심볼은 skipped_unknown에 집계되고 skipped 배열에 포함됩니다.
+    """
+    try:
+        result = service.register(request.symbols)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    return GenieResponse(data=UsRegisterResult(**asdict(result)))
+
+
+@router.post("/us-candles/backfill", response_model=GenieResponse[UsBackfillResult])
+@inject
+def backfill_us_candles(
+        request: UsBackfillRequest,
+        service: UsStockDailyCandleService = Depends(Provide[ApplicationContainer.us_stock_daily_candle_service]),
+) -> GenieResponse[UsBackfillResult]:
+    """미국 주식 일봉 백필 (심볼 subset 전용).
+
+    종목 수 × 약 0.5초 소요 — 소수 심볼만 권장. start 미지정 시 1990-01-01부터 백필합니다.
+    """
+    start_date: date | None = None
+    if request.start:
+        try:
+            start_date = datetime.strptime(request.start, "%Y%m%d").date()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start는 YYYYMMDD 형식이어야 합니다.") from None
+
+    kwargs: dict[str, object] = {"symbols": request.symbols}
+    if start_date is not None:
+        kwargs["start"] = start_date
+
+    try:
+        result = service.backfill(**kwargs)  # type: ignore[arg-type]
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    return GenieResponse(data=UsBackfillResult(**asdict(result)))
+
+
+@router.get("/us-tickers", response_model=GenieResponse[list[UsTickerInfo]])
+@inject
+def list_us_tickers(
+        service: UsStockTickerService = Depends(Provide[ApplicationContainer.us_stock_ticker_service]),
+) -> GenieResponse[list[UsTickerInfo]]:
+    """등록된 미국 티커(US_STOCK + US_ETF) 목록과 stock_daily_candles 데이터 보유 현황 반환.
+
+    정렬: 봉수 내림차순 → ticker 오름차순.
+    """
+    summaries = service.list_us_tickers()
+    items = [
+        UsTickerInfo(
+            ticker=s.ticker,
+            name=s.name,
+            asset_type=s.asset_type,
+            exchange=s.exchange,
+            candle_count=s.candle_count,
+            first_date=s.first_date,
+            last_date=s.last_date,
+        )
+        for s in summaries
+    ]
+    return GenieResponse(data=items)

@@ -28,29 +28,22 @@
 """
 
 import argparse
-import contextlib
 from datetime import datetime
-import io
 import logging
 import sys
-
-import pandas as pd
 
 from src.backtest.cli import (
     ComparisonRow,
     derive_sizer_label,
     format_comparison_table,
-    merge_params,
     parse_param_overrides,
     results_to_csv_str,
 )
-from src.backtest.registry import StrategySpec, get_strategy, list_strategies
-from src.backtest.result import BacktestResult
+from src.backtest.registry import get_strategy, list_strategies
+from src.service.backtest_service import _DEFAULT_PERCENT as _DEFAULT_CLI_PERCENT
+from src.service.backtest_service import _load_candles_df, _run_single_strategy
 
 logger = logging.getLogger(__name__)
-
-# 타임프레임별 기본 CLI sizer (manages_own_sizing=False이고 spec.default_sizer도 None인 경우 폴백)
-_DEFAULT_CLI_PERCENT = 95
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -94,13 +87,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_specs(args: argparse.Namespace) -> list[StrategySpec]:
+def _resolve_specs(args: argparse.Namespace) -> list:
     """CLI 인수로부터 실행할 StrategySpec 목록 반환."""
     if args.all:
         return [get_strategy(name) for name in list_strategies()]
 
     names = [n.strip() for n in args.strategy.split(",") if n.strip()]
-    specs: list[StrategySpec] = []
+    specs = []
     for name in names:
         try:
             specs.append(get_strategy(name))
@@ -108,143 +101,6 @@ def _resolve_specs(args: argparse.Namespace) -> list[StrategySpec]:
             logger.error("전략 조회 실패: %s", e)
             sys.exit(1)
     return specs
-
-
-def _load_stock_daily_df(
-    ticker_id: int,
-    start_dt: datetime | None,
-    end_dt: datetime | None,
-    session: object,
-) -> pd.DataFrame:
-    """주식 일봉을 StockDailyCandleRepository로 로드 → 수정주가 적용 DataFrame 반환.
-
-    세션 안에서 호출해야 한다(세션 종료 후 ORM 객체 detached 방지).
-    """
-    from datetime import date
-
-    from src.backtest.data_feed.candle_loader import stock_daily_candles_to_dataframe
-    from src.database.stock_daily_candle_repository import StockDailyCandleRepository
-
-    from_date: date | None = start_dt.date() if start_dt else None
-    to_date: date | None = end_dt.date() if end_dt else None
-
-    rows = StockDailyCandleRepository(session).find_by_ticker(ticker_id, from_date, to_date)  # type: ignore[arg-type]
-    df, _ = stock_daily_candles_to_dataframe(rows)
-    return df
-
-
-def _load_candles_df(
-    spec: StrategySpec,
-    ticker_id: int,
-    start_dt: datetime | None,
-    end_dt: datetime | None,
-    asset: str,
-    session: object,
-) -> tuple[pd.DataFrame, str]:
-    """spec.timeframe + asset 조합에 맞는 리포지토리로 캔들을 로드하고 DataFrame을 반환한다.
-
-    세션 안에서 호출해야 한다.
-
-    Returns:
-        (DataFrame, actual_timeframe) — DataFrame이 비어있을 수 있음.
-    """
-    from src.backtest.data_feed.candle_loader import candles_to_dataframe
-    from src.database.candle_repositories import CandleDailyRepository, CandleHour1Repository, CandleMinute1Repository
-
-    if spec.timeframe == "1d" and asset == "stock":
-        df = _load_stock_daily_df(ticker_id, start_dt, end_dt, session)
-        return df, "1d"
-
-    # 암호화폐 일봉 또는 시간/분봉 (자산 공통)
-    if spec.timeframe == "1d":
-        repo: CandleDailyRepository | CandleHour1Repository | CandleMinute1Repository = CandleDailyRepository(session)  # type: ignore[arg-type]
-    elif spec.timeframe == "1h":
-        repo = CandleHour1Repository(session)  # type: ignore[arg-type]
-    elif spec.timeframe == "1m":
-        repo = CandleMinute1Repository(session)  # type: ignore[arg-type]
-    else:
-        logger.warning("[%s] 지원하지 않는 타임프레임: %s — 스킵", spec.name, spec.timeframe)
-        return pd.DataFrame(), "unknown"
-
-    # intraday 종료일 보정: end_dt가 자정(00:00:00)이면 그 날 봉이 잘릴 수 있으므로 23:59:59로 보정
-    adjusted_end = end_dt
-    if end_dt is not None and spec.timeframe in ("1h", "1m"):
-        adjusted_end = end_dt.replace(hour=23, minute=59, second=59)
-
-    candles = repo.get_candles(ticker_id, start_dt, adjusted_end)  # type: ignore[return-value]
-    if not candles:
-        return pd.DataFrame(), spec.timeframe
-
-    df, actual_tf = candles_to_dataframe(candles)  # type: ignore[arg-type]
-    return df, actual_tf
-
-
-def _run_single_strategy(
-    spec: StrategySpec,
-    ticker: str,
-    df: pd.DataFrame,
-    initial_cash: float,
-    commission: float,
-    slippage: float,
-    param_overrides: dict[str, object],
-    verbose: bool = False,
-) -> BacktestResult | None:
-    """단일 전략 백테스트 실행. 실패 시 None 반환(전체 중단 없음).
-
-    df는 세션 종료 후 전달되므로 DB 커넥션을 점유하지 않는다.
-    verbose=False(기본)이면 전략 내부 print()와 builder의 print()를 캡처해 억제한다.
-    """
-    from src.backtest.backtest_builder import BacktestBuilder
-    from src.backtest.commission_config import CommissionConfig
-    from src.backtest.data_feed.pandas import PandasDataFeedConfig
-
-    if df.empty:
-        logger.warning("[%s] DataFrame 비어있음 (ticker=%s, timeframe=%s) — 스킵", spec.name, ticker, spec.timeframe)
-        return None
-
-    # 파라미터 병합 (default_params + CLI overrides)
-    final_params = merge_params(spec.default_params, param_overrides)
-    if param_overrides:
-        applied_keys = ", ".join(f"{k}={v!r}" for k, v in param_overrides.items())
-        logger.info("[%s] 파라미터 override 적용: %s", spec.name, applied_keys)
-    logger.info("[%s] 최종 파라미터: %s", spec.name, final_params)
-
-    # PandasDataFeedConfig
-    data_config = PandasDataFeedConfig.create(df, name=f"{ticker}_{spec.timeframe}")
-
-    # BacktestBuilder 구성
-    builder = (
-        BacktestBuilder()
-        .with_initial_cash(initial_cash)
-        .with_commission(CommissionConfig.stock(commission))
-        .with_slippage(slippage)
-        .with_strategy(spec.strategy_class, **final_params)
-        .add_data(data_config)
-    )
-
-    # sizer: manages_own_sizing=True 이면 주입 안 함
-    if not spec.manages_own_sizing:
-        sizer_cfg = spec.default_sizer
-        if sizer_cfg is None:
-            from src.backtest.sizer_config import SizerConfig
-            sizer_cfg = SizerConfig.percent(_DEFAULT_CLI_PERCENT)
-        builder = builder.with_sizer(sizer_cfg)
-
-    # cheat_on_open
-    if spec.requires_cheat_on_open:
-        builder = builder.with_cheat_on_open(True)
-
-    try:
-        if verbose:
-            result = builder.run_with_result(strategy_name=spec.name)
-        else:
-            # 전략 내부 print() + BacktestBuilder.run()의 print()를 캡처해 억제
-            with contextlib.redirect_stdout(io.StringIO()):
-                result = builder.run_with_result(strategy_name=spec.name)
-        return result
-    except Exception as exc:
-        logger.error("[%s] 백테스트 실행 실패: %s", spec.name, exc, exc_info=True)
-        return None
 
 
 def main() -> None:
@@ -314,6 +170,8 @@ def main() -> None:
         logger.warning("주의: 비교 대상 전략들의 타임프레임이 다릅니다 (%s). 타임프레임이 다른 전략은 직접 비교에 주의하세요.", timeframes_in_specs)
 
     # ── 1단계: DB 세션 안에서 캔들 로드 + DataFrame 변환만 수행 ──────────────
+    import pandas as pd
+
     from src.container import ApplicationContainer
     from src.database.ticker_repository import TickerRepository
 
@@ -321,6 +179,7 @@ def main() -> None:
     # (spec.name → DataFrame) 맵
     spec_dfs: dict[str, pd.DataFrame] = {}
 
+    # 티커 조회는 별도 세션으로 먼저 수행한다.
     with database.session_scope() as session:
         ticker_obj = TickerRepository(session).find_by_ticker(args.ticker)
         if ticker_obj is None or ticker_obj.id is None:
@@ -328,15 +187,29 @@ def main() -> None:
             sys.exit(1)
         ticker_id: int = ticker_obj.id
 
-        for spec in specs:
-            logger.info("--- [%s] 캔들 로드 중 (timeframe=%s, asset=%s) ---", spec.name, spec.timeframe, args.asset)
-            df, actual_tf = _load_candles_df(spec, ticker_id, start_dt, end_dt, args.asset, session)
+    # 전략별로 독립 세션을 열어 캔들을 로드한다.
+    # DB 예외(테이블 없음 등)가 발생하면 해당 세션만 롤백·종료되고
+    # 다음 전략은 새 세션으로 안전하게 시도할 수 있다.
+    for spec in specs:
+        logger.info("--- [%s] 캔들 로드 중 (timeframe=%s, asset=%s) ---", spec.name, spec.timeframe, args.asset)
+        try:
+            with database.session_scope() as session:
+                df, actual_tf = _load_candles_df(spec, ticker_id, start_dt, end_dt, args.asset, session)
             if df.empty:
                 logger.warning("[%s] 캔들 데이터 없음 (ticker=%s, timeframe=%s) — 스킵", spec.name, args.ticker, spec.timeframe)
             else:
                 spec_dfs[spec.name] = df
+        except Exception as exc:
+            logger.warning(
+                "[%s] 캔들 로드 실패 (ticker=%s, timeframe=%s) — 스킵: %s",
+                spec.name,
+                args.ticker,
+                spec.timeframe,
+                exc,
+            )
 
     # ── 2단계: 세션 종료 후 백테스트 실행 (DB 커넥션 비점유) ────────────────
+    from src.backtest.result import BacktestResult
     results: list[BacktestResult] = []
     tf_map: dict[str, str] = {}
     sizer_map: dict[str, str] = {}

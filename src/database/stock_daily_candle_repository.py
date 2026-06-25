@@ -139,6 +139,26 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
         )
         return {r[0] for r in rows}
 
+    def data_summary_all(self, ticker_ids: list[int] | None = None) -> dict[int, tuple[int, date, date]]:
+        """{ticker_id: (count, min_date, max_date)} — 단일 GROUP BY 쿼리 (N+1 금지).
+
+        ticker_ids가 주어지면 해당 ticker_id만 필터링 후 GROUP BY (US 전용 조회 등).
+        None이면 전체 테이블 집계 (하위호환).
+        count는 ticker_id 기준 — id는 nullable 컬럼이라 NULL 행 시 과소집계 위험이 있음.
+        """
+        if ticker_ids is not None and len(ticker_ids) == 0:
+            return {}
+        query = self.session.query(
+            StockDailyCandle.ticker_id,
+            func.count(StockDailyCandle.ticker_id),
+            func.min(StockDailyCandle.date),
+            func.max(StockDailyCandle.date),
+        )
+        if ticker_ids is not None:
+            query = query.filter(StockDailyCandle.ticker_id.in_(ticker_ids))
+        rows = query.group_by(StockDailyCandle.ticker_id).all()
+        return {r[0]: (r[1], r[2], r[3]) for r in rows}
+
     def find_split_candidate_ticker_ids(
         self,
         since: date,

@@ -46,6 +46,7 @@ from src.providers.us_stock_daily_client import UsStockDailyClient
 from src.report.reporter import Reporter
 from src.scheduled_tasks.context import ScheduledTasksContext
 from src.service.adjusted_candle_sync_service import AdjustedCandleSyncService
+from src.service.backtest_service import BacktestService
 from src.service.buyback_sync_service import BuybackSyncService
 from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.candle_query_service import CandleQueryService
@@ -101,6 +102,7 @@ class ApplicationContainer(containers.DeclarativeContainer):
             "src.api.routes.dividend",  # dividend 라우터 추가
             "src.api.routes.income_statement",  # 손익계산서 라우터 추가
             "src.api.routes.screening",  # screening 라우터 추가
+            "src.api.routes.lab",  # lab 라우터 추가
             "src.strategy.factory",  # factory.py 추가
         ],
     )
@@ -343,4 +345,8 @@ class ApplicationContainer(containers.DeclarativeContainer):
         InfiniteBuyingService,
         database=database,
         overseas_api=hantu_overseas_api,
+    )
+    backtest_service = providers.Factory(
+        BacktestService,
+        database=database,
     )

@@ -361,3 +361,100 @@ class FilterScreeningResponse(BaseModel):
     limit: int
     offset: int
     rows: list[FilterScreeningRowResponse]
+
+
+# ---------------------------------------------------------------------------
+# Lab (백테스트 + US 데이터 관리) 스키마
+# ---------------------------------------------------------------------------
+
+class StrategyInfo(BaseModel):
+    """전략 레지스트리 1건."""
+
+    name: str
+    timeframe: str
+    description: str
+
+
+class BacktestRunRequest(BaseModel):
+    """백테스트 실행 요청."""
+
+    ticker: str
+    strategies: list[str] = Field(min_length=1, max_length=20)
+    start: str | None = None          # YYYYMMDD
+    end: str | None = None            # YYYYMMDD
+    initial_cash: float = Field(default=10_000_000.0, gt=0)
+    commission: float = Field(default=0.0005, ge=0)
+    slippage: float = Field(default=0.0, ge=0)
+    asset: Literal["stock", "crypto"] = "stock"
+    param_overrides: dict[str, Any] | None = None
+
+
+class BacktestRunItem(BaseModel):
+    """전략별 백테스트 결과."""
+
+    strategy_name: str
+    timeframe: str
+    initial_cash: float
+    final_value: float
+    total_return_pct: float
+    cagr_pct: float | None
+    max_drawdown_pct: float | None
+    sharpe_ratio: float | None
+    total_trades: int
+    win_rate_pct: float | None
+    period_days: int | None
+    bust: bool
+
+
+class BacktestRunResponse(BaseModel):
+    """백테스트 실행 전체 응답."""
+
+    results: list[BacktestRunItem]
+    skipped: list[str]        # 캔들 데이터 없어 제외된 전략명
+    failed: list[str]         # 실행 예외로 실패한 전략명
+    mixed_timeframes: bool    # 결과 전략들의 타임프레임이 혼합되어 있으면 True
+
+
+class UsRegisterRequest(BaseModel):
+    """미국 주식 종목 등록 요청."""
+
+    symbols: list[str] = Field(min_length=1, max_length=50)
+
+
+class UsRegisterResult(BaseModel):
+    """미국 주식 종목 등록 결과."""
+
+    registered: int
+    updated: int
+    skipped_unknown: int
+    skipped: list[str]
+
+
+class UsBackfillRequest(BaseModel):
+    """미국 주식 일봉 백필 요청."""
+
+    symbols: list[str] = Field(min_length=1, max_length=50)
+    start: str | None = None          # YYYYMMDD; 미지정 시 서비스 기본값(1990-01-01)
+
+
+class UsBackfillResult(BaseModel):
+    """미국 주식 일봉 백필 결과."""
+
+    ticker_count: int
+    attempted: int
+    failed: int
+    tickers_upserted: int
+    rows_upserted: int
+    failed_tickers: list[str]
+
+
+class UsTickerInfo(BaseModel):
+    """미국 티커 1건 + 데이터 보유 현황."""
+
+    ticker: str
+    name: str | None
+    asset_type: str
+    exchange: str | None
+    candle_count: int
+    first_date: date | None
+    last_date: date | None

@@ -12,6 +12,7 @@ from src.api.routes import (
     fundamental,
     health,
     income_statement,
+    lab,
     screening,
     strategy,
     ticker,
@@ -67,3 +68,4 @@ app.include_router(fundamental.router, prefix="/api")
 app.include_router(dividend.router, prefix="/api")
 app.include_router(income_statement.router, prefix="/api")
 app.include_router(screening.router, prefix="/api")
+app.include_router(lab.router, prefix="/api")

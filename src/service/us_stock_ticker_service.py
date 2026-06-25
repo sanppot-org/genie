@@ -11,6 +11,7 @@ StockListing 4종은 호출 비용이 있어 인스턴스 캐시에 1회만 로�
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 import logging
 
 import FinanceDataReader as fdr  # noqa: N813
@@ -19,6 +20,7 @@ from src.common.data_adapter import DataSource
 from src.constants import AssetType
 from src.database.database import Database
 from src.database.models import Ticker
+from src.database.stock_daily_candle_repository import StockDailyCandleRepository
 from src.database.ticker_repository import TickerRepository
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,19 @@ class ListingMeta:
     name: str
     exchange: str | None
     asset_type: AssetType
+
+
+@dataclass(frozen=True)
+class UsTickerSummary:
+    """미국 티커 1건 + 데이터 보유 현황."""
+
+    ticker: str
+    name: str | None
+    asset_type: str
+    exchange: str | None
+    candle_count: int
+    first_date: date | None
+    last_date: date | None
 
 
 @dataclass
@@ -93,6 +108,48 @@ class UsStockTickerService:
             result.registered, result.updated, result.skipped_unknown,
         )
         return result
+
+    def list_us_tickers(self) -> list[UsTickerSummary]:
+        """US_STOCK + US_ETF 티커 목록과 stock_daily_candles 보유 현황을 단일 집계로 반환.
+
+        N+1 없음: ticker 목록 1회 + GROUP BY 집계 1회. 두 결과를 메모리에서 병합.
+        세션 안에서 ORM 값을 평범한 값으로 추출 후 세션 닫기 (detached 방지).
+        정렬: candle_count 내림차순 → ticker 오름차순.
+        """
+        us_types = (AssetType.US_STOCK.value, AssetType.US_ETF.value)
+        with self._database.session_scope() as session:
+            candle_repo = StockDailyCandleRepository(session)
+
+            tickers_us = (
+                session.query(Ticker)
+                .filter(Ticker.asset_type.in_(us_types))
+                .order_by(Ticker.ticker.asc())
+                .all()
+            )
+            us_ids = [t.id for t in tickers_us if t.id is not None]
+            # US 티커가 0개면 집계 쿼리 자체를 건너뜀 (불필요한 풀스캔 방지)
+            summary_map = candle_repo.data_summary_all(ticker_ids=us_ids)
+
+            results: list[UsTickerSummary] = []
+            for t in tickers_us:
+                info = summary_map.get(t.id)
+                if info is not None:
+                    count, first, last = info
+                else:
+                    count, first, last = 0, None, None
+                results.append(UsTickerSummary(
+                    ticker=t.ticker,
+                    name=t.name,
+                    asset_type=t.asset_type,
+                    exchange=t.exchange,
+                    candle_count=count,
+                    first_date=first,
+                    last_date=last,
+                ))
+
+        # 세션 밖에서 정렬 (ORM 객체 detached 방지)
+        results.sort(key=lambda x: (-x.candle_count, x.ticker))
+        return results
 
     def _load_listing_map(self) -> dict[str, ListingMeta]:
         """주식(NASDAQ/NYSE/AMEX)+ETF/US 상장목록을 1회 로드해 symbol→ListingMeta 맵 구성(캐시).
