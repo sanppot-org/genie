@@ -11,6 +11,8 @@ from src.api.schemas import (
     BacktestRunItem,
     BacktestRunRequest,
     BacktestRunResponse,
+    CorrelationRequest,
+    CorrelationResponse,
     GenieResponse,
     StrategyInfo,
     UsBackfillRequest,
@@ -21,6 +23,7 @@ from src.api.schemas import (
 )
 from src.container import ApplicationContainer
 from src.service.backtest_service import BacktestService
+from src.service.correlation_service import CorrelationService
 from src.service.us_stock_daily_candle_service import UsStockDailyCandleService
 from src.service.us_stock_ticker_service import UsStockTickerService
 
@@ -120,6 +123,55 @@ def run_backtest(
         skipped=output.skipped,
         failed=output.failed,
         mixed_timeframes=output.mixed_timeframes,
+    ))
+
+
+@router.post("/correlation/run", response_model=GenieResponse[CorrelationResponse])
+@inject
+def run_correlation(
+        request: CorrelationRequest,
+        service: CorrelationService = Depends(Provide[ApplicationContainer.correlation_service]),
+) -> GenieResponse[CorrelationResponse]:
+    """멀티 티커 상관관계 분석. 기본은 일봉 수익률(pct_change) 피어슨 상관행렬.
+
+    - 티커 2~20개(스키마 검증). 미등록·무데이터 티커는 dropped에 포함.
+    - 공통 거래일만 사용(dropna). 결과 행/열 순서는 tickers 배열을 따름.
+    """
+    start: date | None = None
+    end: date | None = None
+    try:
+        if request.start:
+            start = datetime.strptime(request.start, "%Y%m%d").date()
+        if request.end:
+            end = datetime.strptime(request.end, "%Y%m%d").date()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="날짜는 YYYYMMDD 형식이어야 합니다.") from None
+
+    if start and end and end < start:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="종료일이 시작일보다 앞설 수 없습니다.")
+
+    try:
+        output = service.run(
+            tickers=request.tickers,
+            start=start,
+            end=end,
+            asset=request.asset,
+            method=request.method,
+            return_type=request.return_type,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+    return GenieResponse(data=CorrelationResponse(
+        tickers=output.tickers,
+        matrix=output.matrix,
+        observations=output.observations,
+        period_start=output.period_start,
+        period_end=output.period_end,
+        method=output.method,
+        return_type=output.return_type,
+        dropped=output.dropped,
+        warnings=output.warnings,
     ))
 
 

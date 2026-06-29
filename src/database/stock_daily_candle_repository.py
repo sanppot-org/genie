@@ -45,6 +45,31 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
             query = query.filter(StockDailyCandle.date <= to_date)
         return query.order_by(StockDailyCandle.date.asc()).all()
 
+    def find_by_tickers(
+            self,
+            ticker_ids: list[int],
+            from_date: date | None = None,
+            to_date: date | None = None,
+    ) -> dict[int, list[StockDailyCandle]]:
+        """여러 종목 ID를 한 번의 IN 쿼리로 조회 → {ticker_id: [row...]} (각 date 오름차순).
+
+        N+1 회피용(상관분석 등 멀티 티커 로드). data_summary_all의 IN 패턴과 동일.
+        데이터가 없는 ticker_id는 결과 dict에 키로 등장하지 않는다(호출부에서 dropped 처리).
+        """
+        if not ticker_ids:
+            return {}
+        query = self.session.query(StockDailyCandle).filter(StockDailyCandle.ticker_id.in_(ticker_ids))
+        if from_date is not None:
+            query = query.filter(StockDailyCandle.date >= from_date)
+        if to_date is not None:
+            query = query.filter(StockDailyCandle.date <= to_date)
+        rows = query.order_by(StockDailyCandle.ticker_id.asc(), StockDailyCandle.date.asc()).all()
+
+        result: dict[int, list[StockDailyCandle]] = {}
+        for row in rows:
+            result.setdefault(row.ticker_id, []).append(row)
+        return result
+
     def find_by_date(self, target_date: date) -> list[StockDailyCandle]:
         """특정 일자 전 종목 스냅샷."""
         return (

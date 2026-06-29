@@ -10,6 +10,8 @@ import type {
   BacktestRunItem,
   BacktestRunRequest,
   BacktestRunResult,
+  CorrelationRequest,
+  CorrelationResponse,
   GenieResponse,
   StrategyInfo,
   UsBackfillResult,
@@ -802,6 +804,217 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
   );
 }
 
+// ── C. Correlation analysis ────────────────────────────────────────────────────
+
+/** Diverging cell color: +상관 빨강, -상관 파랑, 강도는 |값|. null은 무색. */
+function corrCellStyle(v: number | null): React.CSSProperties {
+  if (v === null) return {};
+  const alpha = Math.min(Math.abs(v), 1) * 0.85;
+  const rgb = v >= 0 ? "220, 38, 38" : "37, 99, 235";
+  return {
+    backgroundColor: `rgba(${rgb}, ${alpha})`,
+    color: alpha > 0.5 ? "#fff" : undefined,
+  };
+}
+
+function CorrelationSection() {
+  const [tickersRaw, setTickersRaw] = useState("");
+  const [method, setMethod] = useState<"pearson" | "spearman">("pearson");
+  const [returnType, setReturnType] = useState<"returns" | "price">("returns");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+
+  const corrMutation = useMutation({
+    mutationFn: (req: CorrelationRequest) =>
+      apiPost<GenieResponse<CorrelationResponse>>("/api/correlation/run", req).then((r) => r.data),
+  });
+
+  const parsedTickers = parseSymbols(tickersRaw);
+  const canRun = parsedTickers.length >= 2 && !corrMutation.isPending;
+
+  function handleRun() {
+    if (!canRun) return;
+    corrMutation.reset();
+    corrMutation.mutate({
+      tickers: parsedTickers,
+      start: toBackendDate(start),
+      end: toBackendDate(end),
+      asset: "stock",
+      method,
+      return_type: returnType,
+    });
+  }
+
+  const result = corrMutation.isPending ? null : corrMutation.data;
+
+  return (
+    <section className="space-y-5">
+      <div className="flex items-center gap-3">
+        <SectionLabel>상관관계</SectionLabel>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      {/* ── Form ── */}
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="space-y-1 sm:col-span-3 lg:col-span-2">
+          <label className="text-xs text-muted-foreground" htmlFor="corr-tickers">
+            티커 (쉼표 구분, 2~20개)
+          </label>
+          <Input
+            id="corr-tickers"
+            value={tickersRaw}
+            onChange={(e) => setTickersRaw(e.target.value)}
+            placeholder="005930, 000660, 035720"
+            className="font-mono text-sm"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">상관 기준</span>
+          <div
+            role="group"
+            aria-label="상관 기준"
+            className="flex h-9 gap-1 rounded-md border border-input p-0.5"
+          >
+            {(["returns", "price"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setReturnType(opt)}
+                aria-pressed={returnType === opt}
+                className={`flex-1 rounded text-xs font-medium transition-colors ${
+                  returnType === opt
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt === "returns" ? "수익률" : "가격"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">방법</span>
+          <div
+            role="group"
+            aria-label="상관 방법"
+            className="flex h-9 gap-1 rounded-md border border-input p-0.5"
+          >
+            {(["pearson", "spearman"] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setMethod(opt)}
+                aria-pressed={method === opt}
+                className={`flex-1 rounded text-xs font-medium capitalize transition-colors ${
+                  method === opt
+                    ? "bg-foreground text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground" htmlFor="corr-start">
+            시작일
+          </label>
+          <Input id="corr-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} className="text-sm" />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-muted-foreground" htmlFor="corr-end">
+            종료일
+          </label>
+          <Input id="corr-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="text-sm" />
+        </div>
+      </div>
+
+      <Button variant="outline" size="sm" disabled={!canRun} onClick={handleRun} className="gap-2">
+        {corrMutation.isPending && <Spinner />}
+        상관 분석
+      </Button>
+
+      {corrMutation.isError && (
+        <p className="text-sm text-destructive">에러: {extractErrorMessage(corrMutation.error)}</p>
+      )}
+
+      {result && <CorrelationResult result={result} />}
+    </section>
+  );
+}
+
+function CorrelationResult({ result }: { result: CorrelationResponse }) {
+  if (result.tickers.length < 2) {
+    return (
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <p>상관계산에 필요한 유효 티커가 부족합니다.</p>
+        {result.dropped.length > 0 && <p>제외됨: {result.dropped.join(", ")}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span>관측 {result.observations.toLocaleString("ko-KR")}개</span>
+        {result.period_start && result.period_end && (
+          <span>
+            {result.period_start} ~ {result.period_end}
+          </span>
+        )}
+        <span>{result.return_type === "returns" ? "수익률" : "가격"} · {result.method}</span>
+      </div>
+
+      <div className="overflow-x-auto rounded-md border border-border">
+        <table className="w-full border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-border bg-muted/30">
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground" />
+              {result.tickers.map((t) => (
+                <th key={t} className="px-3 py-2 text-center font-mono font-medium text-muted-foreground">
+                  {t}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {result.tickers.map((rowTicker, i) => (
+              <tr key={rowTicker} className="border-b border-border last:border-0">
+                <td className="px-3 py-2 font-mono font-medium text-muted-foreground">{rowTicker}</td>
+                {result.matrix[i].map((v, j) => (
+                  <td
+                    key={`${rowTicker}-${result.tickers[j]}`}
+                    className="px-3 py-2 text-center font-mono tabular-nums"
+                    style={corrCellStyle(v)}
+                  >
+                    {v === null ? "—" : v.toFixed(2)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {result.dropped.length > 0 && (
+        <p className="text-xs text-muted-foreground">제외된 티커: {result.dropped.join(", ")}</p>
+      )}
+      {result.warnings.length > 0 && (
+        <ul className="space-y-0.5 text-xs text-amber-600">
+          {result.warnings.map((w) => (
+            <li key={w}>⚠ {w}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function LabPage() {
@@ -812,7 +1025,7 @@ export default function LabPage() {
       <header className="space-y-1 border-b border-border pb-5">
         <h1 className="text-2xl font-semibold tracking-tight">Lab</h1>
         <p className="text-sm text-muted-foreground">
-          전략 백테스트 실행 및 미국 주식 데이터 관리
+          전략 백테스트 실행 · 상관관계 분석 · 미국 주식 데이터 관리
         </p>
       </header>
 
@@ -821,6 +1034,10 @@ export default function LabPage() {
       <div className="h-px bg-border" />
 
       <BacktestSection ticker={backtestTicker} setTicker={setBacktestTicker} />
+
+      <div className="h-px bg-border" />
+
+      <CorrelationSection />
     </main>
   );
 }

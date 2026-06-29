@@ -231,6 +231,29 @@ export interface BacktestRunRequest {
   param_overrides?: Record<string, unknown> | null;
 }
 
+// ── Correlation analysis ──────────────────────────────────────────────────────
+
+export interface CorrelationRequest {
+  tickers: string[];
+  start?: string | null;
+  end?: string | null;
+  asset: "stock";
+  method: "pearson" | "spearman";
+  return_type: "returns" | "price";
+}
+
+export interface CorrelationResponse {
+  tickers: string[];
+  matrix: (number | null)[][];
+  observations: number;
+  period_start: string | null;
+  period_end: string | null;
+  method: string;
+  return_type: string;
+  dropped: string[];
+  warnings: string[];
+}
+
 // ── US Ticker / Candle management ────────────────────────────────────────────
 
 export interface UsTickerInfo {

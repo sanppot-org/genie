@@ -51,6 +51,7 @@ from src.service.buyback_sync_service import BuybackSyncService
 from src.service.cancellation_sync_service import CancellationSyncService
 from src.service.candle_query_service import CandleQueryService
 from src.service.candle_service import CandleService
+from src.service.correlation_service import CorrelationService
 from src.service.daily_candle_sync_service import DailyCandleSyncService
 from src.service.dividend_service import DividendService
 from src.service.dividend_sync_service import DividendSyncService
@@ -348,5 +349,9 @@ class ApplicationContainer(containers.DeclarativeContainer):
     )
     backtest_service = providers.Factory(
         BacktestService,
+        database=database,
+    )
+    correlation_service = providers.Factory(
+        CorrelationService,
         database=database,
     )

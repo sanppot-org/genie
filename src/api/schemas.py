@@ -415,6 +415,31 @@ class BacktestRunResponse(BaseModel):
     mixed_timeframes: bool    # 결과 전략들의 타임프레임이 혼합되어 있으면 True
 
 
+class CorrelationRequest(BaseModel):
+    """멀티 티커 상관관계 분석 요청."""
+
+    tickers: list[str] = Field(min_length=2, max_length=20)
+    start: str | None = None              # YYYYMMDD
+    end: str | None = None                # YYYYMMDD
+    asset: Literal["stock"] = "stock"     # 1차 릴리스는 일봉 stock만
+    method: Literal["pearson", "spearman"] = "pearson"
+    return_type: Literal["returns", "price"] = "returns"
+
+
+class CorrelationResponse(BaseModel):
+    """상관관계 분석 응답. matrix[i][j] = tickers[i]·tickers[j] 상관계수(대각 1.0, 계산불가 null)."""
+
+    tickers: list[str]                    # 행/열 순서 (정렬 후 최종 포함 티커)
+    matrix: list[list[float | None]]      # N×N
+    observations: int                     # 정렬·dropna 후 공통 관측 수
+    period_start: date | None
+    period_end: date | None
+    method: str
+    return_type: str
+    dropped: list[str]                    # 미등록·무데이터로 제외된 티커
+    warnings: list[str]
+
+
 class UsRegisterRequest(BaseModel):
     """미국 주식 종목 등록 요청."""
 
