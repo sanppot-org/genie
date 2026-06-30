@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +14,12 @@ import type {
   CorrelationResponse,
   GenieResponse,
   StrategyInfo,
+  Ticker,
   UsBackfillResult,
   UsRegisterResult,
   UsTickerInfo,
 } from "@/lib/types";
+import { useRecentTickers } from "@/lib/use-recent-tickers";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -806,6 +808,9 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
 
 // ── C. Correlation analysis ────────────────────────────────────────────────────
 
+// 상관행렬 최대 종목 수(백엔드 스키마 max_length=20과 일치).
+const MAX_CORR = 20;
+
 /** Diverging cell color: +상관 빨강, -상관 파랑, 강도는 |값|. null은 무색. */
 function corrCellStyle(v: number | null): React.CSSProperties {
   if (v === null) return {};
@@ -818,25 +823,49 @@ function corrCellStyle(v: number | null): React.CSSProperties {
 }
 
 function CorrelationSection() {
-  const [tickersRaw, setTickersRaw] = useState("");
+  const [q, setQ] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const deferredQ = useDeferredValue(q);
+  const [selected, setSelected] = useState<Ticker[]>([]);
+  const { recent, add: addRecent, remove: removeRecent } = useRecentTickers();
   const [method, setMethod] = useState<"pearson" | "spearman">("pearson");
   const [returnType, setReturnType] = useState<"returns" | "price">("returns");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+
+  const searchResults = useQuery({
+    queryKey: ["lab-corr-tickers", deferredQ],
+    queryFn: () =>
+      apiGet<GenieResponse<Ticker[]>>("/api/tickers", { q: deferredQ, limit: 10 }).then((r) => r.data),
+    enabled: deferredQ.trim().length > 0,
+  });
 
   const corrMutation = useMutation({
     mutationFn: (req: CorrelationRequest) =>
       apiPost<GenieResponse<CorrelationResponse>>("/api/correlation/run", req).then((r) => r.data),
   });
 
-  const parsedTickers = parseSymbols(tickersRaw);
-  const canRun = parsedTickers.length >= 2 && !corrMutation.isPending;
+  const canRun = selected.length >= 2 && !corrMutation.isPending;
+
+  function addTicker(t: Ticker) {
+    setSelected((prev) =>
+      prev.some((p) => p.ticker === t.ticker) || prev.length >= MAX_CORR ? prev : [...prev, t],
+    );
+    addRecent(t); // "차트"·"비교" 탭과 동일 최근 기록(genie:recentTickers) 공유.
+    setQ("");
+    setSearchFocused(false);
+    (document.activeElement as HTMLElement | null)?.blur();
+  }
+
+  function removeTicker(ticker: string) {
+    setSelected((prev) => prev.filter((p) => p.ticker !== ticker));
+  }
 
   function handleRun() {
     if (!canRun) return;
     corrMutation.reset();
     corrMutation.mutate({
-      tickers: parsedTickers,
+      tickers: selected.map((t) => t.ticker),
       start: toBackendDate(start),
       end: toBackendDate(end),
       asset: "stock",
@@ -856,17 +885,62 @@ function CorrelationSection() {
 
       {/* ── Form ── */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="space-y-1 sm:col-span-3 lg:col-span-2">
+        <div className="relative space-y-1 sm:col-span-3 lg:col-span-2">
           <label className="text-xs text-muted-foreground" htmlFor="corr-tickers">
-            티커 (쉼표 구분, 2~20개)
+            종목 검색 (2~{MAX_CORR}개)
           </label>
           <Input
             id="corr-tickers"
-            value={tickersRaw}
-            onChange={(e) => setTickersRaw(e.target.value)}
-            placeholder="005930, 000660, 035720"
-            className="font-mono text-sm"
+            value={q}
+            disabled={selected.length >= MAX_CORR}
+            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            placeholder={
+              selected.length >= MAX_CORR
+                ? `최대 ${MAX_CORR}개`
+                : "ticker 또는 종목명 (예: 005930, 삼성)"
+            }
+            className="text-sm"
           />
+          {searchFocused && deferredQ.trim().length > 0 && (
+            <section className="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-md border border-border bg-background p-1 shadow-lg">
+              {searchResults.isLoading && (
+                <p className="px-3 py-2 text-sm text-muted-foreground">불러오는 중...</p>
+              )}
+              {searchResults.isError && (
+                <p className="px-3 py-2 text-sm text-destructive">
+                  검색 실패: {extractErrorMessage(searchResults.error)}
+                </p>
+              )}
+              {searchResults.data && searchResults.data.length === 0 && (
+                <p className="px-3 py-2 text-sm text-muted-foreground">결과 없음</p>
+              )}
+              <ul>
+                {searchResults.data?.map((t) => {
+                  const picked = selected.some((p) => p.ticker === t.ticker);
+                  return (
+                    <li key={t.ticker}>
+                      <button
+                        type="button"
+                        disabled={picked}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => addTicker(t)}
+                        className={`w-full rounded-md px-3 py-2 text-left text-sm hover:bg-muted disabled:opacity-40 ${
+                          picked ? "bg-muted" : ""
+                        }`}
+                      >
+                        <span className="font-mono">{t.ticker}</span>
+                        <span className="ml-2">{t.name}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{t.asset_type}</span>
+                        {picked && <span className="ml-2 text-xs text-muted-foreground">추가됨</span>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -933,6 +1007,62 @@ function CorrelationSection() {
           <Input id="corr-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="text-sm" />
         </div>
       </div>
+
+      {/* ── 선택된 종목 칩 ── */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selected.map((t) => (
+            <span
+              key={t.ticker}
+              className="inline-flex items-center rounded-full border border-border bg-background pl-3 text-sm"
+            >
+              <span className="font-mono">{t.ticker}</span>
+              <span className="ml-1.5">{t.name}</span>
+              <button
+                type="button"
+                aria-label={`${t.name} 제거`}
+                onClick={() => removeTicker(t.ticker)}
+                className="px-2 py-1 text-muted-foreground hover:text-foreground"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── 최근 종목 (선택 안 된 것만) ── */}
+      {recent.some((t) => !selected.some((s) => s.ticker === t.ticker)) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">최근</span>
+          {recent
+            .filter((t) => !selected.some((s) => s.ticker === t.ticker))
+            .map((t) => (
+              <span
+                key={t.ticker}
+                className="inline-flex items-center rounded-full border border-border bg-background pl-3 text-sm"
+              >
+                <button
+                  type="button"
+                  disabled={selected.length >= MAX_CORR}
+                  onClick={() => addTicker(t)}
+                  className="py-1 hover:text-foreground disabled:opacity-40"
+                >
+                  <span className="font-mono">{t.ticker}</span>
+                  <span className="ml-1.5">{t.name}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`${t.name} 최근 기록 삭제`}
+                  onClick={() => removeRecent(t.ticker)}
+                  className="px-2 py-1 text-muted-foreground hover:text-foreground"
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+        </div>
+      )}
 
       <Button variant="outline" size="sm" disabled={!canRun} onClick={handleRun} className="gap-2">
         {corrMutation.isPending && <Spinner />}
