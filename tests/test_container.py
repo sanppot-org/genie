@@ -1,6 +1,6 @@
 """Tests for DI Container."""
 
-import os
+from collections.abc import Generator
 
 import pytest
 
@@ -8,9 +8,24 @@ from src.container import ApplicationContainer
 
 
 @pytest.fixture(autouse=True)
-def set_test_env() -> None:
-    """테스트용 환경 변수 설정"""
-    os.environ["POSTGRES_PASSWORD"] = "test_password"
+def set_test_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """테스트용 환경 변수 설정 (monkeypatch로 테스트 종료 시 자동 복원)."""
+    monkeypatch.setenv("POSTGRES_PASSWORD", "test_password")
+
+
+@pytest.fixture(autouse=True)
+def _restore_global_wiring() -> Generator[None, None, None]:
+    """app 글로벌 컨테이너 와이어링 복원 (테스트 격리).
+
+    ApplicationContainer는 wiring_config.auto_wire=True라 인스턴스화할 때마다
+    라우트 모듈(@inject)을 그 인스턴스로 재바인딩한다. 이 파일이 새 인스턴스를
+    여러 개 만들면 app.py의 글로벌 컨테이너 바인딩을 가로채, 이후 실행되는 API
+    테스트의 `container.x.override()`가 무력화된다(라우트가 실제 서비스→실DB로
+    빠져 500/단언 실패). 각 테스트 후 app 글로벌 컨테이너를 다시 wire해 복원한다.
+    """
+    yield
+    from app import container as app_container
+    app_container.wire()
 
 
 def test_container_database_config() -> None:
