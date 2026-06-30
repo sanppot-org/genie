@@ -1073,17 +1073,31 @@ function CorrelationSection() {
         <p className="text-sm text-destructive">에러: {extractErrorMessage(corrMutation.error)}</p>
       )}
 
-      {result && <CorrelationResult result={result} />}
+      {result && (
+        <CorrelationResult
+          result={result}
+          nameByTicker={Object.fromEntries(selected.map((t) => [t.ticker, t.name]))}
+        />
+      )}
     </section>
   );
 }
 
-function CorrelationResult({ result }: { result: CorrelationResponse }) {
+function CorrelationResult({
+  result,
+  nameByTicker,
+}: {
+  result: CorrelationResponse;
+  nameByTicker: Record<string, string>;
+}) {
+  // 종목명 우선 표기(없으면 티커 코드로 폴백).
+  const label = (ticker: string) => nameByTicker[ticker] ?? ticker;
+
   if (result.tickers.length < 2) {
     return (
       <div className="space-y-2 text-sm text-muted-foreground">
-        <p>상관계산에 필요한 유효 티커가 부족합니다.</p>
-        {result.dropped.length > 0 && <p>제외됨: {result.dropped.join(", ")}</p>}
+        <p>상관계산에 필요한 유효 종목이 부족합니다.</p>
+        {result.dropped.length > 0 && <p>제외됨: {result.dropped.map(label).join(", ")}</p>}
       </div>
     );
   }
@@ -1106,8 +1120,8 @@ function CorrelationResult({ result }: { result: CorrelationResponse }) {
             <tr className="border-b border-border bg-muted/30">
               <th className="px-3 py-2 text-left font-medium text-muted-foreground" />
               {result.tickers.map((t) => (
-                <th key={t} className="px-3 py-2 text-center font-mono font-medium text-muted-foreground">
-                  {t}
+                <th key={t} className="px-3 py-2 text-center font-medium text-muted-foreground">
+                  {label(t)}
                 </th>
               ))}
             </tr>
@@ -1115,7 +1129,7 @@ function CorrelationResult({ result }: { result: CorrelationResponse }) {
           <tbody>
             {result.tickers.map((rowTicker, i) => (
               <tr key={rowTicker} className="border-b border-border last:border-0">
-                <td className="px-3 py-2 font-mono font-medium text-muted-foreground">{rowTicker}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-medium text-muted-foreground">{label(rowTicker)}</td>
                 {result.matrix[i].map((v, j) => (
                   <td
                     key={`${rowTicker}-${result.tickers[j]}`}
@@ -1132,7 +1146,7 @@ function CorrelationResult({ result }: { result: CorrelationResponse }) {
       </div>
 
       {result.dropped.length > 0 && (
-        <p className="text-xs text-muted-foreground">제외된 티커: {result.dropped.join(", ")}</p>
+        <p className="text-xs text-muted-foreground">제외된 종목: {result.dropped.map(label).join(", ")}</p>
       )}
       {result.warnings.length > 0 && (
         <ul className="space-y-0.5 text-xs text-amber-600">
