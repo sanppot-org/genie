@@ -373,6 +373,7 @@ class StrategyInfo(BaseModel):
     name: str
     timeframe: str
     description: str
+    default_params: dict[str, object] = Field(default_factory=dict)
 
 
 class BacktestRunRequest(BaseModel):

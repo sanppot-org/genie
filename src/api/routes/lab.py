@@ -35,9 +35,14 @@ router = APIRouter(tags=["lab"])
 def get_strategies(
         service: BacktestService = Depends(Provide[ApplicationContainer.backtest_service]),
 ) -> GenieResponse[list[StrategyInfo]]:
-    """레지스트리에 등록된 전략 목록 반환. [{name, timeframe, description}]"""
+    """레지스트리에 등록된 전략 목록 반환. [{name, timeframe, description, default_params}]"""
     infos = [
-        StrategyInfo(name=spec.name, timeframe=spec.timeframe, description=spec.description)
+        StrategyInfo(
+            name=spec.name,
+            timeframe=spec.timeframe,
+            description=spec.description,
+            default_params=dict(spec.default_params),
+        )
         for spec in service.list_strategies()
     ]
     return GenieResponse(data=infos)

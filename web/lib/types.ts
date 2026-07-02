@@ -195,6 +195,7 @@ export interface StrategyInfo {
   name: string;
   timeframe: string;
   description: string;
+  default_params: Record<string, unknown>;
 }
 
 export interface BacktestRunItem {

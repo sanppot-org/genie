@@ -51,6 +51,21 @@ function fmtDays(v: number | null): string {
   return `${v.toLocaleString("ko-KR")}일`;
 }
 
+/** Parse a raw param input using the default value's type as a hint.
+ *  number → Number (invalid면 null로 제외), boolean → "true" 비교, 그 외 → JSON 파싱 (실패 시 raw string). */
+function parseParamValue(raw: string, defaultValue: unknown): unknown {
+  if (typeof defaultValue === "number") {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof defaultValue === "boolean") return raw === "true";
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return raw;
+  }
+}
+
 /** Sort results: non-bust by CAGR desc, bust rows at the bottom. */
 function sortResults(rows: BacktestRunItem[]): BacktestRunItem[] {
   const live = rows
@@ -409,6 +424,8 @@ function BacktestSection({
   const [commission, setCommission] = useState(String(DEFAULT_COMMISSION));
   const [slippage, setSlippage] = useState(String(DEFAULT_SLIPPAGE));
   const [selectedStrategies, setSelectedStrategies] = useState<Set<string>>(new Set());
+  // 파라미터 override 원본 문자열 (빈 값 = 기본값 사용). 단일 전략 선택 시에만 적용.
+  const [paramOverrides, setParamOverrides] = useState<Record<string, string>>({});
 
   // Load available strategies
   const strategiesQuery = useQuery({
@@ -429,7 +446,16 @@ function BacktestSection({
       else next.add(name);
       return next;
     });
+    // 선택이 바뀌면 이전 전략의 override가 새 전략에 적용되지 않도록 초기화
+    setParamOverrides({});
   }
+
+  // 단일 전략 선택 시에만 파라미터 조정 허용 (백엔드 param_overrides 제약과 동일)
+  const singleStrategy =
+    selectedStrategies.size === 1
+      ? strategiesQuery.data?.find((s) => selectedStrategies.has(s.name))
+      : undefined;
+  const tunableParams = singleStrategy ? Object.entries(singleStrategy.default_params) : [];
 
   function handleRun() {
     const cash = parseFloat(initialCash);
@@ -437,6 +463,16 @@ function BacktestSection({
     const slip = parseFloat(slippage);
     if (!ticker.trim() || selectedStrategies.size === 0) return;
     if (!isFinite(cash) || cash <= 0 || !isFinite(comm) || !isFinite(slip)) return;
+
+    // 단일 전략 선택 시에만 override 전송 (값이 입력된 필드만, 타입은 기본값 기준으로 파싱)
+    let overridesPayload: Record<string, unknown> | null = null;
+    if (singleStrategy) {
+      const entries = Object.entries(paramOverrides)
+        .filter(([, v]) => v.trim() !== "")
+        .map(([k, v]) => [k, parseParamValue(v, singleStrategy.default_params[k])] as const)
+        .filter(([, v]) => v !== null);
+      if (entries.length > 0) overridesPayload = Object.fromEntries(entries);
+    }
 
     backtestMutation.reset();
     const req: BacktestRunRequest = {
@@ -448,6 +484,7 @@ function BacktestSection({
       commission: comm,
       slippage: slip,
       asset,
+      param_overrides: overridesPayload,
     };
     backtestMutation.mutate(req);
   }
@@ -634,6 +671,78 @@ function BacktestSection({
           <p className="text-sm text-muted-foreground">등록된 전략이 없습니다.</p>
         )}
       </div>
+
+      {/* ── Strategy params (단일 전략 선택 시에만 조정 가능) ── */}
+      {singleStrategy && tunableParams.length > 0 && (
+        <div className="space-y-2 rounded-md border border-border bg-muted/20 px-4 py-3">
+          <p className="text-xs text-muted-foreground">
+            전략 파라미터 — <span className="font-mono">{singleStrategy.name}</span>{" "}
+            <span className="opacity-70">(비워두면 기본값 사용)</span>
+          </p>
+          <div className="flex flex-wrap gap-x-4 gap-y-3">
+            {tunableParams.map(([key, defaultValue]) => (
+              <div key={key} className="w-44 space-y-1">
+                <label
+                  className="font-mono text-xs text-muted-foreground"
+                  htmlFor={`bt-param-${key}`}
+                >
+                  {key}
+                </label>
+                {typeof defaultValue === "boolean" ? (
+                  <div
+                    role="group"
+                    aria-label={key}
+                    className="flex h-9 gap-1 rounded-md border border-input p-0.5"
+                  >
+                    {[
+                      ["", "기본"],
+                      ["true", "ON"],
+                      ["false", "OFF"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() =>
+                          setParamOverrides((prev) => ({ ...prev, [key]: value }))
+                        }
+                        aria-pressed={(paramOverrides[key] ?? "") === value}
+                        className={`flex-1 rounded text-xs font-medium transition-colors ${
+                          (paramOverrides[key] ?? "") === value
+                            ? "bg-foreground text-background"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <Input
+                    id={`bt-param-${key}`}
+                    type={typeof defaultValue === "number" ? "number" : "text"}
+                    step="any"
+                    value={paramOverrides[key] ?? ""}
+                    onChange={(e) =>
+                      setParamOverrides((prev) => ({ ...prev, [key]: e.target.value }))
+                    }
+                    placeholder={
+                      typeof defaultValue === "number"
+                        ? String(defaultValue)
+                        : JSON.stringify(defaultValue)
+                    }
+                    className="font-mono text-sm"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {selectedStrategies.size > 1 && (
+        <p className="text-xs text-muted-foreground">
+          파라미터 조정은 전략을 1개만 선택했을 때 가능합니다.
+        </p>
+      )}
 
       {/* ── Run button ── */}
       <div className="flex items-center gap-3">
