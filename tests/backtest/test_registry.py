@@ -9,6 +9,7 @@ from src.backtest.strategy.buy_and_hold_strategy import BuyAndHoldStrategy
 from src.backtest.strategy.ema_alignment_strategy import EmaAlignmentStrategy
 from src.backtest.strategy.ema_dynamic_sizer import EmaDynamicSizer
 from src.backtest.strategy.ema_simple_alignment_strategy import EmaSimpleAlignmentStrategy
+from src.backtest.strategy.infinite_buying_strategy import InfiniteBuyingStrategy
 from src.backtest.strategy.morning_afternoon_strategy import MorningAfternoonStrategy
 from src.backtest.strategy.simple_strategy import SimpleStrategy
 from src.backtest.strategy.split_strategy import SplitStrategy
@@ -17,22 +18,23 @@ from src.backtest.strategy.volatility_breakout_strategy import VolatilityBreakou
 
 
 class TestRegistryIntegration:
-    """레지스트리 통합 테스트 — 8개 전략 등록 확인"""
+    """레지스트리 통합 테스트 — 9개 전략 등록 확인"""
 
     EXPECTED_STRATEGIES = {
         "simple": (SimpleStrategy, "1d", False),
         "volatility_breakout": (VolatilityBreakoutStrategy, "1d", False),
         "ema_alignment": (EmaAlignmentStrategy, "1d", False),
         "ema_simple_alignment": (EmaSimpleAlignmentStrategy, "1d", False),
+        "infinite_buying": (InfiniteBuyingStrategy, "1d", False),
         "split": (SplitStrategy, "1d", False),
         "timed_hold": (TimedHoldStrategy, "1h", True),
         "morning_afternoon": (MorningAfternoonStrategy, "1h", False),
         "buy_and_hold": (BuyAndHoldStrategy, "1d", False),
     }
 
-    def test_registry_has_all_eight_strategies(self):
-        """레지스트리에 정확히 8개 전략이 등록되어 있어야 합니다"""
-        assert len(STRATEGY_REGISTRY) == 8
+    def test_registry_has_all_nine_strategies(self):
+        """레지스트리에 정확히 9개 전략이 등록되어 있어야 합니다"""
+        assert len(STRATEGY_REGISTRY) == 9
 
     def test_all_strategies_have_correct_class_and_timeframe(self):
         """각 전략의 클래스·타임프레임·cheat_on_open이 올바르게 등록되어야 합니다"""
@@ -48,9 +50,9 @@ class TestRegistryIntegration:
             assert isinstance(spec, StrategySpec), f"{name}: StrategySpec 인스턴스 아님"
 
     def test_list_strategies_returns_all_names_sorted(self):
-        """list_strategies()가 8개의 이름을 정렬된 순서로 반환해야 합니다"""
+        """list_strategies()가 9개의 이름을 정렬된 순서로 반환해야 합니다"""
         names = list_strategies()
-        assert len(names) == 8
+        assert len(names) == 9
         assert names == sorted(names)
         assert set(names) == set(self.EXPECTED_STRATEGIES)
 
@@ -85,6 +87,12 @@ class TestRegistryIntegration:
         """SplitStrategy는 manages_own_sizing=True여야 합니다"""
         spec = get_strategy("split")
         assert spec.manages_own_sizing is True
+
+    def test_infinite_buying_manages_own_sizing(self):
+        """InfiniteBuyingStrategy는 manages_own_sizing=True여야 합니다"""
+        spec = get_strategy("infinite_buying")
+        assert spec.manages_own_sizing is True
+        assert spec.default_sizer is None
 
     def test_get_strategy_returns_independent_default_params(self):
         """get_strategy()가 반환한 default_params를 수정해도 레지스트리 원본에 영향 없어야 합니다"""

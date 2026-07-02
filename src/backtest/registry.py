@@ -28,6 +28,7 @@ from src.backtest.strategy.buy_and_hold_strategy import BuyAndHoldStrategy
 from src.backtest.strategy.ema_alignment_strategy import EmaAlignmentStrategy
 from src.backtest.strategy.ema_dynamic_sizer import EmaDynamicSizer
 from src.backtest.strategy.ema_simple_alignment_strategy import EmaSimpleAlignmentStrategy
+from src.backtest.strategy.infinite_buying_strategy import InfiniteBuyingStrategy
 from src.backtest.strategy.morning_afternoon_strategy import MorningAfternoonStrategy
 from src.backtest.strategy.simple_strategy import SimpleStrategy
 from src.backtest.strategy.split_strategy import SplitStrategy
@@ -67,7 +68,7 @@ class StrategySpec:
 
 
 # ---------------------------------------------------------------------------
-# 레지스트리 — 8개 전략 등록
+# 레지스트리 — 9개 전략 등록
 # ---------------------------------------------------------------------------
 
 STRATEGY_REGISTRY: dict[str, StrategySpec] = {
@@ -124,6 +125,24 @@ STRATEGY_REGISTRY: dict[str, StrategySpec] = {
         default_sizer=SizerConfig.percent(95),
         requires_cheat_on_open=False,
         description="EMA 정배열/역배열 양방향 전략 (롱·숏 독립 제어)",
+    ),
+    "infinite_buying": StrategySpec(
+        name="infinite_buying",
+        strategy_class=InfiniteBuyingStrategy,
+        default_params={
+            "split_count": 40,
+            "band_base_pct": 15.0,
+            "target_profit_pct": 15.0,
+            "first_buy_loc_pct": 15.0,
+            "compound_mode": "half",
+        },
+        timeframe="1d",
+        # 회당금액 기준으로 self.buy(size=...)를 직접 계산하므로 외부 sizer 없이 동작합니다.
+        # LOC/MOC 종가 체결 재현을 위해 전략이 start()에서 broker.set_coc(True)를 직접 설정합니다.
+        default_sizer=None,
+        manages_own_sizing=True,
+        requires_cheat_on_open=False,
+        description="무한매수법 (라오어) — T·별지점 기반 LOC 분할매수 + 쿼터/지정가 매도 (docs/무한매수법.md)",
     ),
     "split": StrategySpec(
         name="split",
