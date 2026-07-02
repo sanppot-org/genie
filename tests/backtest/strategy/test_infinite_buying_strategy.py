@@ -36,21 +36,21 @@ class TestInfiniteBuyingStrategy:
         assert strategy.cycle_count >= 1, "전량 청산으로 사이클이 완료되어야 함"
 
     def test_quarter_sell_at_star_price(self) -> None:
-        """고가가 별지점만 도달(목표가 미도달) 시 쿼터매도만 체결, 사이클 유지"""
-        # Given: 매수 후 고가가 별지점(114.25)과 목표가(115) 사이인 데이터
+        """종가가 별지점~목표가 사이일 때 쿼터매도만 체결(종가 체결), 사이클 유지"""
+        # Given: 첫 매수(T=1, 별지점 114.25/목표가 115) 후 종가 114.5인 데이터
         cerebro = bt.Cerebro()
-        cerebro.adddata(self._to_feed(self._touch_star_only()))
+        cerebro.adddata(self._to_feed(self._close_between_star_and_target()))
         cerebro.addstrategy(InfiniteBuyingStrategy, split_count=40)
         cerebro.broker.setcash(100_000_000)
 
         # When
         strategy = cerebro.run()[0]
 
-        # Then: 별지점 쿼터매도 체결, 전량 청산은 없음
-        assert strategy.sell_executed, "별지점 도달 시 쿼터매도가 체결되어야 함"
+        # Then: 종가 114.5(별지점 이상, 목표가 미만)에 쿼터매도만 체결
+        assert strategy.sell_executed, "종가가 별지점 이상이면 쿼터매도가 체결되어야 함"
         sells = [t for t in strategy.trade_history if t["type"] == "sell"]
-        assert any(abs(s["price"] - 114.25) < 0.01 for s in sells), (
-            f"쿼터매도는 별지점(114.25) 지정가로 체결되어야 함 (실제: {[s['price'] for s in sells]})"
+        assert any(abs(s["price"] - 114.5) < 0.01 for s in sells), (
+            f"쿼터매도는 종가(114.5)에 체결되어야 함 (실제: {[s['price'] for s in sells]})"
         )
         assert strategy.cycle_count == 0, "목표가 미도달 시 사이클이 유지되어야 함"
         assert strategy.hold_qty > 0, "쿼터매도 후에도 잔량이 남아야 함"
@@ -70,8 +70,8 @@ class TestInfiniteBuyingStrategy:
         assert strategy.buy_executed, "소진 전까지 분할 매수가 실행되어야 함"
         assert strategy.cycle_count == 0, "하락장에서는 사이클이 완료되지 않아야 함"
         assert strategy.hold_qty > 0, "청산 없이 보유가 유지되어야 함"
-        # 소진 후 현금이 회당금액의 절반에도 못 미치면 신규 매수 불가
-        assert strategy.broker.get_cash() < strategy.per_buy_amount, "자금이 소진 상태여야 함"
+        # 소진 모드에 진입해 MOC 쿼터매도(비중 덜어내기)가 발생해야 함
+        assert strategy.sell_executed, "회차 소진 시 MOC 쿼터매도가 실행되어야 함"
 
     # === 헬퍼 메서드 ===
 
@@ -90,22 +90,15 @@ class TestInfiniteBuyingStrategy:
             })
         return rows
 
-    def _touch_star_only(self) -> list[dict]:
-        """첫 매수(T=1) 직후 고가 114.5 — 별지점(114.25)만 도달, 목표가(115) 미도달
+    def _close_between_star_and_target(self) -> list[dict]:
+        """첫 매수(T=1) 직후 종가 114.5 — 별지점(114.25) 이상, 목표가(115) 미만
 
-        day0 계획 → day1 첫 매수(T=1, 별지점 114.25) → day2 고가 114.5로 쿼터매도만 체결.
+        day0 계획 → day1 첫 매수(종가 100, T=1, 별지점 114.25) → day2 종가 114.5로 쿼터매도만 체결.
         """
         base = datetime(2024, 1, 1)
         rows = [self._candle(base + timedelta(days=i), 100.0) for i in range(2)]
-        rows.append({
-            "datetime": base + timedelta(days=2),
-            "open": 100.0,
-            "high": 114.5,
-            "low": 99.0,
-            "close": 100.0,
-            "volume": 1000.0,
-        })
-        rows.append(self._candle(base + timedelta(days=3), 100.0))
+        rows.append(self._candle(base + timedelta(days=2), 114.5))
+        rows.append(self._candle(base + timedelta(days=3), 114.5))
         return rows
 
     def _continuous_decline(self) -> list[dict]:

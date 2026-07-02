@@ -8,16 +8,18 @@
 - 첫 매수: 전일 종가 × (1+15%) LOC + 여유매수로 회당금액 소진
 - 전반전(T < 분할/2): 별지점-0.01에 회당금액 절반, 평단에 나머지 LOC 매수
 - 후반전(T >= 분할/2): 별지점-0.01에 회당금액 전체 + 여유매수
-- 매도(매일): 잔량 25% 별지점 지정가(쿼터매도) + 75% 평단×(1+15%) 지정가
+- 매도(매일): 잔량 25% 별지점(쿼터매도) + 75% 평단×(1+15%) 지정가매도
 - 회차 소진 시: MOC 쿼터매도(종가)만 실행, 매수 금지
 - 반복리(기본): 실현 수익 발생 시 회당금액 += 수익/2/분할수
 - 전량 청산 시 사이클 종료 → 다음 bar부터 첫 매수 재시작
 
-일봉 백테스트 근사 가정:
-- LOC 매수: 전일 수립한 지정가 vs 당일 종가 비교, 충족 시 종가 체결(cheat_on_close)
-- 여유매수: 첫 매수·후반전은 floor(회당금액/종가)로 예산 최대 소진
-- 지정가 매도: backtrader Limit 주문(당일 고가 도달 시 지정가 체결), 매일 취소 후 재설정
-- MOC 쿼터매도: cheat_on_close 시장가 → 종가 체결
+일봉 백테스트 근사 가정 (매수·매도 모두 종가 기준으로 대칭 모델링):
+- 매수(LOC): 전일 수립한 지정가 vs 당일 종가 비교, 종가 <= 지정가면 종가 체결
+- 매도(AFTER 지정가): 종가 vs 별지점/목표가 비교, 종가 >= 별지점이면 종가 체결.
+  장중 고가 터치가 아니라 종가 기준으로 판정하여 매수 LOC와 동일 시맨틱을 유지한다
+  (장중 고가 기반 지정가 체결은 종가가 훨씬 낮게 끝나도 별지점가 매도로 처리되는 낙관 편향이 있어 배제).
+- 체결가는 종가 — cheat_on_close로 재현.
+- 여유매수: 첫 매수·후반전은 floor(회당금액/종가)로 예산 최대 소진.
 """
 
 import math
@@ -62,16 +64,18 @@ class InfiniteBuyingStrategy(bt.Strategy):
         self.per_buy_amount: float = 0.0
 
         # 보유 미러 — coc 주문은 체결 통지가 다음 bar에 오므로 발주 시점에 선반영하여
-        # 당일 계획 수립(T·평단·별지점 계산)에 즉시 사용한다. 지정가 매도는 통지 시점에 반영.
+        # 당일 계획 수립(T·평단·별지점 계산)에 즉시 사용한다.
         self.hold_qty: int = 0
         self.hold_cost: float = 0.0  # 매수누적액
 
         # 익일 계획 — buy_plan: (mode, limit, qty). mode "budget"=회당금액 소진, "fixed"=고정 수량
         self.buy_plan: list[tuple[str, float, int]] = []
+        # 익일 매도 판정 기준가 (종가 기준). hold_qty>0일 때만 유효.
+        self.sell_star: float = 0.0   # 별지점 — 종가 >= 별지점이면 쿼터매도
+        self.sell_target: float = 0.0  # 목표가 — 종가 >= 목표가이면 전량 청산
         self.moc_quarter_qty: int = 0  # 소진 시 익일 MOC 쿼터매도 수량 (>0이면 매수 금지)
-        self.pending_sells: list[Any] = []
 
-        # coc 주문 선반영 추적 — 거부 시 미러 롤백용. ref -> (kind, qty, price_or_avg)
+        # coc 주문 선반영 추적 — 거부/미체결 시 미러 롤백용. ref -> (kind, qty, price_or_avg)
         self.inflight: dict[int, tuple[str, int, float]] = {}
 
         # 통계/테스트용
@@ -131,7 +135,7 @@ class InfiniteBuyingStrategy(bt.Strategy):
         self.hold_cost += qty * close
 
     def _issue_coc_sell(self, qty: int) -> None:
-        """MOC 매도 재현 — 종가 체결 시장가 발주 + 보유 미러 선반영 (평단 유지, 누적액 비례 축소)"""
+        """매도 재현 — 종가 체결 시장가 발주 + 보유 미러 선반영 (평단 유지, 누적액 비례 축소)"""
         avg = self._avg_price()
         order = self.sell(size=qty)
         self.inflight[order.ref] = ("sell", qty, avg)
@@ -159,6 +163,8 @@ class InfiniteBuyingStrategy(bt.Strategy):
         self.hold_qty = 0
         self.hold_cost = 0.0
         self.buy_plan = []
+        self.sell_star = 0.0
+        self.sell_target = 0.0
         self.moc_quarter_qty = 0
         self.log(f"CYCLE {self.cycle_count} COMPLETE — 전량 청산, 새 사이클 대기")
 
@@ -192,15 +198,9 @@ class InfiniteBuyingStrategy(bt.Strategy):
                 })
                 self.log(f"BUY EXECUTED {size}주, Price: {price:.2f} (T={self._t_value():.2f})")
             else:
+                # 매도는 모두 coc 시장가 — 미러는 발주 시 선반영됨, 여기선 수익만 계산.
                 self.sell_executed = True
-                if inflight is None:
-                    # 지정가 매도 체결 — 미러 반영은 여기서 (평단 유지, 누적액 비례 축소)
-                    avg = self._avg_price() if self.hold_qty > 0 else price
-                    self.hold_qty -= size
-                    self.hold_cost -= size * avg
-                else:
-                    # MOC 매도 — 미러는 발주 시 선반영됨, 수익 계산만 수행
-                    avg = inflight[2]
+                avg = inflight[2] if inflight is not None else price
                 profit = (price - avg) * size
                 self._apply_compound(profit)
                 self.trade_history.append({
@@ -214,7 +214,7 @@ class InfiniteBuyingStrategy(bt.Strategy):
                     self._finish_cycle()
 
         elif order.status in [order.Margin, order.Rejected, order.Canceled]:
-            # coc 주문이 거부되면 선반영한 미러를 롤백 (지정가 매도의 일상적 취소는 미러 무관)
+            # coc 주문이 거부되면 선반영한 미러를 롤백
             inflight = self.inflight.pop(order.ref, None)
             if inflight is not None:
                 kind, qty, price = inflight
@@ -231,15 +231,26 @@ class InfiniteBuyingStrategy(bt.Strategy):
     # ------------------------------------------------------------------
 
     def next(self) -> None:
-        """매 bar: ① 소진 시 MOC 쿼터매도 ② 전일 계획 LOC 매수 평가 ③ 익일 매수·매도 계획 갱신"""
+        """매 bar: 종가 기준으로 매도/매수를 판정(우선순위: 소진 MOC → 매도 → 매수)한 뒤 익일 계획 갱신"""
         close = float(self.dataclose[0])
 
         # ① 회차 소진 — MOC 쿼터매도만, 매수 금지
         if self.moc_quarter_qty > 0:
-            self._issue_coc_sell(min(self.moc_quarter_qty, self.hold_qty))
-            self.log(f"MOC QUARTER SELL {self.moc_quarter_qty}주 @ {close:.2f} (소진 모드)")
+            qty = min(self.moc_quarter_qty, self.hold_qty)
+            if qty > 0:
+                self._issue_coc_sell(qty)
+                self.log(f"MOC QUARTER SELL {qty}주 @ {close:.2f} (소진 모드)")
 
-        # ② LOC 매수 — 전일 계획 지정가 vs 당일 종가
+        # ② 매도 (종가 >= 별지점). 목표가 이상이면 전량 청산, 아니면 쿼터매도.
+        elif self.hold_qty > 0 and close >= self.sell_star:
+            if close >= self.sell_target:
+                self._issue_coc_sell(self.hold_qty)
+            else:
+                quarter = self.hold_qty // 4
+                if quarter > 0:
+                    self._issue_coc_sell(quarter)
+
+        # ③ 매수 (종가 <= 지정가). 별지점 지정가는 항상 별지점보다 낮으므로 ②와 상호배타.
         elif self.buy_plan:
             qty = 0
             for mode, limit, fixed_qty in self.buy_plan:
@@ -250,19 +261,17 @@ class InfiniteBuyingStrategy(bt.Strategy):
             if qty > 0:
                 self._issue_coc_buy(qty, close)
 
-        # ③ 미체결 지정가 매도 취소 후 익일 계획 재수립
-        for order in self.pending_sells:
-            self.cancel(order)
-        self.pending_sells.clear()
         self._plan_next_bar(close)
 
     def _plan_next_bar(self, prev_close: float) -> None:
-        """익일 매수 계획(buy_plan)과 매도 지정가 주문을 현재 미러 상태로 수립"""
+        """익일 매수 계획(buy_plan)과 매도 판정 기준가(sell_star/sell_target)를 현재 미러 상태로 수립"""
         self.buy_plan = []
         self.moc_quarter_qty = 0
 
         # 첫 매수 — 전일 종가 × (1 + 15%) LOC + 여유매수(예산 소진)
         if self.hold_qty <= 0:
+            self.sell_star = 0.0
+            self.sell_target = 0.0
             limit = prev_close * (1 + self.params.first_buy_loc_pct / 100)  # type: ignore[attr-defined]
             self.buy_plan = [("budget", limit, 0)]
             return
@@ -270,35 +279,21 @@ class InfiniteBuyingStrategy(bt.Strategy):
         avg = self._avg_price()
         t = self._t_value()
         split = float(self.params.split_count)  # type: ignore[attr-defined]
-        star = self._star_price()
-        target = avg * (1 + self.params.target_profit_pct / 100)  # type: ignore[attr-defined]
+        self.sell_star = self._star_price()
+        self.sell_target = avg * (1 + self.params.target_profit_pct / 100)  # type: ignore[attr-defined]
 
-        quarter_qty = self.hold_qty // 4
         # 소진 판정: T가 분할수에 도달했거나 현금이 반 회분에도 못 미치면 1회차 매수 불가
-        exhausted = t >= split or self.broker.get_cash() < self.per_buy_amount * 0.5
+        if t >= split or self.broker.get_cash() < self.per_buy_amount * 0.5:
+            self.moc_quarter_qty = self.hold_qty // 4
+            return
 
-        if exhausted:
-            self.moc_quarter_qty = quarter_qty
+        # 매수 계획 (매도는 next에서 종가 기준 평가)
+        if t < split / 2:
+            # 전반전 — 별지점-0.01에 회당금액 절반, 평단에 나머지
+            p1 = self.sell_star - 0.01
+            q1 = math.floor(self.per_buy_amount / 2 / p1)
+            q2 = max(math.floor(self.per_buy_amount / avg) - q1, 0)
+            self.buy_plan = [("fixed", p1, q1), ("fixed", avg, q2)]
         else:
-            # 쿼터매도 — 잔량 25%를 별지점 지정가
-            if quarter_qty > 0:
-                self.pending_sells.append(
-                    self.sell(exectype=bt.Order.Limit, price=star, size=quarter_qty)
-                )
-            # 매수 계획
-            if t < split / 2:
-                # 전반전 — 별지점-0.01에 회당금액 절반, 평단에 나머지
-                p1 = star - 0.01
-                q1 = math.floor(self.per_buy_amount / 2 / p1)
-                q2 = max(math.floor(self.per_buy_amount / avg) - q1, 0)
-                self.buy_plan = [("fixed", p1, q1), ("fixed", avg, q2)]
-            else:
-                # 후반전 — 별지점-0.01에 회당금액 전체 + 여유매수(예산 소진)
-                self.buy_plan = [("budget", star - 0.01, 0)]
-
-        # 지정가매도 — 쿼터를 제외한 잔량 75%를 평단×(1+익절률)
-        remain = self.hold_qty - quarter_qty
-        if remain > 0:
-            self.pending_sells.append(
-                self.sell(exectype=bt.Order.Limit, price=target, size=remain)
-            )
+            # 후반전 — 별지점-0.01에 회당금액 전체 + 여유매수(예산 소진)
+            self.buy_plan = [("budget", self.sell_star - 0.01, 0)]
