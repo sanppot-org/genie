@@ -20,8 +20,26 @@ import type { BacktestEquityPoint, BacktestRunItem } from "@/lib/types";
 const CHART_HEIGHT = 480;
 const DD_PANE_HEIGHT = 130;
 const BENCHMARK_COLOR = "#9ca3af"; // gray-400
+// 한눈에 보기용 최대 포인트 수 — 이보다 길면 버킷으로 뭉뚱그림 (30년 일봉 → 약 2달 단위).
+const MAX_POINTS = 160;
 
 const pctFmt = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+
+/** 시계열을 버킷 단위로 집계해 한눈에 보이게 단순화.
+ *  equity는 버킷 마지막 값, drawdown은 버킷 내 최저값 — MDD 깊이가 뭉개지지 않게 보존. */
+function downsample(curve: BacktestEquityPoint[]): BacktestEquityPoint[] {
+  if (curve.length <= MAX_POINTS) return curve;
+  const bucket = Math.ceil(curve.length / MAX_POINTS);
+  const out: BacktestEquityPoint[] = [];
+  for (let i = 0; i < curve.length; i += bucket) {
+    const slice = curve.slice(i, i + bucket);
+    const last = slice[slice.length - 1];
+    let minDd = slice[0].drawdown_pct;
+    for (const p of slice) minDd = Math.min(minDd, p.drawdown_pct);
+    out.push({ date: last.date, return_pct: last.return_pct, drawdown_pct: minDd });
+  }
+  return out;
+}
 
 interface DrawnMeta {
   name: string;
@@ -79,7 +97,7 @@ export function BacktestChart({ items, benchmark }: Props) {
 
     const drawn: DrawnMeta[] = [];
     items.forEach((item, i) => {
-      const curve = item.equity_curve ?? [];
+      const curve = downsample(item.equity_curve ?? []);
       const color = colorFor(i);
       const equityData = curve.map<LineData>((p) => ({ time: p.date as Time, value: p.return_pct }));
       const ddData = curve.map<LineData>((p) => ({ time: p.date as Time, value: p.drawdown_pct }));
@@ -135,7 +153,7 @@ export function BacktestChart({ items, benchmark }: Props) {
         },
         0,
       );
-      api.setData(benchmark.map<LineData>((p) => ({ time: p.date as Time, value: p.return_pct })));
+      api.setData(downsample(benchmark).map<LineData>((p) => ({ time: p.date as Time, value: p.return_pct })));
     }
 
     chart.panes()[1]?.setHeight(DD_PANE_HEIGHT);
