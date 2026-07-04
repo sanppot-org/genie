@@ -127,7 +127,53 @@ class TestRunWithResult:
         assert isinstance(d, dict)
         expected_keys = {
             "strategy_name", "initial_cash", "final_value", "total_return_pct",
-            "cagr_pct", "max_drawdown_pct", "sharpe_ratio", "total_trades",
+            "cagr_pct", "max_drawdown_pct", "sharpe_ratio", "sortino_ratio", "total_trades",
             "win_rate_pct", "period_days", "start_date", "end_date",
         }
         assert expected_keys == set(d.keys())
+
+    def test_sortino_ratio_is_float_with_sufficient_data(self) -> None:
+        """260+ bar 데이터에서 sortino_ratio가 None이 아닌 유한 float인지 검증."""
+        import math
+        df = _make_df(n=260)
+        result = self._builder(BuyAndHoldStrategy, df=df).run_with_result()
+        assert result.sortino_ratio is None or isinstance(result.sortino_ratio, float)
+        if result.sortino_ratio is not None:
+            assert math.isfinite(result.sortino_ratio)
+
+
+class TestComputeSortino:
+    """_compute_sortino 순수 함수 단위 테스트."""
+
+    def test_known_series_matches_manual_formula(self) -> None:
+        """일별 수익률로 (평균/하방편차)×√252 를 정확히 계산하는지 검증."""
+        import math
+
+        from src.backtest.result import _TRADING_DAYS_PER_YEAR, _compute_sortino
+
+        returns = [0.02, -0.01, 0.03, -0.02, 0.01]
+        analysis = dict(enumerate(returns))  # .items() 로 (key, ret) 순회 → ret만 사용
+        mean = sum(returns) / len(returns)
+        downside = math.sqrt(sum(r**2 for r in returns if r < 0) / len(returns))
+        expected = mean / downside * math.sqrt(_TRADING_DAYS_PER_YEAR)
+
+        assert _compute_sortino(analysis) == pytest.approx(expected)
+
+    def test_no_downside_returns_none(self) -> None:
+        """하락일이 없으면(하방 변동 0) 정의 불가 → None."""
+        from src.backtest.result import _compute_sortino
+
+        assert _compute_sortino({0: 0.01, 1: 0.02, 2: 0.0}) is None
+
+    def test_insufficient_sample_returns_none(self) -> None:
+        """표본이 2개 미만이면 None."""
+        from src.backtest.result import _compute_sortino
+
+        assert _compute_sortino({0: -0.01}) is None
+        assert _compute_sortino({}) is None
+
+    def test_non_iterable_returns_none(self) -> None:
+        """items()가 없는 입력은 None (방어적)."""
+        from src.backtest.result import _compute_sortino
+
+        assert _compute_sortino(None) is None

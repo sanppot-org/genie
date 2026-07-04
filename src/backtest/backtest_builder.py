@@ -6,7 +6,7 @@ from backtrader import Analyzer, Strategy, TimeFrame
 
 from src.backtest.commission_config import CommissionConfig
 from src.backtest.data_feed.base import DataFeedConfig
-from src.backtest.result import BacktestResult, _compute_cagr, _compute_total_return_pct, _safe_max_drawdown, _safe_sharpe, _safe_trade_stats, build_equity_curve
+from src.backtest.result import BacktestResult, _compute_cagr, _compute_sortino, _compute_total_return_pct, _safe_max_drawdown, _safe_sharpe, _safe_trade_stats, build_equity_curve
 from src.backtest.sizer_config import SizerConfig
 
 # 표준 분석기 번들: (analyzer_class, name, params_dict)
@@ -235,8 +235,10 @@ class BacktestBuilder:
         trade_analysis = strat.analyzers.trades.get_analysis()
         total_trades, win_rate_pct = _safe_trade_stats(trade_analysis)
 
-        # TimeReturn 분석기 → 일별 자산곡선 (equity curve + drawdown)
-        equity_curve = build_equity_curve(strat.analyzers.timereturn.get_analysis())
+        # TimeReturn 분석기 → 일별 자산곡선 + 소르티노 (동일 시계열 재사용)
+        timereturn_analysis = strat.analyzers.timereturn.get_analysis()
+        equity_curve = build_equity_curve(timereturn_analysis)
+        sortino_ratio = _compute_sortino(timereturn_analysis)
 
         # period_days: 첫 봉~마지막 봉 사이의 실제 캘린더 일수.
         # data.datetime.datetime(ago) 는 linebuffer.LineBuffer.datetime()을 호출하며,
@@ -271,6 +273,7 @@ class BacktestBuilder:
             cagr_pct=cagr_pct,
             max_drawdown_pct=max_drawdown_pct,
             sharpe_ratio=sharpe_ratio,
+            sortino_ratio=sortino_ratio,
             total_trades=total_trades,
             win_rate_pct=win_rate_pct,
             period_days=period_days,

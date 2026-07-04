@@ -165,6 +165,7 @@ class ComparisonRow:
     cagr_pct: float | None
     max_drawdown_pct: float | None
     sharpe_ratio: float | None
+    sortino_ratio: float | None
     win_rate_pct: float | None
     total_trades: int
     period_days: int | None
@@ -186,6 +187,7 @@ class ComparisonRow:
             cagr_pct=result.cagr_pct,
             max_drawdown_pct=result.max_drawdown_pct,
             sharpe_ratio=result.sharpe_ratio,
+            sortino_ratio=result.sortino_ratio,
             win_rate_pct=result.win_rate_pct,
             total_trades=result.total_trades,
             period_days=result.period_days,
@@ -259,7 +261,7 @@ def format_comparison_table(rows: list[ComparisonRow]) -> str:
     has_bust = any(r.bust for r in sorted_rows)
 
     # 컬럼 헤더
-    headers = ["전략명", "타임프레임", "Sizer", "수익률%", "CAGR%", "MDD%", "Sharpe", "승률%", "거래수", "기간(일)"]
+    headers = ["전략명", "타임프레임", "Sizer", "수익률%", "CAGR%", "MDD%", "Sharpe", "Sortino", "승률%", "거래수", "기간(일)"]
 
     # 데이터 문자열 변환: bust 행은 수치 셀을 BUST_LABEL로 대체
     str_rows: list[list[str]] = []
@@ -273,6 +275,7 @@ def format_comparison_table(rows: list[ComparisonRow]) -> str:
                 _BUST_LABEL,  # CAGR%
                 _BUST_LABEL,  # MDD%
                 _BUST_LABEL,  # Sharpe
+                _BUST_LABEL,  # Sortino
                 _BUST_LABEL,  # 승률%
                 _fmt_int(r.total_trades),
                 _fmt_int(r.period_days),
@@ -286,6 +289,7 @@ def format_comparison_table(rows: list[ComparisonRow]) -> str:
                 _fmt_pct(r.cagr_pct),
                 _fmt_pct(r.max_drawdown_pct),
                 _fmt_float(r.sharpe_ratio),
+                _fmt_float(r.sortino_ratio),
                 _fmt_pct(r.win_rate_pct),
                 _fmt_int(r.total_trades),
                 _fmt_int(r.period_days),
@@ -332,7 +336,7 @@ def results_to_csv_str(results: list[BacktestResult], timeframes: dict[str, str]
         fieldnames=[
             "strategy_name", "timeframe", "initial_cash", "final_value",
             "total_return_pct", "cagr_pct", "max_drawdown_pct",
-            "sharpe_ratio", "total_trades", "win_rate_pct", "period_days",
+            "sharpe_ratio", "sortino_ratio", "total_trades", "win_rate_pct", "period_days",
             "start_date", "end_date",
         ],
     )
@@ -341,7 +345,7 @@ def results_to_csv_str(results: list[BacktestResult], timeframes: dict[str, str]
         row: dict[str, object] = r.to_dict()
         row["timeframe"] = timeframes.get(r.strategy_name, "unknown")
         # inf/nan 수치는 빈칸으로 정규화 (분석 도구 호환)
-        for key in ("total_return_pct", "cagr_pct", "max_drawdown_pct", "sharpe_ratio", "win_rate_pct"):
+        for key in ("total_return_pct", "cagr_pct", "max_drawdown_pct", "sharpe_ratio", "sortino_ratio", "win_rate_pct"):
             v = row.get(key)
             if isinstance(v, float) and not math.isfinite(v):
                 row[key] = ""

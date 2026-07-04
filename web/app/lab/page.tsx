@@ -856,6 +856,7 @@ function ResultsPanel({
                   ["CAGR", "text-right"],
                   ["MDD", "text-right"],
                   ["Sharpe", "text-right"],
+                  ["Sortino", "text-right"],
                   ["승률", "text-right"],
                   ["거래수", "text-right"],
                   ["기간", "text-right"],
@@ -893,7 +894,7 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
           <span className="line-through">{row.strategy_name}</span>
         </td>
         <td className="px-3 py-2 font-mono text-muted-foreground">{row.timeframe}</td>
-        <td colSpan={8} className="px-3 py-2 text-center font-mono text-xs text-red-600">
+        <td colSpan={9} className="px-3 py-2 text-center font-mono text-xs text-red-600">
           청산 / 비정상 종료
         </td>
       </tr>
@@ -921,6 +922,9 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
       </td>
       <td className="px-3 py-2 text-right font-mono tabular-nums">
         {fmtNum(row.sharpe_ratio, 3)}
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">
+        {fmtNum(row.sortino_ratio, 3)}
       </td>
       <td className="px-3 py-2 text-right font-mono tabular-nums">
         {fmtPct(row.win_rate_pct, 1)}

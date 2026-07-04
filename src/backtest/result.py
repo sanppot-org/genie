@@ -34,6 +34,7 @@ class BacktestResult:
     total_trades: int  # 청산 완료 거래 수
     win_rate_pct: float | None  # 승률 (%), 거래 0건이면 None. 본전 거래(손익=0)는 패배로 집계됨.
     period_days: int | None  # 백테스트 기간 (일수), 계산 불가 시 None
+    sortino_ratio: float | None = None  # 소르티노 비율 (연율화, MAR=0). 하방 변동만 위험으로 셈. 계산 불가 시 None
     start_date: date | None = None  # 실제 사용된 데이터 첫 봉 날짜, 산출 불가 시 None
     end_date: date | None = None    # 실제 사용된 데이터 마지막 봉 날짜, 산출 불가 시 None
     equity_curve: list[EquityPoint] | None = None  # 일별 자산곡선 (TimeReturn 기반), 산출 불가 시 None
@@ -42,12 +43,13 @@ class BacktestResult:
         """한 줄 요약 문자열 반환."""
         cagr_str = f"{self.cagr_pct:.2f}%" if self.cagr_pct is not None else "N/A"
         sharpe_str = f"{self.sharpe_ratio:.2f}" if self.sharpe_ratio is not None else "N/A"
+        sortino_str = f"{self.sortino_ratio:.2f}" if self.sortino_ratio is not None else "N/A"
         win_str = f"{self.win_rate_pct:.1f}%" if self.win_rate_pct is not None else "N/A"
         mdd_str = f"{self.max_drawdown_pct:.2f}%" if self.max_drawdown_pct is not None else "N/A"
         return (
             f"[{self.strategy_name}] "
             f"수익률={self.total_return_pct:.2f}% CAGR={cagr_str} "
-            f"MDD={mdd_str} Sharpe={sharpe_str} "
+            f"MDD={mdd_str} Sharpe={sharpe_str} Sortino={sortino_str} "
             f"거래={self.total_trades}회 승률={win_str}"
         )
 
@@ -134,6 +136,35 @@ def _safe_sharpe(sharpe_analysis: object) -> float | None:
         return float(val)
     except (KeyError, TypeError, ValueError):
         return None
+
+
+_TRADING_DAYS_PER_YEAR = 252  # 일별 → 연율화 계수 (샤프 분석기 annualize와 동일 기준)
+
+
+def _compute_sortino(timereturn_analysis: object, target_return: float = 0.0) -> float | None:
+    """TimeReturn(timeframe=Days) 일별 수익률로 연율화 소르티노 비율을 계산한다. 산출 불가 시 None.
+
+    소르티노 = (평균 일수익률 − 목표수익률) / 하방편차, ×√252 로 연율화.
+    하방편차 = sqrt( Σ min(r − 목표, 0)² / N ) — 상승 변동은 위험으로 세지 않고 하락만 벌한다.
+    목표수익률(MAR)은 0. 표본이 2개 미만이거나 하방 변동이 없으면(모두 목표 이상) None.
+    샤프와 같은 timereturn 시계열을 재사용하므로 두 지표의 표본·주기가 일치한다.
+    """
+    try:
+        returns = [float(r) for _, r in timereturn_analysis.items()]  # type: ignore[attr-defined]
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+    if len(returns) < 2:
+        return None
+
+    mean_return = sum(returns) / len(returns)
+    downside_sq_sum = sum((r - target_return) ** 2 for r in returns if r < target_return)
+    if downside_sq_sum <= 0:  # 하방 변동 없음 → 소르티노 정의 불가(사실상 발산)
+        return None
+    downside_dev = math.sqrt(downside_sq_sum / len(returns))
+
+    sortino = (mean_return - target_return) / downside_dev * math.sqrt(_TRADING_DAYS_PER_YEAR)
+    return sortino if math.isfinite(sortino) else None
 
 
 def _safe_trade_stats(trade_analysis: object) -> tuple[int, float | None]:

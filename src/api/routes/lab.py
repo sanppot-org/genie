@@ -125,6 +125,7 @@ def run_backtest(
             cagr_pct=rr.result.cagr_pct,
             max_drawdown_pct=rr.result.max_drawdown_pct,
             sharpe_ratio=rr.result.sharpe_ratio,
+            sortino_ratio=rr.result.sortino_ratio,
             total_trades=rr.result.total_trades,
             win_rate_pct=rr.result.win_rate_pct,
             period_days=rr.result.period_days,

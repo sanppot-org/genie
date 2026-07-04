@@ -213,6 +213,7 @@ export interface BacktestRunItem {
   cagr_pct: number | null;
   max_drawdown_pct: number | null;
   sharpe_ratio: number | null;
+  sortino_ratio: number | null; // 소르티노 비율 (연율화, MAR=0), 산출 불가 시 null
   total_trades: number;
   win_rate_pct: number | null;
   period_days: number | null;

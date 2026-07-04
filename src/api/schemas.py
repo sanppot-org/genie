@@ -409,6 +409,7 @@ class BacktestRunItem(BaseModel):
     cagr_pct: float | None
     max_drawdown_pct: float | None
     sharpe_ratio: float | None
+    sortino_ratio: float | None = None  # 소르티노 비율 (연율화, MAR=0), 산출 불가 시 None
     total_trades: int
     win_rate_pct: float | None
     period_days: int | None
