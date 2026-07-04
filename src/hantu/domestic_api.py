@@ -3,8 +3,6 @@ from datetime import time as time_obj
 import logging
 import time
 
-import requests
-
 from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic import (
@@ -94,7 +92,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -124,7 +122,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -152,7 +150,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             PDNO=ticker,
         )
 
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -183,7 +181,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             fid_input_iscd=ticker,
         )
 
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -214,7 +212,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             fid_input_iscd=ticker,
         )
 
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -241,7 +239,7 @@ class HantuDomesticAPI(HantuBaseAPI):
 
         param = estimate_perform.RequestQueryParam(SHT_CD=ticker)
 
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -356,7 +354,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.post(url, headers=header.model_dump(by_alias=True), data=body.model_dump_json())
+        res = self._request("post", url, headers=header.model_dump(by_alias=True), data=body.model_dump_json())
 
         self._validate_response(res)
 
@@ -401,7 +399,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -469,7 +467,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -511,7 +509,7 @@ class HantuDomesticAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -573,7 +571,7 @@ class HantuDomesticAPI(HantuBaseAPI):
             SHT_CD=sht_cd,
         )
 
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
         self._validate_response(res)
 
         body = dividend.ResponseBody.model_validate(res.json())

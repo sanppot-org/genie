@@ -2,8 +2,6 @@ from datetime import datetime
 import logging
 import time
 
-import requests
-
 from src.common.order_direction import OrderDirection
 from src.hantu.base_api import HantuBaseAPI
 from src.hantu.model.domestic.account_type import AccountType
@@ -103,7 +101,7 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
 
         self._validate_response(res)
 
@@ -201,7 +199,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             CTX_AREA_NK200=ctx_area_nk200,
         )
 
-        res = requests.get(url, headers=header.model_dump(by_alias=True), params=param.model_dump())
+        res = self._request("get", url, headers=header.model_dump(by_alias=True), params=param.model_dump())
         self._validate_response(res)
         body = overseas_execution.ResponseBody.model_validate(res.json())
         accumulated.extend(body.output)
@@ -247,7 +245,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             "SYMB": symbol,
         }
 
-        res = requests.get(url, headers=headers, params=params)
+        res = self._request("get", url, headers=headers, params=params)
 
         self._validate_response(res)
 
@@ -302,7 +300,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             "FID_PERIOD_DIV_CODE": period.value,
         }
 
-        res = requests.get(url, headers=headers, params=params)
+        res = self._request("get", url, headers=headers, params=params)
 
         self._validate_response(res)
 
@@ -401,7 +399,7 @@ class HantuOverseasAPI(HantuBaseAPI):
             "KEYB": end_time.strftime("%Y%m%d%H%M%S") if end_time else "",
         }
 
-        res = requests.get(url, headers=headers, params=params)
+        res = self._request("get", url, headers=headers, params=params)
 
         self._validate_response(res)
 
@@ -691,7 +689,7 @@ class HantuOverseasAPI(HantuBaseAPI):
         )
 
         # 호출
-        res = requests.post(url, headers=header.model_dump(by_alias=True), data=body.model_dump_json())
+        res = self._request("post", url, headers=header.model_dump(by_alias=True), data=body.model_dump_json())
 
         self._validate_response(res)
 

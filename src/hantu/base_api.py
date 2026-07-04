@@ -1,10 +1,12 @@
 import logging
 from pathlib import Path
+from typing import cast
 
 import requests
 from requests import Response
 
 from src.config import HantuConfig
+from src.hantu.exceptions import HantuConnectionError
 from src.hantu.model import access_token
 from src.hantu.model.domestic.account_type import AccountType
 
@@ -41,11 +43,26 @@ class HantuBaseAPI:
             self.url_base = config.v_url_base
             self.token_path = config.v_token_path
 
+    def _request(self, method: str, url: str, **kwargs: object) -> Response:
+        """KIS API 공통 HTTP 요청 헬퍼.
+
+        연결 레벨 실패(ConnectionError/Timeout)를 HantuConnectionError로 번역해 re-raise한다.
+        번역만 할 뿐 삼키지 않으므로, 매매 주문 등 호출부는 여전히 실패로 표면화된다.
+        기본 timeout을 강제해 점검 중 half-open 커넥션에서 소켓이 무한 대기하는 것을 막는다.
+        """
+        kwargs.setdefault("timeout", (5, 30))  # (connect 5s, read 30s)
+        try:
+            # requests.get/post로 디스패치 — 기존 호출 표면과 동일(테스트 mock 호환).
+            return cast(Response, getattr(requests, method.lower())(url, **kwargs))
+        except (requests.ConnectionError, requests.Timeout) as e:
+            logger.warning("KIS API 연결 실패 [%s %s]: %s", method.upper(), url, e)
+            raise HantuConnectionError(str(e)) from e
+
     def _make_token(self) -> str:
         """OAuth2 액세스 토큰 생성"""
         request_body = access_token.RequestBody(appkey=self.app_key, appsecret=self.app_secret)
 
-        res = requests.post(url=f"{self.url_base}/oauth2/tokenP", data=request_body.model_dump_json())
+        res = self._request("post", f"{self.url_base}/oauth2/tokenP", data=request_body.model_dump_json())
 
         if res.status_code == 200:
             response_body = access_token.ResponseBody.model_validate(res.json())

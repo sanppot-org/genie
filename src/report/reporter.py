@@ -1,8 +1,11 @@
+import logging
 
 from src.collector.data_fetcher import fetch_finance_data_reader, fetch_yfinance
 from src.common.slack.client import SlackClient
 from src.hantu import HantuDomesticAPI
 from src.upbit.upbit_api import UpbitAPI
+
+logger = logging.getLogger(__name__)
 
 
 class Reporter:
@@ -22,6 +25,18 @@ class Reporter:
             return "➡️"
 
     def report(self) -> None:
+        """금/환율/프리미엄 리포트를 Slack으로 전송.
+
+        프리미엄은 여러 소스를 교차 계산하므로 부분 전송이 성립하지 않는다. 외부 소스
+        (yfinance/KIS/FDR/Upbit)가 장애·점검으로 실패하면 이번 사이클 리포트를 스킵하고
+        한 줄 warning만 남긴다(크래시 안 함).
+        """
+        try:
+            self._build_and_send_report()
+        except Exception as e:  # noqa: BLE001 — 스케줄 잡, 외부 소스 실패 시 이번 사이클만 스킵
+            logger.warning("리포트 생성 실패, 이번 사이클 스킵: %s", e)
+
+    def _build_and_send_report(self) -> None:
         # 1. 환율 (KRW/USD) - yfinance
         krw_usd_today = float(fetch_yfinance('KRW=X')['Close'].iloc[-1])
 
