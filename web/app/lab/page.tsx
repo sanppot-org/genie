@@ -1,8 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
+import { BacktestChart } from "@/components/backtest-chart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, apiGet, apiPost } from "@/lib/api";
@@ -496,7 +497,8 @@ function BacktestSection({
   }
 
   const result = backtestMutation.isPending ? null : backtestMutation.data;
-  const sortedResults = result ? sortResults(result.results) : [];
+  // useMemo: 참조 안정화 — 입력 타이핑 등 리렌더 시 BacktestChart가 차트를 재생성하지 않도록.
+  const sortedResults = useMemo(() => (result ? sortResults(result.results) : []), [result]);
 
   const canRun =
     ticker.trim().length > 0 &&
@@ -801,6 +803,12 @@ function ResultsPanel({
   commission: number;
   ticker: string;
 }) {
+  // useMemo: 참조 안정화 — rows가 바뀔 때만 차트 재생성.
+  const chartItems = useMemo(
+    () => rows.filter((r) => !r.bust && r.equity_curve && r.equity_curve.length > 0),
+    [rows],
+  );
+
   return (
     <div className="space-y-3">
       {/* Warnings */}
@@ -829,6 +837,9 @@ function ResultsPanel({
         {ticker} · 초기자본{" "}
         {initialCash.toLocaleString("ko-KR")}원 · 수수료 {(commission * 100).toFixed(2)}%
       </div>
+
+      {/* Equity curve + drawdown chart (bust 전략 제외, 색은 테이블 정렬 순서와 동일) */}
+      <BacktestChart items={chartItems} benchmark={result.benchmark} />
 
       {/* Table */}
       {rows.length === 0 ? (

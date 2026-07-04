@@ -6,20 +6,22 @@ from backtrader import Analyzer, Strategy, TimeFrame
 
 from src.backtest.commission_config import CommissionConfig
 from src.backtest.data_feed.base import DataFeedConfig
-from src.backtest.result import BacktestResult, _compute_cagr, _compute_total_return_pct, _safe_max_drawdown, _safe_sharpe, _safe_trade_stats
+from src.backtest.result import BacktestResult, _compute_cagr, _compute_total_return_pct, _safe_max_drawdown, _safe_sharpe, _safe_trade_stats, build_equity_curve
 from src.backtest.sizer_config import SizerConfig
 
 # 표준 분석기 번들: (analyzer_class, name, params_dict)
 # SharpeRatio는 timeframe=Days + annualize=True 로 연율화된 샤프를 반환하도록 설정
+# TimeReturn은 timeframe=Days 로 일별 수익률 시계열을 수집 (1h/1m 전략도 일 단위로 집계됨)
 _STANDARD_ANALYZERS: list[tuple[type[Analyzer], str, dict[str, object]]] = [
     (bt.analyzers.Returns, "returns", {}),
     (bt.analyzers.SharpeRatio, "sharpe", {"timeframe": TimeFrame.Days, "annualize": True}),
     (bt.analyzers.DrawDown, "drawdown", {}),
     (bt.analyzers.TradeAnalyzer, "trades", {}),
+    (bt.analyzers.TimeReturn, "timereturn", {"timeframe": TimeFrame.Days}),
 ]
 
 # with_analyzer()에서 사용 불가한 예약 이름 집합
-_RESERVED_ANALYZER_NAMES: frozenset[str] = frozenset({"returns", "sharpe", "drawdown", "trades"})
+_RESERVED_ANALYZER_NAMES: frozenset[str] = frozenset({"returns", "sharpe", "drawdown", "trades", "timereturn"})
 
 
 class BacktestBuilder:
@@ -233,6 +235,9 @@ class BacktestBuilder:
         trade_analysis = strat.analyzers.trades.get_analysis()
         total_trades, win_rate_pct = _safe_trade_stats(trade_analysis)
 
+        # TimeReturn 분석기 → 일별 자산곡선 (equity curve + drawdown)
+        equity_curve = build_equity_curve(strat.analyzers.timereturn.get_analysis())
+
         # period_days: 첫 봉~마지막 봉 사이의 실제 캘린더 일수.
         # data.datetime.datetime(ago) 는 linebuffer.LineBuffer.datetime()을 호출하며,
         # array[idx + ago] → num2date() 순으로 동작한다.
@@ -271,6 +276,7 @@ class BacktestBuilder:
             period_days=period_days,
             start_date=start_date,
             end_date=end_date,
+            equity_curve=equity_curve,
         )
 
     def run_and_plot(self) -> list[Any]:  # type: ignore[misc]

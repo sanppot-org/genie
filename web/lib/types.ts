@@ -198,6 +198,12 @@ export interface StrategyInfo {
   default_params: Record<string, unknown>;
 }
 
+export interface BacktestEquityPoint {
+  date: string; // YYYY-MM-DD
+  return_pct: number; // 초기자본 대비 수익률 (%)
+  drawdown_pct: number; // 고점 대비 낙폭 (%, ≤ 0)
+}
+
 export interface BacktestRunItem {
   strategy_name: string;
   timeframe: string;
@@ -213,6 +219,7 @@ export interface BacktestRunItem {
   start_date: string | null; // 실제 사용된 데이터 첫 봉 날짜 (YYYY-MM-DD)
   end_date: string | null; // 실제 사용된 데이터 마지막 봉 날짜 (YYYY-MM-DD)
   bust: boolean;
+  equity_curve: BacktestEquityPoint[] | null; // 일별 자산곡선, 산출 불가 시 null
 }
 
 export interface BacktestRunResult {
@@ -220,6 +227,7 @@ export interface BacktestRunResult {
   skipped: string[];
   failed: string[];
   mixed_timeframes: boolean;
+  benchmark: BacktestEquityPoint[] | null; // Buy & Hold 벤치마크 (종가 기반)
 }
 
 export interface BacktestRunRequest {

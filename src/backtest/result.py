@@ -7,8 +7,17 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass  # noqa: TCH003
-from datetime import date  # noqa: TCH003
+from datetime import date, datetime  # noqa: TCH003
 import math
+
+
+@dataclass(frozen=True)
+class EquityPoint:
+    """자산곡선 1점 (일 단위). return_pct는 초기자본 대비, drawdown_pct는 고점 대비(≤ 0)."""
+
+    date: date
+    return_pct: float
+    drawdown_pct: float
 
 
 @dataclass(frozen=True)
@@ -27,6 +36,7 @@ class BacktestResult:
     period_days: int | None  # 백테스트 기간 (일수), 계산 불가 시 None
     start_date: date | None = None  # 실제 사용된 데이터 첫 봉 날짜, 산출 불가 시 None
     end_date: date | None = None    # 실제 사용된 데이터 마지막 봉 날짜, 산출 불가 시 None
+    equity_curve: list[EquityPoint] | None = None  # 일별 자산곡선 (TimeReturn 기반), 산출 불가 시 None
 
     def summary(self) -> str:
         """한 줄 요약 문자열 반환."""
@@ -42,8 +52,10 @@ class BacktestResult:
         )
 
     def to_dict(self) -> dict[str, object]:
-        """모든 필드를 dict로 직렬화한다. CSV 내보내기 등에 사용."""
-        return dataclasses.asdict(self)
+        """모든 필드를 dict로 직렬화한다. CSV 내보내기 등에 사용. 시계열(equity_curve)은 제외."""
+        d = dataclasses.asdict(self)
+        d.pop("equity_curve", None)
+        return d
 
 
 def _compute_cagr(initial: float, final: float, period_days: int | None) -> float | None:
@@ -74,6 +86,35 @@ def _compute_total_return_pct(initial: float, final: float) -> float:
     if initial == 0:
         return 0.0
     return (final / initial - 1.0) * 100.0
+
+
+def build_equity_curve(timereturn_analysis: object) -> list[EquityPoint] | None:
+    """TimeReturn(timeframe=Days) 분석 결과로 일별 자산곡선을 만든다. 산출 불가 시 None.
+
+    equity는 일별 수익률의 누적곱, drawdown은 running peak 대비 %(≤ 0).
+    TimeReturn 결과(OrderedDict)는 시간 오름차순을 보장한다.
+    """
+    try:
+        items = list(timereturn_analysis.items())  # type: ignore[attr-defined]
+    except (AttributeError, TypeError):
+        return None
+
+    curve: list[EquityPoint] = []
+    equity = 1.0
+    peak = 1.0
+    for dt, ret in items:
+        try:
+            equity *= 1.0 + float(ret)
+        except (TypeError, ValueError):
+            continue
+        peak = max(peak, equity)
+        day = dt.date() if isinstance(dt, datetime) else dt
+        curve.append(EquityPoint(
+            date=day,
+            return_pct=(equity - 1.0) * 100.0,
+            drawdown_pct=(equity / peak - 1.0) * 100.0,
+        ))
+    return curve or None
 
 
 def _safe_max_drawdown(drawdown_analysis: object) -> float | None:

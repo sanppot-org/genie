@@ -8,6 +8,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.schemas import (
+    BacktestEquityPoint,
     BacktestRunItem,
     BacktestRunRequest,
     BacktestRunResponse,
@@ -21,6 +22,7 @@ from src.api.schemas import (
     UsRegisterResult,
     UsTickerInfo,
 )
+from src.backtest.result import EquityPoint
 from src.container import ApplicationContainer
 from src.service.backtest_service import BacktestService
 from src.service.correlation_service import CorrelationService
@@ -28,6 +30,13 @@ from src.service.us_stock_daily_candle_service import UsStockDailyCandleService
 from src.service.us_stock_ticker_service import UsStockTickerService
 
 router = APIRouter(tags=["lab"])
+
+
+def _to_equity_points(curve: list[EquityPoint] | None) -> list[BacktestEquityPoint] | None:
+    """도메인 EquityPoint 리스트 → API 스키마 변환. None은 그대로 통과."""
+    if curve is None:
+        return None
+    return [BacktestEquityPoint(date=p.date, return_pct=p.return_pct, drawdown_pct=p.drawdown_pct) for p in curve]
 
 
 @router.get("/backtest/strategies", response_model=GenieResponse[list[StrategyInfo]])
@@ -122,6 +131,7 @@ def run_backtest(
             start_date=rr.result.start_date,
             end_date=rr.result.end_date,
             bust=rr.bust,
+            equity_curve=_to_equity_points(rr.result.equity_curve),
         )
         for rr in output.results
     ]
@@ -130,6 +140,7 @@ def run_backtest(
         skipped=output.skipped,
         failed=output.failed,
         mixed_timeframes=output.mixed_timeframes,
+        benchmark=_to_equity_points(output.benchmark),
     ))
 
 

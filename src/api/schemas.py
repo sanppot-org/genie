@@ -390,6 +390,14 @@ class BacktestRunRequest(BaseModel):
     param_overrides: dict[str, Any] | None = None
 
 
+class BacktestEquityPoint(BaseModel):
+    """자산곡선 1점 (일 단위). return_pct는 초기자본 대비, drawdown_pct는 고점 대비(≤ 0)."""
+
+    date: date
+    return_pct: float
+    drawdown_pct: float
+
+
 class BacktestRunItem(BaseModel):
     """전략별 백테스트 결과."""
 
@@ -407,6 +415,7 @@ class BacktestRunItem(BaseModel):
     start_date: date | None = None  # 실제 사용된 데이터 첫 봉 날짜
     end_date: date | None = None    # 실제 사용된 데이터 마지막 봉 날짜
     bust: bool
+    equity_curve: list[BacktestEquityPoint] | None = None  # 일별 자산곡선, 산출 불가 시 None
 
 
 class BacktestRunResponse(BaseModel):
@@ -416,6 +425,7 @@ class BacktestRunResponse(BaseModel):
     skipped: list[str]        # 캔들 데이터 없어 제외된 전략명
     failed: list[str]         # 실행 예외로 실패한 전략명
     mixed_timeframes: bool    # 결과 전략들의 타임프레임이 혼합되어 있으면 True
+    benchmark: list[BacktestEquityPoint] | None = None  # Buy & Hold 벤치마크 (종가 기반)
 
 
 class CorrelationRequest(BaseModel):

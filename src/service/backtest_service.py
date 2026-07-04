@@ -20,7 +20,7 @@ import pandas as pd
 
 from src.backtest.cli import is_bust, merge_params
 from src.backtest.registry import StrategySpec, get_strategy, list_strategies
-from src.backtest.result import BacktestResult
+from src.backtest.result import BacktestResult, EquityPoint
 from src.database.database import Database
 
 logger = logging.getLogger(__name__)
@@ -45,6 +45,7 @@ class BacktestRunOutput:
     skipped: list[str]       # 캔들 데이터 없어 제외된 전략명
     failed: list[str]        # 실행 예외로 실패한 전략명
     mixed_timeframes: bool   # 결과 전략들의 타임프레임이 혼합되어 있으면 True
+    benchmark: list[EquityPoint] | None = None  # Buy & Hold 벤치마크 (종가 기반, 일 단위)
 
 
 class BacktestService:
@@ -158,12 +159,49 @@ class BacktestService:
             skipped=skipped,
             failed=failed,
             mixed_timeframes=len(timeframes_used) > 1,
+            benchmark=_build_benchmark(_pick_benchmark_df(specs, spec_dfs)),
         )
 
 
 # ---------------------------------------------------------------------------
 # 내부 헬퍼 — scripts/backtest.py의 동일 함수와 동형, 재사용 가능하도록 분리
 # ---------------------------------------------------------------------------
+
+def _pick_benchmark_df(specs: list[StrategySpec], spec_dfs: dict[str, pd.DataFrame]) -> pd.DataFrame | None:
+    """벤치마크 계산에 쓸 캔들 DataFrame 선택 — 1d 전략의 df 우선, 없으면 첫 df."""
+    for spec in specs:
+        if spec.timeframe == "1d" and spec.name in spec_dfs:
+            return spec_dfs[spec.name]
+    return next(iter(spec_dfs.values()), None)
+
+
+def _build_benchmark(df: pd.DataFrame | None) -> list[EquityPoint] | None:
+    """종가 기반 Buy & Hold 자산곡선 (일 단위). 1h/1m 데이터는 일별 마지막 종가로 집계.
+
+    첫 종가 대비 수익률 %, running peak 대비 낙폭 %(≤ 0). 산출 불가 시 None.
+    """
+    if df is None or df.empty or "close" not in df.columns:
+        return None
+    closes = df["close"].dropna()
+    closes = closes[closes > 0]
+    if closes.empty:
+        return None
+    daily = closes.groupby(pd.DatetimeIndex(closes.index).date).last()  # date 단위 마지막 종가
+    first = float(daily.iloc[0])
+
+    curve: list[EquityPoint] = []
+    peak = 0.0
+    for day, close in daily.items():
+        if not isinstance(day, date):  # groupby 키는 항상 date — mypy 내로잉용 가드
+            continue
+        equity = float(close) / first
+        peak = max(peak, equity)
+        curve.append(EquityPoint(
+            date=day,
+            return_pct=(equity - 1.0) * 100.0,
+            drawdown_pct=(equity / peak - 1.0) * 100.0,
+        ))
+    return curve or None
 
 def _load_candles_df(
     spec: StrategySpec,
