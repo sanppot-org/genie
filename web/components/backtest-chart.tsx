@@ -4,6 +4,7 @@ import {
   ColorType,
   LineSeries,
   LineStyle,
+  PriceScaleMode,
   createChart,
   createSeriesMarkers,
   type ISeriesApi,
@@ -24,6 +25,13 @@ const BENCHMARK_COLOR = "#9ca3af"; // gray-400
 const MAX_POINTS = 160;
 
 const pctFmt = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+
+// 상단 pane은 로그 스케일 — 로그축은 양수만 허용하므로 수익률(%)을 배수(1 + r/100)로 변환해 그린다.
+// 축·레전드 표시는 %로 되돌린다. 단순보유와 전략의 수익률 격차가 커도 전략 선이 눌리지 않는다.
+const toMultiple = (retPct: number) => 1 + retPct / 100;
+const toPct = (multiple: number) => (multiple - 1) * 100;
+const equityAxisFmt = (v: number) => `${toPct(v) >= 0 ? "+" : ""}${toPct(v).toFixed(0)}%`;
+const ddAxisFmt = (v: number) => `${v.toFixed(0)}%`;
 
 /** 시계열을 버킷 단위로 집계해 한눈에 보이게 단순화.
  *  equity는 버킷 마지막 값, drawdown은 버킷 내 최저값 — MDD 깊이가 뭉개지지 않게 보존. */
@@ -91,7 +99,6 @@ export function BacktestChart({ items, benchmark }: Props) {
         vertLines: { color: "#eee" },
       },
       rightPriceScale: { scaleMargins: { top: 0.1, bottom: 0.1 } },
-      localization: { priceFormatter: (v: number) => `${v.toFixed(1)}%` },
       timeScale: { timeVisible: false },
     });
 
@@ -99,19 +106,32 @@ export function BacktestChart({ items, benchmark }: Props) {
     items.forEach((item, i) => {
       const curve = downsample(item.equity_curve ?? []);
       const color = colorFor(i);
-      const equityData = curve.map<LineData>((p) => ({ time: p.date as Time, value: p.return_pct }));
+      const equityData = curve.map<LineData>((p) => ({ time: p.date as Time, value: toMultiple(p.return_pct) }));
       const ddData = curve.map<LineData>((p) => ({ time: p.date as Time, value: p.drawdown_pct }));
 
       const equityApi = chart.addSeries(
         LineSeries,
-        { color, lineWidth: 2, priceLineVisible: false, lastValueVisible: true },
+        {
+          color,
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          priceFormat: { type: "custom", formatter: equityAxisFmt, minMove: 0.01 },
+        },
         0,
       );
       equityApi.setData(equityData);
+      equityApi.priceScale().applyOptions({ mode: PriceScaleMode.Logarithmic });
 
       const ddApi = chart.addSeries(
         LineSeries,
-        { color, lineWidth: 1, priceLineVisible: false, lastValueVisible: false },
+        {
+          color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          priceFormat: { type: "custom", formatter: ddAxisFmt, minMove: 0.01 },
+        },
         1,
       );
       ddApi.setData(ddData);
@@ -150,10 +170,11 @@ export function BacktestChart({ items, benchmark }: Props) {
           lineStyle: LineStyle.Dashed,
           priceLineVisible: false,
           lastValueVisible: true,
+          priceFormat: { type: "custom", formatter: equityAxisFmt, minMove: 0.01 },
         },
         0,
       );
-      api.setData(downsample(benchmark).map<LineData>((p) => ({ time: p.date as Time, value: p.return_pct })));
+      api.setData(downsample(benchmark).map<LineData>((p) => ({ time: p.date as Time, value: toMultiple(p.return_pct) })));
     }
 
     chart.panes()[1]?.setHeight(DD_PANE_HEIGHT);
@@ -168,7 +189,7 @@ export function BacktestChart({ items, benchmark }: Props) {
         let dd = m.lastDd;
         if (hovering) {
           const e = param.seriesData.get(m.equityApi);
-          if (e && "value" in e) ret = e.value as number;
+          if (e && "value" in e) ret = toPct(e.value as number); // 시리즈 값은 배수 → %로 환산
           const d = param.seriesData.get(m.ddApi);
           if (d && "value" in d) dd = d.value as number;
         }
@@ -221,7 +242,7 @@ export function BacktestChart({ items, benchmark }: Props) {
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        위: 초기자본 대비 수익률 · 아래: 고점 대비 낙폭 (MDD 지점 ● 표시) · 휠로 확대/축소
+        위: 초기자본 대비 수익률 (로그 스케일) · 아래: 고점 대비 낙폭 (MDD 지점 ● 표시) · 휠로 확대/축소
       </p>
       <div ref={ref} className="w-full" style={{ height: CHART_HEIGHT }} />
     </div>
