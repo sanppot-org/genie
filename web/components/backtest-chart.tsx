@@ -160,8 +160,9 @@ export function BacktestChart({ items, benchmark }: Props) {
       });
     });
 
-    // 벤치마크 (Buy & Hold) — 상단 pane에 회색 점선
+    // 벤치마크 (Buy & Hold) — 상단(수익률)·하단(낙폭) pane 모두 회색 점선
     if (benchmark && benchmark.length > 0) {
+      const bench = downsample(benchmark);
       const api = chart.addSeries(
         LineSeries,
         {
@@ -174,7 +175,21 @@ export function BacktestChart({ items, benchmark }: Props) {
         },
         0,
       );
-      api.setData(downsample(benchmark).map<LineData>((p) => ({ time: p.date as Time, value: toMultiple(p.return_pct) })));
+      api.setData(bench.map<LineData>((p) => ({ time: p.date as Time, value: toMultiple(p.return_pct) })));
+
+      const ddApi = chart.addSeries(
+        LineSeries,
+        {
+          color: BENCHMARK_COLOR,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          priceFormat: { type: "custom", formatter: ddAxisFmt, minMove: 0.01 },
+        },
+        1,
+      );
+      ddApi.setData(bench.map<LineData>((p) => ({ time: p.date as Time, value: p.drawdown_pct })));
     }
 
     chart.panes()[1]?.setHeight(DD_PANE_HEIGHT);
@@ -238,6 +253,9 @@ export function BacktestChart({ items, benchmark }: Props) {
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <span style={{ color: BENCHMARK_COLOR }}>╌╌</span>
             단순보유 {pctFmt(benchmark[benchmark.length - 1].return_pct)}
+            <span>
+              (MDD {benchmark.reduce((m, p) => Math.min(m, p.drawdown_pct), 0).toFixed(1)}%)
+            </span>
           </span>
         )}
       </div>
