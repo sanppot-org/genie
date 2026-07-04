@@ -128,6 +128,6 @@ class TestRunWithResult:
         expected_keys = {
             "strategy_name", "initial_cash", "final_value", "total_return_pct",
             "cagr_pct", "max_drawdown_pct", "sharpe_ratio", "total_trades",
-            "win_rate_pct", "period_days",
+            "win_rate_pct", "period_days", "start_date", "end_date",
         }
         assert expected_keys == set(d.keys())

@@ -404,6 +404,8 @@ class BacktestRunItem(BaseModel):
     total_trades: int
     win_rate_pct: float | None
     period_days: int | None
+    start_date: date | None = None  # 실제 사용된 데이터 첫 봉 날짜
+    end_date: date | None = None    # 실제 사용된 데이터 마지막 봉 날짜
     bust: bool
 
 

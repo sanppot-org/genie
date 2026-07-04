@@ -333,6 +333,7 @@ def results_to_csv_str(results: list[BacktestResult], timeframes: dict[str, str]
             "strategy_name", "timeframe", "initial_cash", "final_value",
             "total_return_pct", "cagr_pct", "max_drawdown_pct",
             "sharpe_ratio", "total_trades", "win_rate_pct", "period_days",
+            "start_date", "end_date",
         ],
     )
     writer.writeheader()

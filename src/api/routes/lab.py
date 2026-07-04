@@ -119,6 +119,8 @@ def run_backtest(
             total_trades=rr.result.total_trades,
             win_rate_pct=rr.result.win_rate_pct,
             period_days=rr.result.period_days,
+            start_date=rr.result.start_date,
+            end_date=rr.result.end_date,
             bust=rr.bust,
         )
         for rr in output.results

@@ -51,6 +51,12 @@ function fmtDays(v: number | null): string {
   return `${v.toLocaleString("ko-KR")}일`;
 }
 
+/** 데이터 시작~종료일 (YYYY-MM-DD ~ YYYY-MM-DD). 둘 다 없으면 N/A. */
+function fmtDateRange(start: string | null, end: string | null): string {
+  if (!start && !end) return "N/A";
+  return `${start ?? "?"} ~ ${end ?? "?"}`;
+}
+
 /** Parse a raw param input using the default value's type as a hint.
  *  number → Number (invalid면 null로 제외), boolean → "true" 비교, 그 외 → JSON 파싱 (실패 시 raw string). */
 function parseParamValue(raw: string, defaultValue: unknown): unknown {
@@ -842,6 +848,7 @@ function ResultsPanel({
                   ["승률", "text-right"],
                   ["거래수", "text-right"],
                   ["기간", "text-right"],
+                  ["데이터 기간", "text-right"],
                 ].map(([label, align]) => (
                   <th
                     key={label}
@@ -875,7 +882,7 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
           <span className="line-through">{row.strategy_name}</span>
         </td>
         <td className="px-3 py-2 font-mono text-muted-foreground">{row.timeframe}</td>
-        <td colSpan={7} className="px-3 py-2 text-center font-mono text-xs text-red-600">
+        <td colSpan={8} className="px-3 py-2 text-center font-mono text-xs text-red-600">
           청산 / 비정상 종료
         </td>
       </tr>
@@ -910,6 +917,9 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
       <td className="px-3 py-2 text-right font-mono tabular-nums">{row.total_trades}</td>
       <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground">
         {fmtDays(row.period_days)}
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground whitespace-nowrap">
+        {fmtDateRange(row.start_date, row.end_date)}
       </td>
     </tr>
   );

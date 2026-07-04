@@ -210,6 +210,8 @@ export interface BacktestRunItem {
   total_trades: number;
   win_rate_pct: number | null;
   period_days: number | null;
+  start_date: string | null; // 실제 사용된 데이터 첫 봉 날짜 (YYYY-MM-DD)
+  end_date: string | null; // 실제 사용된 데이터 마지막 봉 날짜 (YYYY-MM-DD)
   bust: boolean;
 }
 

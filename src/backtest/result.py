@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass  # noqa: TCH003
+from datetime import date  # noqa: TCH003
 import math
 
 
@@ -24,6 +25,8 @@ class BacktestResult:
     total_trades: int  # 청산 완료 거래 수
     win_rate_pct: float | None  # 승률 (%), 거래 0건이면 None. 본전 거래(손익=0)는 패배로 집계됨.
     period_days: int | None  # 백테스트 기간 (일수), 계산 불가 시 None
+    start_date: date | None = None  # 실제 사용된 데이터 첫 봉 날짜, 산출 불가 시 None
+    end_date: date | None = None    # 실제 사용된 데이터 마지막 봉 날짜, 산출 불가 시 None
 
     def summary(self) -> str:
         """한 줄 요약 문자열 반환."""

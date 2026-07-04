@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any
 
 import backtrader as bt
@@ -237,17 +238,20 @@ class BacktestBuilder:
         # array[idx + ago] → num2date() 순으로 동작한다.
         # ago=0: 마지막(현재) 봉, ago=-(n_bars-1): 첫 봉.
         period_days: int | None = None
+        start_date: date | None = None
+        end_date: date | None = None
         try:
             data = strat.datas[0]
             n_bars = len(data)
-            if n_bars >= 2:
+            if n_bars >= 1:
                 last_dt = data.datetime.datetime(0)
                 first_dt = data.datetime.datetime(-(n_bars - 1))
-                period_days = (last_dt - first_dt).days
-                if period_days <= 0:
-                    period_days = None
-            elif n_bars == 1:
-                period_days = None  # 단일 봉: 기간 산출 불가
+                start_date = first_dt.date()
+                end_date = last_dt.date()
+                if n_bars >= 2:  # 단일 봉은 기간 산출 불가(period_days=None)
+                    period_days = (last_dt - first_dt).days
+                    if period_days <= 0:
+                        period_days = None
         except (AttributeError, IndexError, TypeError):
             pass
 
@@ -265,6 +269,8 @@ class BacktestBuilder:
             total_trades=total_trades,
             win_rate_pct=win_rate_pct,
             period_days=period_days,
+            start_date=start_date,
+            end_date=end_date,
         )
 
     def run_and_plot(self) -> list[Any]:  # type: ignore[misc]
