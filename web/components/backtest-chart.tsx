@@ -137,6 +137,9 @@ export function BacktestChart({ items, benchmark }: Props) {
         BaselineSeries,
         {
           baseValue: { type: "price", price: 0 },
+          // 그라데이션을 기준값(0)·실제 데이터 범위에 앵커 — false(기본)면 패널 전체 높이 기준이라
+          // 0선 위 여백까지 채우기 색이 번져 보인다.
+          relativeGradient: true,
           bottomLineColor: color,
           bottomFillColor1: hexToRgba(color, 0.06), // 0 부근은 옅게
           bottomFillColor2: hexToRgba(color, 0.28), // 깊은 낙폭일수록 진하게
