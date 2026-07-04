@@ -26,11 +26,13 @@ from tenacity import (
     before_sleep_log,
     retry,
     retry_if_exception_type,
+    retry_if_not_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
 
 from src.hantu.domestic_api import HantuDomesticAPI
+from src.hantu.exceptions import HantuConnectionError
 from src.hantu.model.domestic import estimate_perform
 from src.providers.kis_income_statement_client import _RATE_LIMIT_CODE, KisRateLimitError
 
@@ -139,7 +141,14 @@ class KisEstimateClient:
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=2, min=1, max=10),
-        retry=retry_if_exception_type((requests.RequestException, KisRateLimitError)),
+        # 일시 오류(rate-limit·네트워크 blip)는 재시도하되, KIS 서버 불가(HantuConnectionError,
+        # 점검/네트워크 장애)는 재시도 제외 — 한 요청 안에서 복구되지 않아 재시도가 무의미하고,
+        # 5회 재시도가 사용자 요청(연간 재무요약)을 ~49-74s 붙잡아 응답을 막기 때문. 표시용
+        # best-effort라 1회 fail-fast 후 서비스가 조용히 예상행을 생략한다.
+        retry=(
+            retry_if_exception_type((requests.RequestException, KisRateLimitError))
+            & retry_if_not_exception_type(HantuConnectionError)
+        ),
         before_sleep=before_sleep_log(logger, logging.WARNING),
         reraise=True,
     )

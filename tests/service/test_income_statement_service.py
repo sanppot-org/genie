@@ -219,20 +219,28 @@ _GOOD_ESTIMATES = [
 ]
 
 
-def test_annual_appends_estimate_rows() -> None:
-    """연간 뷰: 확정 행 뒤에 추정 행(2026E/2027E) append, is_estimate=True."""
-    _, points = _service(_ANNUAL_ROWS, estimates=_GOOD_ESTIMATES).get_time_series("005930", PERIOD_ANNUAL)
+def test_annual_estimates_returns_estimate_rows_only() -> None:
+    """연간 추정 조회: 추정 행(2026E/2027E)만 반환(확정행 미포함), is_estimate=True."""
+    _, points = _service(_ANNUAL_ROWS, estimates=_GOOD_ESTIMATES).get_annual_estimates("005930")
 
-    assert [p.stac_yymm for p in points] == ["202312", "202412", "202512", "202612", "202712"]
-    assert [p.is_estimate for p in points] == [False, False, False, True, True]
-    e2026 = points[3]
+    assert [p.stac_yymm for p in points] == ["202612", "202712"]
+    assert all(p.is_estimate for p in points)
+    e2026 = points[0]
     assert e2026.sale_account == Decimal("400")
     assert e2026.eps == 400.0
     assert e2026.price is None  # 캔들 없음 → 최근 종가 없음 → None
 
 
-def test_quarter_does_not_append_estimates() -> None:
-    """분기 뷰: 추정치는 연간만 존재 → append 안 함."""
+def test_get_time_series_excludes_estimates() -> None:
+    """확정 시계열(`get_time_series`)은 예상행을 포함하지 않는다 — 예상은 별도 엔드포인트로 분리."""
+    _, points = _service(_ANNUAL_ROWS, estimates=_GOOD_ESTIMATES).get_time_series("005930", PERIOD_ANNUAL)
+
+    assert [p.stac_yymm for p in points] == ["202312", "202412", "202512"]
+    assert all(not p.is_estimate for p in points)
+
+
+def test_quarter_has_no_estimates() -> None:
+    """분기 뷰: 확정 시계열만(추정치는 연간만 존재하고, get_time_series는 예상을 붙이지 않음)."""
     rows = [_row("202503", "50", PERIOD_QUARTER), _row("202506", "120", PERIOD_QUARTER)]
     _, points = _service(rows, estimates=_GOOD_ESTIMATES).get_time_series("005930", PERIOD_QUARTER)
 
@@ -251,7 +259,7 @@ def test_estimate_appends_even_when_confirmed_revenue_differs() -> None:
         _estimate("202612", True, "231461"),
         _estimate("202712", True, "244928"),
     ]
-    _, points = _service(_ANNUAL_ROWS, estimates=financial).get_time_series("086790", PERIOD_ANNUAL)
+    _, points = _service(_ANNUAL_ROWS, estimates=financial).get_annual_estimates("086790")
 
     estimates = [p for p in points if p.is_estimate]
     assert [p.stac_yymm for p in estimates] == ["202612", "202712"]
@@ -259,11 +267,10 @@ def test_estimate_appends_even_when_confirmed_revenue_differs() -> None:
 
 
 def test_estimate_best_effort_on_client_error() -> None:
-    """estimate client 예외 → 추정 없이 확정 행만 정상 반환(상세조회 유지)."""
-    _, points = _service(_ANNUAL_ROWS, estimate_raises=True).get_time_series("005930", PERIOD_ANNUAL)
+    """estimate client 예외 → 예상행 빈 리스트(확정 시계열은 get_time_series로 별도 제공)."""
+    _, points = _service(_ANNUAL_ROWS, estimate_raises=True).get_annual_estimates("005930")
 
-    assert [p.stac_yymm for p in points] == ["202312", "202412", "202512"]
-    assert all(not p.is_estimate for p in points)
+    assert points == []
 
 
 def test_estimate_price_and_forward_per_from_latest_close() -> None:
@@ -276,7 +283,7 @@ def test_estimate_price_and_forward_per_from_latest_close() -> None:
         _estimate("202612", True, "400"),   # eps=400.0, per=10.0
         _estimate("202712", True, "500"),   # eps=500.0, per=10.0
     ]
-    _, points = _service(_ANNUAL_ROWS, candles=candles, estimates=estimates).get_time_series("005930", PERIOD_ANNUAL)
+    _, points = _service(_ANNUAL_ROWS, candles=candles, estimates=estimates).get_annual_estimates("005930")
 
     est_rows = [p for p in points if p.is_estimate]
     assert len(est_rows) == 2
@@ -336,7 +343,7 @@ def test_estimate_derived_eps_per_when_e_eps_none() -> None:
     candle_repo.find_by_ticker.return_value = candles
 
     svc = IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client)
-    _, points = svc.get_time_series("086790", PERIOD_ANNUAL)
+    _, points = svc.get_annual_estimates("086790")
 
     est_rows = [p for p in points if p.is_estimate]
     assert len(est_rows) == 1
@@ -372,7 +379,7 @@ def test_estimate_derived_eps_none_when_no_base() -> None:
     candle_repo.find_by_ticker.return_value = []
 
     svc = IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client)
-    _, points = svc.get_time_series("086790", PERIOD_ANNUAL)
+    _, points = svc.get_annual_estimates("086790")
 
     est_rows = [p for p in points if p.is_estimate]
     assert len(est_rows) == 1
@@ -420,7 +427,7 @@ def test_estimate_per_fallback_when_eps_none_or_zero() -> None:
     candle_repo.find_by_ticker.return_value = candles
 
     svc = IncomeStatementService(ticker_repo, income_repo, fundamental_repo, candle_repo, estimate_client)
-    _, points = svc.get_time_series("005930", PERIOD_ANNUAL)
+    _, points = svc.get_annual_estimates("005930")
 
     est_rows = [p for p in points if p.is_estimate]
     assert len(est_rows) == 2

@@ -67,6 +67,30 @@ def get_financials(
     )
 
 
+@router.get("/financials/estimates", response_model=GenieResponse[IncomeStatementSeriesResponse])
+@inject
+def get_financial_estimates(
+        ticker: str = Query(min_length=1, max_length=20, description="ticker 코드"),
+        service: IncomeStatementService = Depends(Provide[ApplicationContainer.income_statement_service]),
+) -> GenieResponse[IncomeStatementSeriesResponse]:
+    """종목별 연간 컨센서스 추정행만 반환(확정행 제외, 오름차순). 종목 미발견 시 404.
+
+    확정 시계열(`/financials`)과 분리된 별도 엔드포인트 — 예상은 KIS 라이브 조회가 필요해 점검 중
+    지연·실패할 수 있으므로, 프론트가 이 조회를 병렬로 수행해 확정 표를 막지 않게 한다. 추정치는
+    연간만 존재하므로 period 파라미터가 없다. 미커버/조회실패 종목은 points=[] (예상행 없음).
+    """
+    t, points = service.get_annual_estimates(ticker)
+    return GenieResponse(
+        data=IncomeStatementSeriesResponse(
+            ticker=t.ticker,
+            name=t.name,
+            period_type=PERIOD_ANNUAL,
+            single_quarter=False,
+            points=[_to_point(p) for p in points],
+        )
+    )
+
+
 @router.post("/financials/sync/kr-stock", response_model=GenieResponse[SyncFinancialsResponse])
 @inject
 def sync_kr_stock_financials(

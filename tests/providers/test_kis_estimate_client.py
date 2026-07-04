@@ -3,6 +3,9 @@
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+import pytest
+
+from src.hantu.exceptions import HantuConnectionError
 from src.hantu.model.domestic import estimate_perform
 from src.providers.kis_estimate_client import KisEstimateClient
 
@@ -132,3 +135,19 @@ def test_inconsistent_revenue_growth_returns_empty() -> None:
         _row("5", "15", "25"),       # r4 순이익
     ]
     assert _client(_body(output2, [], periods)).fetch("005930") == []
+
+
+def test_fetch_does_not_retry_on_connection_error() -> None:
+    """KIS 서버 불가(HantuConnectionError)는 재시도 없이 1회 시도 후 전파.
+
+    HantuConnectionError는 requests.RequestException 하위지만, 점검/네트워크 장애는 한 요청 안에서
+    복구되지 않아 재시도가 무의미하고 사용자 응답(연간 재무요약)을 ~49-74s 붙잡는다. fail-fast로
+    호출부(income_statement_service)가 즉시 best-effort 생략하게 한다.
+    """
+    api = MagicMock()
+    api.estimate_perform.side_effect = HantuConnectionError("KIS 점검 중")
+
+    with pytest.raises(HantuConnectionError):
+        KisEstimateClient(api).fetch("005930")
+
+    assert api.estimate_perform.call_count == 1  # 재시도 안 함

@@ -154,6 +154,33 @@ export default function Home() {
     placeholderData: keepPreviousData,
   });
 
+  // 예상(컨센서스 추정)행은 별도 엔드포인트에서 병렬 조회 — KIS 라이브 조회라 점검 중 지연·실패할 수
+  // 있어 확정 표를 막지 않게 분리. 추정치는 연간만 존재하므로 연간에서만 조회하고, 실패 시 조용히 생략.
+  const estimates = useQuery({
+    queryKey: ["financial-estimates", selected?.ticker],
+    queryFn: () =>
+      apiGet<GenieResponse<IncomeStatementSeries>>("/api/financials/estimates", {
+        ticker: selected!.ticker,
+      }).then((r) => r.data),
+    enabled: Boolean(selected) && financialPeriod === "annual",
+    placeholderData: keepPreviousData,
+  });
+
+  // 확정 시계열 + (연간 한정) 예상행을 병합. 예상이 아직/실패면 확정만으로 렌더 — 표가 예상 조회를
+  // 기다리지 않는다. 예상 엔드포인트가 확정 기준으로 중복 제거하므로 단순 concat으로 순서 보존.
+  const financialsSeries: IncomeStatementSeries | undefined =
+    financials.data && financials.data.ticker === selected?.ticker
+      ? {
+          ...financials.data,
+          points:
+            financialPeriod === "annual" &&
+            estimates.data &&
+            estimates.data.ticker === selected?.ticker
+              ? [...financials.data.points, ...estimates.data.points]
+              : financials.data.points,
+        }
+      : undefined;
+
   // 우선주 차트는 전체 기간 1회 fetch (범위 UI는 PreferredChart 내부 소유).
   const prefFundamentals = useQuery({
     queryKey: ["pref-fundamentals", selected?.ticker],
@@ -433,8 +460,8 @@ export default function Home() {
                   조회 실패: {(financials.error as Error).message}
                 </p>
               )}
-              {financials.data && financials.data.ticker === selected.ticker && (
-                <FinancialsChart series={financials.data} />
+              {financialsSeries && (
+                <FinancialsChart series={financialsSeries} />
               )}
             </section>
           )}

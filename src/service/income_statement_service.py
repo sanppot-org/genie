@@ -69,11 +69,52 @@ class IncomeStatementService:
             period_type: str,
             single_quarter: bool = False,
     ) -> tuple[Ticker, list[IncomeStatementPointData]]:
-        """ticker 코드로 종목 + 손익계산서 시계열 반환. 종목 미발견 시 404."""
+        """ticker 코드로 종목 + 확정 손익계산서 시계열 반환(예상행 제외). 종목 미발견 시 404.
+
+        예상(컨센서스 추정)행은 KIS 라이브 조회가 필요해 응답을 지연시킬 수 있으므로 이 확정 시계열과
+        분리한다 — `get_annual_estimates`가 별도로 제공하고, 프론트가 병렬 조회해 병합한다.
+        """
+        ticker = self._resolve_ticker(ticker_code)
+        points = self._confirmed_series(ticker, period_type, single_quarter)
+        return ticker, points
+
+    def get_annual_estimates(self, ticker_code: str) -> tuple[Ticker, list[IncomeStatementPointData]]:
+        """종목 + 연간 컨센서스 추정행만 반환(확정행 제외). 종목 미발견 시 404.
+
+        표시용 best-effort — estimate client 미주입/조회 실패/미커버 종목이면 빈 리스트. 추정치는
+        연간만 존재하므로 항상 연간 확정 시계열을 기준(base_eps/base_ni/latest_close 도출)으로 삼는다.
+        """
+        ticker = self._resolve_ticker(ticker_code)
+        points = self._confirmed_series(ticker, PERIOD_ANNUAL, single_quarter=False)
+        candles = self._candles.find_by_ticker(ticker.id)
+        latest_close = (
+            float(candles[-1].adj_close if candles[-1].adj_close is not None else candles[-1].close)
+            if candles else None
+        )
+        # 최근 확정 행 중 eps·net_income 모두 non-null인 가장 최근 행을 base로 사용.
+        base_eps: float | None = None
+        base_ni: float | None = None
+        for p in reversed(points):
+            if not p.is_estimate and p.eps is not None and p.thtr_ntin is not None:
+                base_eps = p.eps
+                base_ni = float(p.thtr_ntin)
+                break
+        estimates = self._build_estimates(points, ticker.ticker, latest_close, base_eps, base_ni)
+        return ticker, estimates
+
+    def _resolve_ticker(self, ticker_code: str) -> Ticker:
         ticker = self._tickers.find_by_ticker(ticker_code)
         if ticker is None:
             raise GenieError(code=ExceptionCode.NOT_FOUND, id=ticker_code)
+        return ticker
 
+    def _confirmed_series(
+            self,
+            ticker: Ticker,
+            period_type: str,
+            single_quarter: bool,
+    ) -> list[IncomeStatementPointData]:
+        """확정 손익계산서 시계열(예상행 제외)을 DB에서 조립·가공. 라이브 KIS 호출 없음."""
         rows = self._income.find_by_ticker(ticker.id, period_type)
         points = [
             IncomeStatementPointData(
@@ -98,28 +139,11 @@ class IncomeStatementService:
         candles = self._candles.find_by_ticker(ticker.id)
         points = _enrich_with_price(points, candles)
         # 액면분할 보정: 주당지표(eps·dps)를 수정주가 분할계수로 환산해 분할 절벽 제거.
-        # 추정행 append 전에 수행 → base_eps가 보정값(최신은 factor≈1)으로 일관.
+        # 추정행 도출 전에 수행 → base_eps가 보정값(최신은 factor≈1)으로 일관.
         points = _adjust_per_share_for_split(points, funds, candles)
+        return points
 
-        # 예상실적은 연간(추정치는 연간만 존재)에만 best-effort로 덧붙인다.
-        if period_type == PERIOD_ANNUAL:
-            latest_close = (
-                float(candles[-1].adj_close if candles[-1].adj_close is not None else candles[-1].close)
-                if candles else None
-            )
-            # 최근 확정 행 중 eps·net_income 모두 non-null인 가장 최근 행을 base로 사용.
-            base_eps: float | None = None
-            base_ni: float | None = None
-            for p in reversed(points):
-                if not p.is_estimate and p.eps is not None and p.thtr_ntin is not None:
-                    base_eps = p.eps
-                    base_ni = float(p.thtr_ntin)
-                    break
-            points = self._append_estimates(points, ticker.ticker, latest_close, base_eps, base_ni)
-
-        return ticker, points
-
-    def _append_estimates(
+    def _build_estimates(
             self,
             points: list[IncomeStatementPointData],
             ticker_code: str,
@@ -127,23 +151,24 @@ class IncomeStatementService:
             base_eps: float | None = None,
             base_ni: float | None = None,
     ) -> list[IncomeStatementPointData]:
-        """컨센서스 추정 기간(2026E 등)을 확정 행 뒤에 덧붙인다(best-effort).
+        """컨센서스 추정 기간(2026E 등) 행만 도출해 반환한다(확정행 미포함, best-effort).
 
-        - estimate client 미주입/조회 실패/미커버 종목 → 원본 그대로(표시 안 함).
+        - estimate client 미주입/조회 실패/미커버 종목 → 빈 리스트(예상행 없음).
         - 위치 고정 매핑은 섹터 무관 안정 확인됨(client 참조). 금융지주는 매출 정의가
-          손익계산서와 달라 cross-source 대조 불가 → 별도 검증 없이 그대로 덧붙인다.
+          손익계산서와 달라 cross-source 대조 불가 → 별도 검증 없이 그대로 반환한다.
         - e.eps 없는 금융지주 등은 base_eps/base_ni로 예상EPS를 도출(주식수 일정 가정):
           예상EPS = base_eps × (예상순이익 / base_ni), 예상PER = 최근종가 / 예상EPS.
+        - `points`(확정 시계열)는 예상 기간 중복 제거(existing)에만 쓰이고 반환에는 포함되지 않는다.
         """
         if self._estimates is None:
-            return points
+            return []
         try:
             fetched = self._estimates.fetch(ticker_code)
         except Exception as e:  # noqa: BLE001 — 표시용 best-effort, 상세조회는 계속돼야 함
             logger.warning("추정실적 조회 실패 ticker=%s: %r", ticker_code, e)
-            return points
+            return []
         if not fetched:
-            return points
+            return []
 
         existing = {p.stac_yymm for p in points}
         result: list[IncomeStatementPointData] = []
@@ -180,7 +205,7 @@ class IncomeStatementService:
                 price=latest_close,
                 is_estimate=True,
             ))
-        return points + result
+        return result
 
 
 def _enrich_with_fundamentals(
