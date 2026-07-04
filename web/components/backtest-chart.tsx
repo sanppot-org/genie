@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BaselineSeries,
   ColorType,
   LineSeries,
   LineStyle,
@@ -33,6 +34,14 @@ const toPct = (multiple: number) => (multiple - 1) * 100;
 const equityAxisFmt = (v: number) => `${toPct(v) >= 0 ? "+" : ""}${toPct(v).toFixed(0)}%`;
 const ddAxisFmt = (v: number) => `${v.toFixed(0)}%`;
 
+/** "#rrggbb" → "rgba(r, g, b, a)" — 낙폭 영역 채우기용 반투명 색. */
+function hexToRgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 /** 시계열을 버킷 단위로 집계해 한눈에 보이게 단순화.
  *  equity는 버킷 마지막 값, drawdown은 버킷 내 최저값 — MDD 깊이가 뭉개지지 않게 보존. */
 function downsample(curve: BacktestEquityPoint[]): BacktestEquityPoint[] {
@@ -53,7 +62,7 @@ interface DrawnMeta {
   name: string;
   color: string;
   equityApi: ISeriesApi<"Line">;
-  ddApi: ISeriesApi<"Line">;
+  ddApi: ISeriesApi<"Baseline">;
   lastReturn: number;
   lastDd: number;
 }
@@ -123,10 +132,17 @@ export function BacktestChart({ items, benchmark }: Props) {
       equityApi.setData(equityData);
       equityApi.priceScale().applyOptions({ mode: PriceScaleMode.Logarithmic });
 
+      // 낙폭은 0 기준선 아래를 채우는 underwater 영역 — 깊이·기간이 면적으로 보인다.
       const ddApi = chart.addSeries(
-        LineSeries,
+        BaselineSeries,
         {
-          color,
+          baseValue: { type: "price", price: 0 },
+          bottomLineColor: color,
+          bottomFillColor1: hexToRgba(color, 0.06), // 0 부근은 옅게
+          bottomFillColor2: hexToRgba(color, 0.28), // 깊은 낙폭일수록 진하게
+          topLineColor: color,
+          topFillColor1: "transparent",
+          topFillColor2: "transparent",
           lineWidth: 1,
           priceLineVisible: false,
           lastValueVisible: false,
