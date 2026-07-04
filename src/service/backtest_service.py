@@ -20,7 +20,7 @@ import pandas as pd
 
 from src.backtest.cli import is_bust, merge_params
 from src.backtest.registry import StrategySpec, get_strategy, list_strategies
-from src.backtest.result import BacktestResult, EquityPoint
+from src.backtest.result import BacktestResult, EquityPoint, _compute_cagr, _compute_sharpe_from_returns, _compute_sortino
 from src.database.database import Database
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,18 @@ class BacktestRunResult:
 
 
 @dataclass(frozen=True)
+class BenchmarkResult:
+    """Buy & Hold 벤치마크 자산곡선 + 요약 지표 (종가 기반)."""
+
+    curve: list[EquityPoint]
+    total_return_pct: float
+    cagr_pct: float | None
+    max_drawdown_pct: float | None  # MDD (%), ≤ 0
+    sharpe_ratio: float | None
+    sortino_ratio: float | None
+
+
+@dataclass(frozen=True)
 class BacktestRunOutput:
     """BacktestService.run() 전체 실행 결과."""
 
@@ -45,7 +57,7 @@ class BacktestRunOutput:
     skipped: list[str]       # 캔들 데이터 없어 제외된 전략명
     failed: list[str]        # 실행 예외로 실패한 전략명
     mixed_timeframes: bool   # 결과 전략들의 타임프레임이 혼합되어 있으면 True
-    benchmark: list[EquityPoint] | None = None  # Buy & Hold 벤치마크 (종가 기반, 일 단위)
+    benchmark: BenchmarkResult | None = None  # Buy & Hold 벤치마크 (종가 기반, 일 단위)
 
 
 class BacktestService:
@@ -175,10 +187,11 @@ def _pick_benchmark_df(specs: list[StrategySpec], spec_dfs: dict[str, pd.DataFra
     return next(iter(spec_dfs.values()), None)
 
 
-def _build_benchmark(df: pd.DataFrame | None) -> list[EquityPoint] | None:
-    """종가 기반 Buy & Hold 자산곡선 (일 단위). 1h/1m 데이터는 일별 마지막 종가로 집계.
+def _build_benchmark(df: pd.DataFrame | None) -> BenchmarkResult | None:
+    """종가 기반 Buy & Hold 자산곡선 + 요약 지표 (일 단위). 1h/1m 데이터는 일별 마지막 종가로 집계.
 
-    첫 종가 대비 수익률 %, running peak 대비 낙폭 %(≤ 0). 산출 불가 시 None.
+    자산곡선: 첫 종가 대비 수익률 %, running peak 대비 낙폭 %(≤ 0).
+    지표: 총수익률·CAGR(캘린더 일수 기반)·MDD·샤프·소르티노(일별 종가수익률에서 산출). 산출 불가 시 None.
     """
     if df is None or df.empty or "close" not in df.columns:
         return None
@@ -201,7 +214,23 @@ def _build_benchmark(df: pd.DataFrame | None) -> list[EquityPoint] | None:
             return_pct=(equity - 1.0) * 100.0,
             drawdown_pct=(equity / peak - 1.0) * 100.0,
         ))
-    return curve or None
+    if not curve:
+        return None
+
+    # 요약 지표 — 전략 결과 표와 같은 항목(수익률·CAGR·MDD·Sharpe·Sortino)
+    daily_returns = [float(r) for r in daily.pct_change().dropna().tolist()]
+    final_equity = float(daily.iloc[-1]) / first
+    total_return_pct = (final_equity - 1.0) * 100.0
+    max_drawdown_pct = min(p.drawdown_pct for p in curve)
+    period_days = (curve[-1].date - curve[0].date).days
+    return BenchmarkResult(
+        curve=curve,
+        total_return_pct=total_return_pct,
+        cagr_pct=_compute_cagr(1.0, final_equity, period_days),
+        max_drawdown_pct=max_drawdown_pct,
+        sharpe_ratio=_compute_sharpe_from_returns(daily_returns),
+        sortino_ratio=_compute_sortino(dict(enumerate(daily_returns))),
+    )
 
 def _load_candles_df(
     spec: StrategySpec,

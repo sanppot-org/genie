@@ -419,6 +419,17 @@ class BacktestRunItem(BaseModel):
     equity_curve: list[BacktestEquityPoint] | None = None  # 일별 자산곡선, 산출 불가 시 None
 
 
+class BacktestBenchmark(BaseModel):
+    """Buy & Hold 벤치마크 — 자산곡선 + 요약 지표 (종가 기반)."""
+
+    curve: list[BacktestEquityPoint]
+    total_return_pct: float
+    cagr_pct: float | None
+    max_drawdown_pct: float | None
+    sharpe_ratio: float | None
+    sortino_ratio: float | None
+
+
 class BacktestRunResponse(BaseModel):
     """백테스트 실행 전체 응답."""
 
@@ -426,7 +437,7 @@ class BacktestRunResponse(BaseModel):
     skipped: list[str]        # 캔들 데이터 없어 제외된 전략명
     failed: list[str]         # 실행 예외로 실패한 전략명
     mixed_timeframes: bool    # 결과 전략들의 타임프레임이 혼합되어 있으면 True
-    benchmark: list[BacktestEquityPoint] | None = None  # Buy & Hold 벤치마크 (종가 기반)
+    benchmark: BacktestBenchmark | None = None  # Buy & Hold 벤치마크 (곡선 + 지표)
 
 
 class CorrelationRequest(BaseModel):

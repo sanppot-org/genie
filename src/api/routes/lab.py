@@ -8,6 +8,7 @@ from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.schemas import (
+    BacktestBenchmark,
     BacktestEquityPoint,
     BacktestRunItem,
     BacktestRunRequest,
@@ -24,7 +25,7 @@ from src.api.schemas import (
 )
 from src.backtest.result import EquityPoint
 from src.container import ApplicationContainer
-from src.service.backtest_service import BacktestService
+from src.service.backtest_service import BacktestService, BenchmarkResult
 from src.service.correlation_service import CorrelationService
 from src.service.us_stock_daily_candle_service import UsStockDailyCandleService
 from src.service.us_stock_ticker_service import UsStockTickerService
@@ -37,6 +38,20 @@ def _to_equity_points(curve: list[EquityPoint] | None) -> list[BacktestEquityPoi
     if curve is None:
         return None
     return [BacktestEquityPoint(date=p.date, return_pct=p.return_pct, drawdown_pct=p.drawdown_pct) for p in curve]
+
+
+def _to_benchmark(bench: BenchmarkResult | None) -> BacktestBenchmark | None:
+    """도메인 BenchmarkResult → API 스키마 변환 (곡선 + 요약 지표). None은 그대로 통과."""
+    if bench is None:
+        return None
+    return BacktestBenchmark(
+        curve=_to_equity_points(bench.curve) or [],
+        total_return_pct=bench.total_return_pct,
+        cagr_pct=bench.cagr_pct,
+        max_drawdown_pct=bench.max_drawdown_pct,
+        sharpe_ratio=bench.sharpe_ratio,
+        sortino_ratio=bench.sortino_ratio,
+    )
 
 
 @router.get("/backtest/strategies", response_model=GenieResponse[list[StrategyInfo]])
@@ -141,7 +156,7 @@ def run_backtest(
         skipped=output.skipped,
         failed=output.failed,
         mixed_timeframes=output.mixed_timeframes,
-        benchmark=_to_equity_points(output.benchmark),
+        benchmark=_to_benchmark(output.benchmark),
     ))
 
 

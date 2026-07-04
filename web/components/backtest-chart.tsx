@@ -17,7 +17,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { colorFor } from "@/lib/compare-colors";
-import type { BacktestEquityPoint, BacktestRunItem } from "@/lib/types";
+import type { BacktestBenchmark, BacktestEquityPoint, BacktestRunItem } from "@/lib/types";
 
 const CHART_HEIGHT = 480;
 const DD_PANE_HEIGHT = 130;
@@ -77,8 +77,8 @@ interface LegendRow {
 interface Props {
   /** 차트에 그릴 전략 결과 (bust 제외, equity_curve 보유). 색은 배열 순서 기준. */
   items: BacktestRunItem[];
-  /** Buy & Hold 벤치마크 (없으면 미표시). */
-  benchmark: BacktestEquityPoint[] | null;
+  /** Buy & Hold 벤치마크 (없으면 미표시). 곡선 + 요약 지표. */
+  benchmark: BacktestBenchmark | null;
 }
 
 /** 백테스트 자산곡선 2-pane 차트 — 위: 수익률(%) + 벤치마크, 아래: 낙폭(%) + MDD 마커. */
@@ -180,8 +180,8 @@ export function BacktestChart({ items, benchmark }: Props) {
     });
 
     // 벤치마크 (Buy & Hold) — 상단(수익률)·하단(낙폭) pane 모두 회색 점선
-    if (benchmark && benchmark.length > 0) {
-      const bench = downsample(benchmark);
+    if (benchmark && benchmark.curve.length > 0) {
+      const bench = downsample(benchmark.curve);
       const api = chart.addSeries(
         LineSeries,
         {
@@ -268,13 +268,13 @@ export function BacktestChart({ items, benchmark }: Props) {
             </span>
           </span>
         ))}
-        {benchmark && benchmark.length > 0 && (
+        {benchmark && benchmark.curve.length > 0 && (
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <span style={{ color: BENCHMARK_COLOR }}>╌╌</span>
-            단순보유 {pctFmt(benchmark[benchmark.length - 1].return_pct)}
-            <span>
-              (MDD {benchmark.reduce((m, p) => Math.min(m, p.drawdown_pct), 0).toFixed(1)}%)
-            </span>
+            단순보유 {pctFmt(benchmark.total_return_pct)}
+            {benchmark.max_drawdown_pct !== null && (
+              <span>(MDD {benchmark.max_drawdown_pct.toFixed(1)}%)</span>
+            )}
           </span>
         )}
       </div>

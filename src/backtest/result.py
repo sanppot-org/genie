@@ -167,6 +167,24 @@ def _compute_sortino(timereturn_analysis: object, target_return: float = 0.0) ->
     return sortino if math.isfinite(sortino) else None
 
 
+def _compute_sharpe_from_returns(returns: list[float], risk_free_daily: float = 0.0) -> float | None:
+    """일별 수익률 리스트로 연율화 샤프 비율을 계산한다. 산출 불가 시 None.
+
+    벤치마크(Buy & Hold)처럼 backtrader 실행이 아니라 종가 곡선에서 지표를 낼 때 사용한다.
+    샤프 = (평균 일수익률 − 무위험) / 표준편차(모집단) × √252. 표본<2 또는 표준편차 0이면 None.
+    전략 샤프(backtrader SharpeRatio, 무위험 1%/년)와 무위험 처리가 달라 미세한 차이가 있을 수 있다.
+    """
+    if len(returns) < 2:
+        return None
+    mean_return = sum(returns) / len(returns)
+    variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
+    std = math.sqrt(variance)
+    if std == 0:
+        return None
+    sharpe = (mean_return - risk_free_daily) / std * math.sqrt(_TRADING_DAYS_PER_YEAR)
+    return sharpe if math.isfinite(sharpe) else None
+
+
 def _safe_trade_stats(trade_analysis: object) -> tuple[int, float | None]:
     """TradeAnalyzer 결과에서 (closed_trades, win_rate_pct)를 안전하게 추출한다.
 

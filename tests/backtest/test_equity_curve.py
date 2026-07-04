@@ -44,13 +44,30 @@ class TestBuildBenchmark:
             index=pd.DatetimeIndex(["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"]),
         )
 
-        curve = _build_benchmark(df)
+        bench = _build_benchmark(df)
 
-        assert curve is not None and len(curve) == 4
-        assert curve[0].return_pct == pytest.approx(0.0)
-        assert curve[2].return_pct == pytest.approx(-12.0)
-        assert curve[2].drawdown_pct == pytest.approx(-20.0)  # 고점 110 대비 88
-        assert curve[3].drawdown_pct == pytest.approx(0.0)
+        assert bench is not None and len(bench.curve) == 4
+        assert bench.curve[0].return_pct == pytest.approx(0.0)
+        assert bench.curve[2].return_pct == pytest.approx(-12.0)
+        assert bench.curve[2].drawdown_pct == pytest.approx(-20.0)  # 고점 110 대비 88
+        assert bench.curve[3].drawdown_pct == pytest.approx(0.0)
+
+    def test_요약_지표를_함께_계산한다(self):
+        # 100→110→88→110: 총수익률 +10%, MDD -20%, 샤프·소르티노는 3개 일별수익률에서 산출
+        import math
+        df = pd.DataFrame(
+            {"close": [100.0, 110.0, 88.0, 110.0]},
+            index=pd.DatetimeIndex(["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05"]),
+        )
+
+        bench = _build_benchmark(df)
+
+        assert bench is not None
+        assert bench.total_return_pct == pytest.approx(10.0)
+        assert bench.max_drawdown_pct == pytest.approx(-20.0)
+        assert bench.cagr_pct is not None  # 3일 기간이므로 산출됨
+        assert bench.sharpe_ratio is not None and math.isfinite(bench.sharpe_ratio)
+        assert bench.sortino_ratio is not None and math.isfinite(bench.sortino_ratio)
 
     def test_분봉은_일별_마지막_종가로_집계한다(self):
         df = pd.DataFrame(
@@ -61,12 +78,12 @@ class TestBuildBenchmark:
             ]),
         )
 
-        curve = _build_benchmark(df)
+        bench = _build_benchmark(df)
 
-        assert curve is not None and len(curve) == 2
-        assert curve[0].date == date(2024, 1, 2)
-        assert curve[0].return_pct == pytest.approx(0.0)  # 첫날 마지막 종가 105 기준
-        assert curve[1].return_pct == pytest.approx((120.0 / 105.0 - 1) * 100)
+        assert bench is not None and len(bench.curve) == 2
+        assert bench.curve[0].date == date(2024, 1, 2)
+        assert bench.curve[0].return_pct == pytest.approx(0.0)  # 첫날 마지막 종가 105 기준
+        assert bench.curve[1].return_pct == pytest.approx((120.0 / 105.0 - 1) * 100)
 
     def test_빈_데이터면_None(self):
         assert _build_benchmark(None) is None

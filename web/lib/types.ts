@@ -223,12 +223,21 @@ export interface BacktestRunItem {
   equity_curve: BacktestEquityPoint[] | null; // 일별 자산곡선, 산출 불가 시 null
 }
 
+export interface BacktestBenchmark {
+  curve: BacktestEquityPoint[]; // 일별 자산곡선
+  total_return_pct: number;
+  cagr_pct: number | null;
+  max_drawdown_pct: number | null;
+  sharpe_ratio: number | null;
+  sortino_ratio: number | null;
+}
+
 export interface BacktestRunResult {
   results: BacktestRunItem[];
   skipped: string[];
   failed: string[];
   mixed_timeframes: boolean;
-  benchmark: BacktestEquityPoint[] | null; // Buy & Hold 벤치마크 (종가 기반)
+  benchmark: BacktestBenchmark | null; // Buy & Hold 벤치마크 (곡선 + 지표)
 }
 
 export interface BacktestRunRequest {

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError, apiGet, apiPost } from "@/lib/api";
 import type {
+  BacktestBenchmark,
   BacktestRunItem,
   BacktestRunRequest,
   BacktestRunResult,
@@ -875,6 +876,7 @@ function ResultsPanel({
               {rows.map((row) => (
                 <ResultRow key={row.strategy_name} row={row} />
               ))}
+              {result.benchmark && <BenchmarkRow benchmark={result.benchmark} />}
             </tbody>
           </table>
         </div>
@@ -936,6 +938,39 @@ function ResultRow({ row }: { row: BacktestRunItem }) {
       <td className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground whitespace-nowrap">
         {fmtDateRange(row.start_date, row.end_date)}
       </td>
+    </tr>
+  );
+}
+
+/** 벤치마크(단순보유) 행 — 전략과 같은 지표(수익률·CAGR·MDD·Sharpe·Sortino)를 회색 점선 스타일로. */
+function BenchmarkRow({ benchmark }: { benchmark: BacktestBenchmark }) {
+  const mddCls =
+    benchmark.max_drawdown_pct !== null && benchmark.max_drawdown_pct < -20 ? "text-red-600" : "";
+  return (
+    <tr className="border-t-2 border-border bg-muted/20 text-muted-foreground">
+      <td className="px-3 py-2 font-medium whitespace-nowrap">
+        <span className="mr-1.5">╌╌</span>단순보유
+      </td>
+      <td className="px-3 py-2 font-mono">벤치마크</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold">
+        {fmtPct(benchmark.total_return_pct)}
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold">
+        {fmtPct(benchmark.cagr_pct)}
+      </td>
+      <td className={`px-3 py-2 text-right font-mono tabular-nums ${mddCls}`}>
+        {fmtPct(benchmark.max_drawdown_pct)}
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">
+        {fmtNum(benchmark.sharpe_ratio, 3)}
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">
+        {fmtNum(benchmark.sortino_ratio, 3)}
+      </td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">—</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">—</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">—</td>
+      <td className="px-3 py-2 text-right font-mono tabular-nums">—</td>
     </tr>
   );
 }
