@@ -11,10 +11,8 @@ from datetime import date
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 from src.service.backtest_service import BacktestService
-
 
 # ---------------------------------------------------------------------------
 # 테스트 픽스처 헬퍼

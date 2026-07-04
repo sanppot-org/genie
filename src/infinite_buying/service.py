@@ -112,7 +112,6 @@ class InfiniteBuyingService:
                 plan = build_daily_plan(
                     state=state, per_round_amount=position.per_round_amount, prev_close=prev_close,
                     division=cfg.division, base_gap=cfg.base_gap, sell_limit_pct=cfg.sell_limit_pct,
-                    allocation=cfg.allocation,
                 )
                 for intent in plan:
                     # intent별 예외 격리: N+1 주문이 실패해도 이미 체결된 N..1 원장 행은 커밋되어야

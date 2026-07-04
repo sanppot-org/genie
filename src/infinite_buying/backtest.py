@@ -93,7 +93,6 @@ def run_backtest(bars: list[DailyBar], config: BacktestConfig) -> BacktestResult
             division=config.division,
             base_gap=config.base_gap,
             sell_limit_pct=config.sell_limit_pct,
-            allocation=config.allocation,
         )
         had_position = sim.position.holding_qty > 0
         _apply_day(sim, plan, bar, config)

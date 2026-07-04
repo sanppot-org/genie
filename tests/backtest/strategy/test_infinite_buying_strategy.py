@@ -4,6 +4,7 @@
 1. 첫 매수 → 전반전 분할 매수 누적 → 목표가 도달 시 전량 청산 (사이클 완료)
 2. 별지점 도달 시 쿼터매도만 체결 (목표가 미도달 → 사이클 유지)
 3. 회차 소진 시 매수 중단 + 매도만 진행
+4. 지정가매도는 장중 고가 터치 시 목표가 체결 (종가가 되밀려도 75%는 목표가에 매도)
 """
 
 from datetime import datetime, timedelta
@@ -73,6 +74,25 @@ class TestInfiniteBuyingStrategy:
         # 소진 모드에 진입해 MOC 쿼터매도(비중 덜어내기)가 발생해야 함
         assert strategy.sell_executed, "회차 소진 시 MOC 쿼터매도가 실행되어야 함"
 
+    def test_limit_sell_fills_at_target_on_intraday_high(self) -> None:
+        """장중 고가가 목표가를 터치하고 종가가 되밀린 날: 75%만 목표가(평단×1.15)에 체결, 사이클 유지"""
+        # Given: 첫 매수(평단 100, 목표가 115) 후 high 116/close 100인 스파이크 데이터
+        cerebro = bt.Cerebro()
+        cerebro.adddata(self._to_feed(self._intraday_spike_then_fade()))
+        cerebro.addstrategy(InfiniteBuyingStrategy, split_count=40)
+        cerebro.broker.setcash(100_000_000)
+
+        # When
+        strategy = cerebro.run()[0]
+
+        # Then: 지정가매도(Limit)가 종가(100)가 아닌 목표가(115)에 체결됨
+        sells = [t for t in strategy.trade_history if t["type"] == "sell"]
+        assert any(abs(s["price"] - 115.0) < 0.01 for s in sells), (
+            f"지정가매도는 고가 터치 시 목표가(115)에 체결되어야 함 (실제: {[s['price'] for s in sells]})"
+        )
+        assert strategy.cycle_count == 0, "종가가 별지점 아래라 쿼터매도 미체결 → 잔량 25% 유지, 사이클 미완료"
+        assert strategy.hold_qty > 0, "25% 잔량이 남아야 함"
+
     # === 헬퍼 메서드 ===
 
     def _flat_then_rally(self) -> list[dict]:
@@ -99,6 +119,25 @@ class TestInfiniteBuyingStrategy:
         rows = [self._candle(base + timedelta(days=i), 100.0) for i in range(2)]
         rows.append(self._candle(base + timedelta(days=2), 114.5))
         rows.append(self._candle(base + timedelta(days=3), 114.5))
+        return rows
+
+    def _intraday_spike_then_fade(self) -> list[dict]:
+        """첫 매수(평단 100) 후 장중 116까지 스파이크했다가 종가 100으로 되밀린 데이터
+
+        day1 첫 매수(종가 100) → day2 high 116 >= 목표가 115 → Limit 매도 115 체결,
+        종가 100 < 별지점(114.25) → 쿼터매도 미체결.
+        """
+        base = datetime(2024, 1, 1)
+        rows = [self._candle(base + timedelta(days=i), 100.0) for i in range(2)]
+        rows.append({
+            "datetime": base + timedelta(days=2),
+            "open": 100.0,
+            "high": 116.0,
+            "low": 99.0,
+            "close": 100.0,
+            "volume": 1000.0,
+        })
+        rows.append(self._candle(base + timedelta(days=3), 100.0))
         return rows
 
     def _continuous_decline(self) -> list[dict]:

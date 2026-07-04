@@ -19,7 +19,7 @@ def test_cycle_start_emits_single_loc_first_buy() -> None:
     plan = build_daily_plan(
         state=PositionState(holding_qty=0, cumulative_buy=0.0),
         per_round_amount=250.0, prev_close=50.0,
-        division=40, base_gap=15.0, sell_limit_pct=15.0, allocation=10000.0,
+        division=40, base_gap=15.0, sell_limit_pct=15.0,
     )
     assert len(plan) == 1
     fb = plan[0]
@@ -32,7 +32,7 @@ def test_first_half_emits_separation_avg_buys_plus_sells() -> None:
     state = PositionState(holding_qty=16, cumulative_buy=740.0)  # 평단 46.25
     plan = build_daily_plan(
         state=state, per_round_amount=250.0, prev_close=999.0,
-        division=40, base_gap=15.0, sell_limit_pct=15.0, allocation=10000.0,
+        division=40, base_gap=15.0, sell_limit_pct=15.0,
     )
     kinds = _by_kind(plan)
     assert set(kinds) == {"separation_buy", "avg_buy", "quarter_sell", "limit_sell"}
@@ -65,7 +65,7 @@ def test_second_half_emits_full_separation_buy_only_plus_sells() -> None:
     state = PositionState(holding_qty=200, cumulative_buy=5000.0)  # 평단 25, T=20 → 후반전
     plan = build_daily_plan(
         state=state, per_round_amount=250.0, prev_close=999.0,
-        division=40, base_gap=15.0, sell_limit_pct=15.0, allocation=10000.0,
+        division=40, base_gap=15.0, sell_limit_pct=15.0,
     )
     kinds = _by_kind(plan)
     assert "avg_buy" not in kinds  # 후반전은 평단매수 없음
@@ -79,11 +79,11 @@ def test_second_half_emits_full_separation_buy_only_plus_sells() -> None:
 
 
 def test_budget_exhausted_emits_moc_quarter_sell_no_buys() -> None:
-    # 매수누적액+회당금액 > 할당금액 → 회차 소진: 매도만, 쿼터매도는 MOC
-    state = PositionState(holding_qty=40, cumulative_buy=9900.0)  # 평단 247.5
+    # 매수누적액+회당금액 > 회당금액×분할수(유효 할당금액) → 회차 소진: 매도만, 쿼터매도는 MOC
+    state = PositionState(holding_qty=40, cumulative_buy=9900.0)  # 평단 247.5, 9900+250 > 250×40
     plan = build_daily_plan(
         state=state, per_round_amount=250.0, prev_close=999.0,
-        division=40, base_gap=15.0, sell_limit_pct=15.0, allocation=10000.0,
+        division=40, base_gap=15.0, sell_limit_pct=15.0,
     )
     kinds = _by_kind(plan)
     assert not any(i.side == "buy" for i in plan)  # 매수 없음
@@ -98,7 +98,7 @@ def test_zero_qty_intents_are_dropped() -> None:
     state = PositionState(holding_qty=3, cumulative_buy=150.0)  # 평단 50
     plan = build_daily_plan(
         state=state, per_round_amount=250.0, prev_close=999.0,
-        division=40, base_gap=15.0, sell_limit_pct=15.0, allocation=10000.0,
+        division=40, base_gap=15.0, sell_limit_pct=15.0,
     )
     kinds = _by_kind(plan)
     assert "quarter_sell" not in kinds          # 0주 → 제외
