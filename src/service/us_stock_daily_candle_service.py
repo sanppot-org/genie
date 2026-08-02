@@ -112,10 +112,13 @@ class UsStockDailyCandleService:
             for b in bars_by_date.values()
         ]
         adjusted_by_date = {d: self._adjusted(b) for d, b in bars_by_date.items()}
+        # 조회 구간만 로드: adj_* 갱신 대상은 adjusted_by_date(=이번에 받은 봉) 뿐이라
+        # 종목 전체 이력을 ORM으로 적재하면 순수 낭비다. EOD 동기화(5거래일)에서
+        # 종목당 수천~1만 행을 매일 읽던 부하를 제거한다.
         with self._database.session_scope() as session:
             repo = StockDailyCandleRepository(session)
             repo.bulk_upsert(entities)
-            rows = repo.find_by_ticker(ticker_id)
+            rows = repo.find_by_ticker(ticker_id, from_date=min(bars_by_date), to_date=max(bars_by_date))
             repo.update_adjusted_from_rows(rows, adjusted_by_date)
         return len(bars_by_date)
 

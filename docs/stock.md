@@ -105,7 +105,7 @@
   - **종목 등록(선행 필수)**: FDR `StockListing(NASDAQ/NYSE/AMEX)`로 심볼→(이름, 거래소) 자동 해석. 사용자는 심볼만 제공. 워치리스트는 DB 기반 동적 관리(`tickers` 행 추가/`active` 토글).
 
   [x] `DataSource.FDR` enum 추가 (`("fdr", TimeZone.NEW_YORK)`, native_enum=False라 DB 마이그레이션 불필요)
-  [x] `tickers.exchange` nullable 컬럼 추가 (alembic 018, KIS EXCD `NAS/NYS/AMS`, US_STOCK만 채워짐) — **prod 마이그레이션 적용 대기**
+  [x] `tickers.exchange` nullable 컬럼 추가 (alembic 018, KIS EXCD `NAS/NYS/AMS`, US_STOCK만 채워짐) — prod 적용 완료(v1.49.4 태그 배포 시 `deploy.sh`의 `alembic upgrade head`)
   [x] `UsStockDailyClient` (`src/providers/us_stock_daily_client.py`) — FDR→yfinance 폴백, `UsDailyBar` 정규화
   [x] `UsStockTickerService` (`src/service/us_stock_ticker_service.py`) — FDR StockListing 기반 등록(이름·거래소 enrich, 멱등, 목록 미존재 skip)
   [x] `UsStockDailyCandleService` (`src/service/us_stock_daily_candle_service.py`) — 종목별 독립 `session_scope` 백필/EOD upsert + 수정주가 복원, 한 종목 실패가 배치 막지 않음
@@ -113,7 +113,11 @@
   [x] 스케줄러 등록 — `sync_us_stock_daily_candles` cron 07:30 tue-sat KST (미국장 마감 후 데이터 안정화 시점; 미국 mon-fri 세션 = KST tue-sat)
   [x] 스크립트 — `scripts/register_us_tickers.py --symbols`, `scripts/backfill_us_daily_candles.py --start`
   [x] 테스트 — DataSource enum / exchange 컬럼 / 클라이언트 폴백 3케이스 / 종목등록 2케이스 / 동기화 서비스 3케이스(원주가+수정주가 factor, 빈응답 skip, 종목실패 격리)
-  [ ] prod DB에 alembic 018 적용 + 워치리스트 등록 + 초기 백필 (호스트 확인 후)
+  [x] prod DB에 alembic 018 적용 + 워치리스트 등록 + 초기 백필 — 2026-08-02 Nasdaq-100 103종목 등록(전부 `NAS`) + 전체 히스토리 백필 656,002행(합계 664,267행, 최신 2026-07-31). 구성종목은 Nasdaq 공식 API(`api.nasdaq.com/api/quote/list-type/nasdaq100`)에서 취득 — FDR `StockListing('S&P500'/'NASDAQ100')`은 403/미구현. prod DB 5432 직접 연결은 방화벽 차단이라 앱 엔드포인트(`POST /api/us-tickers/register`, `POST /api/us-candles/backfill`)로 수행(nginx 60s 타임아웃 → 2종목/요청 분할). TSLA는 `HANTU_O`→`FDR` re-home됨.
+  - **[알려진 한계] US `close`는 분할조정가 (KR과 의미 불일치)**: FDR `DataReader`가 분할조정 OHLC를 주므로 `stock_daily_candles.close`가 US는 **분할조정가**, KR(pykrx)은 **원주가**다. 검증: AAPL 4:1 분할(2020-08-31) 전후 `close` 124.81→134.18로 단절 없음 / 삼성 005930 50:1 분할(2018-05-04) 전후 `close` 2,650,000→51,900으로 단절 존재. 따라서 US의 `factor = adj_close/close`는 배당만 반영하고, `price=raw` 조회 시 US는 분할조정·KR은 원주가가 나온다. KR·US 혼합 백테스트/차트 비교 시 주의.
+  - [x] **EOD 동기화 읽기 부하 제거** — `_process_ticker`가 `find_by_ticker(ticker_id)`를 날짜 범위 없이 호출해 종목 전체 이력을 매번 ORM 적재하던 문제(대상 2→105종목으로 일 읽기량 8천행→약 66만행). `from_date=min(bars_by_date), to_date=max(bars_by_date)`로 조회 구간 한정 → EOD 동기화는 종목당 5행만 읽는다. 회귀 테스트 `test_adjusted_update_loads_only_fetched_date_range`(조회 인자 검증 + 구간 밖 행 불변).
+  - [ ] TQQQ/SOXL `exchange`가 NULL (US_ETF는 FDR 주식목록에 없어 설계상 None) → 무한매수 발주 시 `service.py:97-99`에서 `skipped_no_exchange`로 전량 skip됨. 발주 사용 전 `NAS` 채워야 함.
+  - [ ] 레거시 `QQQ`(id=5, `HANTU_O`, min1 캔들 19,232건)는 FDR 수집 대상 아님 → 일봉 0건 유지 중.
 
 [x] 로컬에서 better stack 비활성화
 [x] 프로파일에 따라서 스케줄러 비활성화
