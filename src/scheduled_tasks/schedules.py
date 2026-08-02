@@ -45,13 +45,17 @@ def get_schedules() -> list[ScheduleConfig]:
             )
         )
 
+    if config.enable_bithumb_krw:
+        schedules.append(
+            ScheduleConfig(
+                func=update_bithumb_krw,
+                trigger=CronTrigger(hour=23, minute=15),
+                id="update_bithumb_krw",
+                name="Bithumb KRW 잔고 업데이트",
+            )
+        )
+
     schedules.extend([
-        ScheduleConfig(
-            func=update_bithumb_krw,
-            trigger=CronTrigger(hour=23, minute=15),
-            id="update_bithumb_krw",
-            name="Bithumb KRW 잔고 업데이트",
-        ),
         ScheduleConfig(
             func=update_data,
             trigger=IntervalTrigger(minutes=1),

@@ -230,6 +230,12 @@ class AppConfig(BaseSettings):
         alias="ENABLE_REPORT",
     )
 
+    enable_bithumb_krw: bool = Field(
+        default=True,
+        description="Bithumb KRW 잔고 업데이트 스케줄 활성화 여부",
+        alias="ENABLE_BITHUMB_KRW",
+    )
+
     cors_allow_origins: list[str] = Field(
         default=["http://localhost:3000"],
         description="CORS 허용 origin 목록 (쉼표 구분 환경변수 지원). 로컬 임의 포트는 cors_allow_origin_regex 참고.",
