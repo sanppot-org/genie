@@ -18,7 +18,7 @@ services:
       - timescale_data:/var/lib/postgresql/data
       - ./scripts/init_timescale.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-genie}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-genie} -d ${POSTGRES_DB:-genie_trading}" ]
       interval: 10s
       timeout: 5s
       retries: 5
