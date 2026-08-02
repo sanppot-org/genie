@@ -217,6 +217,61 @@ class TestSplitDetection:
         finally:
             session.close()
 
+    def test_장기_거래정지_후_재개_감자_감지(self, db: Database) -> None:
+        """정지 이전 행이 스캔 윈도우 밖이어도 감지한다 (거리 무관 직전 종가 비교).
+
+        prod 실제 사례: 미래산업 025560이 21일 거래정지 후 1:5 감자로 재개됐으나
+        LAG 기반 20일 윈도우로는 직전 종가가 NULL이 되어 조용히 누락됐다.
+        """
+        session = db.get_session()
+        try:
+            t = TickerRepository(session).save(Ticker(
+                ticker="025560", name="미래산업",
+                asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value,
+            ))
+            StockDailyCandleRepository(session).bulk_upsert([
+                # 정지 이전 (재개일로부터 60일 전 — 어떤 고정 버퍼로도 못 덮는 거리)
+                StockDailyCandle(ticker_id=t.id, date=date(2024, 1, 2), open=41000, high=42000,
+                                 low=40500, close=41750, volume=100_000, trade_value=None),
+                # 21일 넘는 공백 후 재개 — 1:5 감자로 1/4 수준
+                StockDailyCandle(ticker_id=t.id, date=date(2024, 3, 2), open=10000, high=10500,
+                                 low=9900, close=10210, volume=500_000, trade_value=None),
+            ])
+            session.commit()
+            ticker_id = t.id
+        finally:
+            session.close()
+
+        session = db.get_session()
+        try:
+            ids = StockDailyCandleRepository(session).find_split_candidate_ticker_ids(date(2024, 3, 1))
+            assert ticker_id in ids
+        finally:
+            session.close()
+
+    def test_직전_종가가_없는_신규_상장은_제외(self, db: Database) -> None:
+        """첫 거래일은 비교 대상이 없어 후보가 아니다 (상관 서브쿼리 NULL)."""
+        session = db.get_session()
+        try:
+            t = TickerRepository(session).save(Ticker(
+                ticker="900001", name="신규상장",
+                asset_type=AssetType.KR_STOCK, data_source=DataSource.PYKRX.value,
+            ))
+            StockDailyCandleRepository(session).bulk_upsert([
+                StockDailyCandle(ticker_id=t.id, date=date(2024, 3, 2), open=10000, high=10500,
+                                 low=9900, close=10210, volume=500_000, trade_value=None),
+            ])
+            session.commit()
+        finally:
+            session.close()
+
+        session = db.get_session()
+        try:
+            ids = StockDailyCandleRepository(session).find_split_candidate_ticker_ids(date(2024, 3, 1))
+            assert ids == set()
+        finally:
+            session.close()
+
 
 class TestReadjustRecentSplits:
     def test_감지_종목_재백필(self, db: Database, client: MagicMock) -> None:

@@ -2,6 +2,13 @@
 
 최신순 상단. 원인·해결·주의사항 3줄 요약.
 
+## 2026-08-02: 장기 거래정지 후 재개 종목의 분할·감자 감지 누락 → 수정주가가 5배 틀린 값으로 잔존
+
+- **원인**: `find_split_candidate_ticker_ids`가 직전 종가를 **윈도우 내 `LAG`** 로 구하고 스캔 범위를 `scan_from = since - 10일`(= `readjust_recent_splits`의 `lookback_days=10`과 합쳐 총 20일)로 잘랐다. 거래정지가 20일보다 길면 정지 이전 행이 스캔 밖으로 나가 재개 첫 행이 파티션 첫 행이 되고 `prev_close = NULL` → 급변이 후보에서 조용히 탈락. 버퍼 10일은 공휴일 연휴만 가정한 값이나 거래정지는 수 주~수 개월. prod 실측: 미래산업(025560) 21일 정지 후 1:5 감자로 재개했는데 미감지 → DB `adj_close` 60,300 vs 네이버 현재 12,060(**배율 0.200, 정확히 5배 오차**). 동일 패턴 KR모터스·티웨이홀딩스·디젠스·지슨 확인(공백 21~26일), 2026-04-01 이후만 **178종목/181건** 누락. NULL이 아니라 *틀린 값*이라 `price=adjusted` 차트·백테스트에 없던 절벽이 생긴다.
+- **해결**: `LAG` → **거리 무관 상관 서브쿼리**(`prv.ticker_id = cur.ticker_id AND prv.date < cur.date ORDER BY prv.date DESC LIMIT 1`)로 교체하고 `scan_from` 버퍼 제거. `ix_stock_daily_candles_ticker_id_date` 역방향 인덱스 스캔으로 행당 1회 조회 → 스캔은 `since` 이후 행 수에만 비례. `prev_close > 0` 이 NULL(첫 거래일)도 걸러내므로 중복 `IS NOT NULL` 제거(참조 1회 = 서브쿼리 재평가 1회라 서브플랜 4→3). prod EXPLAIN ANALYZE: 566ms, 후보 4→**19종목**(2026-07-21 이후 윈도우).
+- **주의**: ① 감지 밴드(`0.6`/`1.7`)는 그대로 — 이번 수정은 비교 *대상*을 못 찾던 문제이지 임계값 문제가 아니다. ② **이미 오염된 종목의 데이터는 코드 수정으로 복구되지 않는다** — `sync(ticker_codes=...)` 1회 재보정 필요(prod 쓰기 승인 대상, 미실행). ③ 분기 안전망(`resync_all_adjusted_candles`, 1/4/7/10월 1일)이 결국 덮지만 최대 3개월 오염이 남는다. ④ `partial_tickers` 경고는 Slack 미전송이라 부분 보정 실패가 조용히 묻힌다(미수정).
+- **참고 — 최근 구간 `adj_close` NULL은 정상**: `adj_*`는 분기 안전망과 분할 감지만 채우고 일일 KR 캔들 동기화는 건드리지 않는다. 분할 없는 종목은 factor가 1.0이라(삼성전자 2019·2022·2025 확인) NULL → 원주가 폴백으로 값이 맞다.
+
 ## 2026-06-11: 자회사 주식소각결정 공시가 모회사로 오귀속 (스크리너 소각비율 부풀림) — codex·OMC 교차검증
 
 - **원인**: `DartCompanyClient.fetch_cancellation_events`의 자회사 배제 필터(`row_stock_code != stock_code`)가 무력. DART `list.json`은 `corp_code`로 서버 필터되어 모든 row의 stock_code가 조회 대상(=공시 제출자) 코드 → 비교가 절대 성립 안 함. 모회사가 자회사(주로 비상장) 소각을 대신 공시한 "주식소각결정(자회사의 주요경영사항)"은 제출자=모회사라 stock_code도 모회사 → 키워드·stock_code 필터 둘 다 통과해 자회사 소각이 모회사 `annual_cancel_ratio`(8점)·`regular_buyback`(7점)을 부풀림. prod 실측 892건 중 **36건(21종목)** 오귀속, 35건은 소각수량까지 보유.

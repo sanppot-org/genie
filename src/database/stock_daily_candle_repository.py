@@ -1,11 +1,12 @@
 """StockDailyCandle Repository."""
 
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import date
 import logging
 
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.orm import aliased
 
 from src.database.base_repository import BaseRepository
 from src.database.models import StockDailyCandle
@@ -193,35 +194,42 @@ class StockDailyCandleRepository(BaseRepository[StockDailyCandle, int]):
         """since 이후 raw 종가가 직전 거래일 대비 밴드 밖으로 급변한 ticker_id 집합.
 
         분할·병합·권리락·감자 등 코퍼레이트 액션 후보(네이버 수정주가 소급 변경 대상).
-        LAG로 종목별 직전 거래일 종가를 구하고, 경계일의 직전값이 윈도우 밖이 되지 않도록
-        스캔 범위를 since보다 buffer만큼 앞에서 시작한다. 비교는 division 없이 곱셈으로.
-        raw close 기준(adj는 back-adjust돼 절벽이 이미 제거됨 → 감지 불가).
+        비교는 division 없이 곱셈으로. raw close 기준(adj는 back-adjust돼 절벽이 이미
+        제거됨 → 감지 불가).
+
+        직전 종가는 **거리 무관 상관 서브쿼리**로 구한다(윈도우 LAG 아님). 거래정지가
+        수 주~수 개월 이어지면 정지 이전 행이 스캔 윈도우 밖으로 나가 LAG가 NULL이 되고,
+        재개 시점의 감자·분할이 조용히 누락됐다. `ix_stock_daily_candles_ticker_id_date`
+        인덱스로 행당 1회 역방향 조회라 since 이후 행 수에만 비례한다.
         """
-        scan_from = since - timedelta(days=10)
-        prev_close = func.lag(StockDailyCandle.close).over(
-            partition_by=StockDailyCandle.ticker_id,
-            order_by=StockDailyCandle.date,
-        ).label("prev_close")
-        windowed = (
+        cur = aliased(StockDailyCandle, name="cur")
+        prv = aliased(StockDailyCandle, name="prv")
+        prev_close = (
+            select(prv.close)
+            .where(prv.ticker_id == cur.ticker_id, prv.date < cur.date)
+            .order_by(prv.date.desc())
+            .limit(1)
+            .correlate(cur)
+            .scalar_subquery()
+        )
+        scanned = (
             self.session.query(
-                StockDailyCandle.ticker_id.label("ticker_id"),
-                StockDailyCandle.date.label("date"),
-                StockDailyCandle.close.label("close"),
-                prev_close,
+                cur.ticker_id.label("ticker_id"),
+                cur.close.label("close"),
+                prev_close.label("prev_close"),
             )
-            .filter(StockDailyCandle.date >= scan_from)
+            .filter(cur.date >= since, cur.close > 0)
             .subquery()
         )
         rows = (
-            self.session.query(windowed.c.ticker_id)
+            self.session.query(scanned.c.ticker_id)
             .filter(
-                windowed.c.date >= since,
-                windowed.c.prev_close.isnot(None),
-                windowed.c.prev_close > 0,
-                windowed.c.close > 0,
+                # prev_close > 0 이 NULL(첫 거래일 = 비교 대상 없음)도 함께 걸러낸다.
+                # 별도 IS NOT NULL을 두지 않는 건 참조 1회가 곧 상관 서브쿼리 1회 재평가라서.
+                scanned.c.prev_close > 0,
                 or_(
-                    windowed.c.close < low * windowed.c.prev_close,
-                    windowed.c.close > high * windowed.c.prev_close,
+                    scanned.c.close < low * scanned.c.prev_close,
+                    scanned.c.close > high * scanned.c.prev_close,
                 ),
             )
             .distinct()
