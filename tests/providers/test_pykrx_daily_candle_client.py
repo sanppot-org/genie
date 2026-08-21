@@ -70,3 +70,22 @@ class TestFetchAdjustedByTicker:
             return_value=pd.DataFrame(),
         ), pytest.raises(EmptyPykrxResponseError):
             client.fetch_adjusted_by_ticker("005930", date(2018, 1, 1), date(2018, 1, 2))
+
+
+class TestFetchByDate:
+    def test_pykrx_컬럼누락_key_error_재시도후_빈응답에러(self) -> None:
+        """pykrx 내부의 예상 OHLCV 컬럼 누락도 빈 응답으로 정규화해 재시도한다."""
+        original_wait = PykrxDailyCandleClient.fetch_by_date.retry.wait  # type: ignore[attr-defined]
+        PykrxDailyCandleClient.fetch_by_date.retry.wait = wait_none()  # type: ignore[attr-defined]
+        try:
+            with patch(
+                "src.providers.pykrx_daily_candle_client.stock.get_market_ohlcv",
+                side_effect=KeyError("None of [Index(['시가', '고가'])] are in the [columns]"),
+            ) as mocked:
+                with pytest.raises(EmptyPykrxResponseError) as exc_info:
+                    PykrxDailyCandleClient().fetch_by_date(date(2026, 8, 21))
+
+            assert mocked.call_count == 3
+            assert isinstance(exc_info.value.__cause__, KeyError)
+        finally:
+            PykrxDailyCandleClient.fetch_by_date.retry.wait = original_wait  # type: ignore[attr-defined]

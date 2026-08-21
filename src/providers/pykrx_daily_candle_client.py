@@ -65,7 +65,14 @@ class PykrxDailyCandleClient:
     def fetch_by_date(self, base_date: date) -> list[PykrxDailyCandleSnapshot]:
         """base_date의 전 종목 일봉 스냅샷."""
         yyyymmdd = _to_yyyymmdd(base_date)
-        df = stock.get_market_ohlcv(yyyymmdd, market="ALL")
+        try:
+            df = stock.get_market_ohlcv(yyyymmdd, market="ALL")
+        except KeyError as e:
+            # KRX가 빈/비정상 표를 반환하면 pykrx가 내부에서 예상 OHLCV 컬럼을
+            # 선택하다 KeyError를 낸다. 정상적인 빈 응답과 동일하게 재시도한다.
+            raise EmptyPykrxResponseError(
+                "pykrx OHLCV response is missing expected columns — possible KRX outage"
+            ) from e
         if df is None or df.empty:
             raise EmptyPykrxResponseError(
                 "pykrx get_market_ohlcv returned empty — possible KRX outage"
