@@ -51,6 +51,23 @@ class TestPykrxFundamentalClient:
         ), pytest.raises(EmptyPykrxResponseError):
             client.fetch_by_date(date(2024, 1, 1))
 
+    def test_fetch_by_date_retries_pykrx_key_error_from_missing_columns(self) -> None:
+        """pykrx 내부의 예상 컬럼 누락 KeyError도 빈 응답으로 정규화해 재시도한다."""
+        original_wait = PykrxFundamentalClient.fetch_by_date.retry.wait  # type: ignore[attr-defined]
+        PykrxFundamentalClient.fetch_by_date.retry.wait = wait_none()  # type: ignore[attr-defined]
+        try:
+            with patch(
+                "src.providers.pykrx_fundamental_client.stock.get_market_fundamental",
+                side_effect=KeyError("None of [Index(['BPS', 'PER'])] are in the [columns]"),
+            ) as mocked:
+                with pytest.raises(EmptyPykrxResponseError) as exc_info:
+                    PykrxFundamentalClient().fetch_by_date(date(2026, 8, 21))
+
+            assert mocked.call_count == 3
+            assert isinstance(exc_info.value.__cause__, KeyError)
+        finally:
+            PykrxFundamentalClient.fetch_by_date.retry.wait = original_wait  # type: ignore[attr-defined]
+
     def test_holiday_pattern_all_zero_bps_raises_immediately(self) -> None:
         """휴장일 패턴(모든 BPS=0)은 KrxClosedDayError, 재시도 없이 즉시 raise."""
         df = _df({

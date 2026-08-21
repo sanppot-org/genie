@@ -136,6 +136,23 @@ class TestPykrxTickerClient:
         finally:
             PykrxTickerClient.fetch_all.retry.wait = original_wait  # type: ignore[attr-defined]
 
+    def test_fetch_all_retries_pykrx_index_error_from_empty_business_day_response(self) -> None:
+        """최근 영업일 조회 중 발생한 pykrx IndexError도 빈 응답으로 정규화해 재시도한다."""
+        original_wait = PykrxTickerClient.fetch_all.retry.wait  # type: ignore[attr-defined]
+        PykrxTickerClient.fetch_all.retry.wait = wait_none()  # type: ignore[attr-defined]
+        try:
+            with patch(
+                "src.providers.pykrx_ticker_client.stock.get_market_ticker_list",
+                side_effect=IndexError("index -1 is out of bounds for axis 0 with size 0"),
+            ) as mock_market:
+                with pytest.raises(EmptyPykrxResponseError) as exc_info:
+                    PykrxTickerClient().fetch_all()
+
+            assert mock_market.call_count == 3
+            assert isinstance(exc_info.value.__cause__, IndexError)
+        finally:
+            PykrxTickerClient.fetch_all.retry.wait = original_wait  # type: ignore[attr-defined]
+
     def test_base_date_none_passes_through_to_pykrx(self) -> None:
         """base_date 미지정 시 None을 그대로 pykrx에 전달한다 (pykrx 자동 처리)."""
         with (

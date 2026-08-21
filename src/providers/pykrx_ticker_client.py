@@ -120,7 +120,15 @@ class PykrxTickerClient:
         base_date=None이면 pykrx가 인접 영업일로 폴백하므로, 응답이 비어있다면
         장애로 간주하고 텀을 두고 재시도한다. 최종 실패 시 `EmptyPykrxResponseError` 전파.
         """
-        results = self.fetch_stock_tickers(base_date) + self.fetch_etf_tickers(base_date)
+        try:
+            results = self.fetch_stock_tickers(base_date) + self.fetch_etf_tickers(base_date)
+        except IndexError as e:
+            # date=None일 때 pykrx는 최근 영업일을 조회한 뒤 df.index[-1]을
+            # 사용한다. KRX가 빈 DataFrame을 반환하면 pykrx 내부에서 IndexError가
+            # 발생하므로, 빈 응답과 동일하게 정규화해 이 메서드의 재시도 정책을 탄다.
+            raise EmptyPykrxResponseError(
+                "pykrx failed to resolve the nearest business day from an empty KRX response"
+            ) from e
         if not results:
             raise EmptyPykrxResponseError("pykrx returned empty ticker list — possible KRX outage")
         return results

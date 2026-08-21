@@ -61,7 +61,14 @@ class PykrxFundamentalClient:
     def fetch_by_date(self, base_date: date | None = None) -> list[PykrxFundamentalSnapshot]:
         """base_date=None이면 pykrx가 인접 영업일로 폴백."""
         yyyymmdd = _to_yyyymmdd(base_date)
-        df = stock.get_market_fundamental(yyyymmdd, market="ALL")
+        try:
+            df = stock.get_market_fundamental(yyyymmdd, market="ALL")
+        except KeyError as e:
+            # KRX가 빈/비정상 표를 반환하면 pykrx가 내부에서 예상 컬럼을 먼저
+            # 선택하다 KeyError를 낸다. 정상적인 빈 응답과 동일하게 재시도한다.
+            raise EmptyPykrxResponseError(
+                "pykrx fundamental response is missing expected columns — possible KRX outage"
+            ) from e
         if df is None or df.empty:
             raise EmptyPykrxResponseError(
                 "pykrx get_market_fundamental returned empty — possible KRX outage"
